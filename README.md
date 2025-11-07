@@ -1,186 +1,386 @@
-# Poincaré Embeddings for NCBI Taxonomy
+# Poincaré Embeddings for NCBI Taxonomy (TaxEmbed)
 
-Learning hierarchical embeddings of organisms using Poincaré geometry.
+**Learn hierarchical embeddings of 2.7M+ organisms using hyperbolic geometry.**
 
-This project builds on the [PyTorch implementation of Poincaré Embeddings](https://github.com/facebookresearch/poincare-embeddings) by Nickel & Kiela (2017), adapted to embed the NCBI taxonomy dataset.
+This project learns embeddings of the complete NCBI taxonomy in **hyperbolic (Poincaré) space**, where taxonomically related organisms (primates, mammals, bacteria) naturally cluster together, preserving the hierarchical tree structure.
 
-## Overview
+Built on [Nickel & Kiela (2017)](http://papers.nips.cc/paper/7213-poincare-embeddings-for-learning-hierarchical-representations.pdf).
 
-This project learns low-dimensional embeddings of ~2.7M organisms from the NCBI taxonomy in hyperbolic space. Taxonomically related organisms (e.g., primates, mammals) are closer together in the embedding space, capturing the hierarchical structure of biological taxonomy.
+## 🚀 Quick Start (5 Minutes)
 
-## Key Features
+### Installation
 
-- Embeddings of 2.7M+ organisms from NCBI taxonomy
-- Hyperbolic geometry for natural hierarchy representation
-- Real-time training monitoring with clustering quality metrics
-- Per-epoch checkpointing for early stopping
-- Fixed initialization and data loading for proper training
+```bash
+# 1. Clone repository
+git clone https://github.com/jcoludar/taxembed.git
+cd taxembed
 
-## Project Structure
+# 2. Create environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Build C++ extensions
+python setup.py build_ext --inplace
+```
+
+### Train Your First Model (Small Dataset)
+
+```bash
+# Train for 50 epochs on 111K organisms
+python embed.py \
+  -dset data/taxonomy_edges_small.mapped.edgelist \
+  -checkpoint my_model.pth \
+  -dim 10 -epochs 50 -negs 50 -burnin 10 \
+  -batchsize 32 -model distance -manifold poincare \
+  -lr 0.1 -gpu -1 -ndproc 1 -train_threads 1 \
+  -eval_each 999999 -fresh
+```
+
+Training takes ~5 minutes. You'll see:
+```
+Epoch 0: loss=3.94
+Epoch 10: loss=3.21
+Epoch 50: loss=2.32  ✓ Model learned!
+```
+
+### Visualize Results
+
+```bash
+# Highlight primates in UMAP projection
+python scripts/visualize_embeddings.py my_model.pth --highlight primates
+
+# Output: umap_my_model_primates_highlighted.png
+# Shows all organisms with primates (394) colored red
+```
+
+### Check Nearest Neighbors
+
+The visualization automatically shows nearest neighbors:
+```
+Homo sapiens (Human):
+  1. TaxID 63221 (distance: 0.0007)  ← Other primate!
+  2. TaxID 67983 (distance: 0.223)
+```
+
+**That's it!** You've trained embeddings and visualized them. 🎉
+
+## 📖 What Are Poincaré Embeddings?
+
+### The Problem
+Traditional embeddings use **Euclidean space** (flat), but hierarchies grow exponentially:
+- Root: 1 node
+- Level 1: 10 nodes  
+- Level 2: 100 nodes
+- Level 3: 1,000 nodes
+
+You need exponentially growing dimensions to fit this in flat space!
+
+### The Solution
+**Hyperbolic space** (Poincaré disk) has:
+- Exponentially growing space as you move from center
+- Perfect for trees: root near center, leaves near boundary
+- Can represent exponential growth in constant dimensions
+
+**Visual:**
+```
+Poincaré Disk (hyperbolic space)
+         ___________
+       /             \
+      |  (Primates)  |  ← Organisms cluster by taxonomy
+      |              |
+      | Mammals      |  ← Related groups near each other
+      |              |
+      |    Bacteria →|  ← Distance = taxonomic distance
+       \            /
+         ----------
+     center = root
+     boundary = leaves
+```
+
+### Your Data
+**Input:** Parent-child relationships from NCBI taxonomy
+```
+Homo sapiens (9606) → Homo (9605)
+Homo (9605) → Homininae (207598)
+Homininae → Hominidae → Primates → Mammalia → ...
+```
+
+**Output:** One 10-dimensional vector per organism
+```
+embed[Homo_sapiens]  = [0.15, 0.23, ..., 0.45]
+embed[other_primate] = [0.16, 0.24, ..., 0.44]  ← Very close!
+embed[E_coli]        = [-0.80, 0.02, ..., 0.10] ← Far away!
+```
+
+**Training:** Make related organisms close, unrelated organisms far
+- Parent-child distance: ~0.1-0.5 (small)
+- Random pair distance: ~1.0-2.0 (large)
+
+**See [`POINCARE_EMBEDDINGS_EXPLAINED.md`](POINCARE_EMBEDDINGS_EXPLAINED.md) for full technical explanation.**
+
+## 🎯 Usage Examples
+
+### Basic Training
+
+```bash
+# Small dataset (111K organisms, ~5 min)
+python embed.py \
+  -dset data/taxonomy_edges_small.mapped.edgelist \
+  -checkpoint model_small.pth \
+  -dim 10 -epochs 50 -negs 50 -burnin 10 \
+  -batchsize 32 -model distance -manifold poincare \
+  -lr 0.1 -gpu -1 -ndproc 1 -train_threads 1 \
+  -eval_each 999999 -fresh
+
+# Full dataset (2.7M organisms, ~1 hour)
+python embed.py \
+  -dset data/taxonomy_edges.mapped.edgelist \
+  -checkpoint model_full.pth \
+  -dim 10 -epochs 200 -negs 50 -burnin 10 \
+  -batchsize 32 -model distance -manifold poincare \
+  -lr 0.1 -gpu -1 -ndproc 1 -train_threads 1 \
+  -eval_each 999999 -fresh
+```
+
+### Visualization Options
+
+```bash
+# Highlight any taxonomic group
+python scripts/visualize_embeddings.py model.pth --highlight primates
+python scripts/visualize_embeddings.py model.pth --highlight mammals
+python scripts/visualize_embeddings.py model.pth --highlight bacteria
+
+# Show only specific group
+python scripts/visualize_embeddings.py model.pth --only primates
+
+# Custom sample size with nearest neighbors
+python scripts/visualize_embeddings.py model.pth --sample 50000 --nearest 10
+
+# Supported groups: primates, mammals, vertebrates, bacteria, archaea, fungi, plants, insects, rodents
+```
+
+### Data Validation
+
+```bash
+# Always validate data before training
+python scripts/validate_data.py small
+python scripts/validate_data.py full
+```
+
+## 📁 Project Structure
 
 ```
 taxembed/
-├── src/
-│   └── taxembed/              # Main package
-│       ├── __init__.py
-│       ├── manifolds/         # Hyperbolic manifold implementations
-│       ├── models/            # Embedding models
-│       ├── data/              # Data loading and processing
-│       └── utils/             # Utility functions
-├── scripts/                   # Standalone scripts
-│   ├── prepare_taxonomy_data.py
-│   ├── remap_edges.py
-│   ├── train.py
-│   ├── evaluate.py
-│   └── visualize.py
-├── data/                      # Data directory (gitignored)
+├── embed.py                   # ⭐ Main training script
+├── prepare_taxonomy_data.py   # Data preparation
+├── remap_edges.py             # TaxID remapping
+├── evaluate_full.py           # Evaluation
+│
+├── scripts/                   # Utility scripts
+│   ├── visualize_embeddings.py  # ⭐ Universal visualization
+│   ├── validate_data.py         # ⭐ Data validation
+│   ├── cleanup_repo.sh          # Repository cleanup
+│   └── regenerate_data.sh       # Data regeneration
+│
+├── src/taxembed/              # Source package
+│   ├── manifolds/             # Hyperbolic geometry
+│   ├── models/                # Embedding models
+│   ├── datasets/              # Data loaders
+│   └── utils/                 # Utilities
+│
+├── hype/                      # Original package (backward compat)
 ├── tests/                     # Unit tests
-├── pyproject.toml             # Project configuration (uv)
-├── ruff.toml                  # Ruff linter configuration
-└── README.md                  # This file
+├── data/                      # Data files (gitignored)
+│
+├── pyproject.toml             # Project config
+├── ruff.toml                  # Linter config
+├── Makefile                   # Convenience commands
+└── [12 documentation files]   # See below
 ```
 
-## Installation
+## 📚 Documentation
 
-### Prerequisites
+### For Users
+- **[README.md](README.md)** ⭐ This file - quick start and overview
+- **[QUICKSTART.md](QUICKSTART.md)** - Detailed quick start guide
+- **[SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md)** ⭐ Complete script reference
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Comprehensive setup guide
 
-- Python 3.8+
-- [uv](https://github.com/astral-sh/uv) (fast Python package installer)
+### Understanding Poincaré Embeddings
+- **[POINCARE_EMBEDDINGS_EXPLAINED.md](POINCARE_EMBEDDINGS_EXPLAINED.md)** ⭐ Technical explanation
+- **[TRAINING_EXPLAINED_SIMPLE.md](TRAINING_EXPLAINED_SIMPLE.md)** ⭐ Simple explanation with examples
 
-### Setup
+### Project Information
+- **[STRUCTURE.md](STRUCTURE.md)** - Project organization
+- **[DATA_FIXES_SUMMARY.md](DATA_FIXES_SUMMARY.md)** - Data bug fixes
+- **[CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md)** - Repository cleanup
+- **[REPOSITORY_STATUS.md](REPOSITORY_STATUS.md)** - Current status
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 
-1. Clone the repository:
+## 🔬 Technical Details
+
+### Training Parameters
+
+| Parameter | Small Dataset | Full Dataset | Meaning |
+|-----------|--------------|--------------|---------|
+| `--dim` | 10 | 10-50 | Embedding dimension |
+| `--epochs` | 50 | 200+ | Training epochs |
+| `--negs` | 50 | 50 | Negative samples per positive |
+| `--burnin` | 10 | 10 | Burn-in epochs (low LR) |
+| `--batchsize` | 32 | 32-128 | Batch size |
+| `--lr` | 0.1 | 0.1 | Learning rate |
+
+### Model Architecture
+
+- **Manifold:** Poincaré ball model of hyperbolic space
+- **Distance:** Poincaré distance (not Euclidean)
+- **Optimizer:** Riemannian SGD (respects curved geometry)
+- **Loss:** Margin-based ranking loss
+- **Initialization:** Small random vectors (norm ~ 0.1)
+
+### Data Format
+
+**Edge List (parent-child):**
+```
+0 1      # TaxID 2 → TaxID 131567
+2 3      # TaxID 6 → TaxID 335928
+...
+```
+
+**Mapping File:**
+```
+taxid   idx
+2       0
+131567  1
+6       2
+...
+```
+
+## 🛠️ Advanced Usage
+
+### Custom Dimensions
 ```bash
-git clone https://github.com/jcoludar/taxembed.git
-cd taxembed
+# Try different embedding dimensions
+python embed.py -dset data/... -checkpoint model_d5.pth -dim 5 ...
+python embed.py -dset data/... -checkpoint model_d20.pth -dim 20 ...
+python embed.py -dset data/... -checkpoint model_d50.pth -dim 50 ...
 ```
 
-2. Install dependencies using uv:
+### Different Manifolds
 ```bash
-uv sync
+# Poincaré (default, recommended)
+python embed.py ... -manifold poincare
+
+# Lorentz (alternative hyperbolic model)
+python embed.py ... -manifold lorentz
 ```
 
-3. Build C++ extensions:
+### GPU Training
 ```bash
-uv run python setup.py build_ext --inplace
+# Use GPU if available
+python embed.py ... -gpu 0
 ```
 
-## Quick Start
-
-### Prepare Data
-
+### Resume Training
 ```bash
-uv run python scripts/prepare_taxonomy_data.py
-uv run python scripts/remap_edges.py
+# Remove -fresh flag to resume from checkpoint
+python embed.py ... -checkpoint model.pth  # (no -fresh)
 ```
 
-### Train Model
+## 🧪 Validation & Testing
 
+### Data Validation
 ```bash
-uv run python scripts/train.py \
-  --dataset data/taxonomy_edges.mapped.edgelist \
-  --checkpoint taxonomy_model.pth \
-  --dim 10 \
-  --epochs 50 \
-  --negs 50 \
-  --burnin 10 \
-  --batchsize 32 \
-  --model distance \
-  --manifold poincare \
-  --lr 0.1 \
-  --ndproc 1 \
-  --eval-each 999999 \
-  --fresh
+# Check data quality
+python scripts/validate_data.py small
+python scripts/validate_data.py full
 ```
 
-### Monitor Training
-
-In a separate terminal:
+### Run Tests
 ```bash
-uv run python scripts/monitor_training.py
+# Unit tests
+python -m pytest tests/
+
+# With coverage
+python -m pytest --cov=src/taxembed tests/
 ```
 
-Shows real-time clustering quality (primate distances vs random pairs).
-
-### Evaluate and Visualize
-
+### Lint Code
 ```bash
-uv run python scripts/evaluate.py --checkpoint taxonomy_model.pth
-uv run python scripts/visualize.py --checkpoint taxonomy_model.pth
+# Check style
+ruff check src/ scripts/
+
+# Auto-fix
+ruff check --fix src/ scripts/
+
+# Format
+ruff format src/ scripts/
 ```
 
-## Development
+## 🚧 Future Extensions (Roadmap)
 
-### Code Quality
+### 1. Species Names (Text Integration)
+Add text encoder to learn from species names alongside graph structure.
 
-This project uses **ruff** for linting and code quality checks.
+**Use Cases:**
+- Text-based queries: "find species like 'sapiens'"
+- Handle synonyms and typos
+- Cross-lingual support
 
-Run linting:
-```bash
-uv run ruff check src/ scripts/
-```
+**Implementation:**
+- Add BERT/BioBERT encoder
+- Joint loss: graph structure + text similarity
+- See [POINCARE_EMBEDDINGS_EXPLAINED.md](POINCARE_EMBEDDINGS_EXPLAINED.md) for details
 
-Fix linting issues automatically:
-```bash
-uv run ruff check --fix src/ scripts/
-```
+### 2. Protein Embeddings
+Incorporate protein sequence embeddings for each organism.
 
-Format code:
-```bash
-uv run ruff format src/ scripts/
-```
+**Use Cases:**
+- Find organisms by protein function
+- Cluster by proteome similarity
+- Better organism disambiguation
 
-### Running Tests
+**Implementation:**
+- Use ESM/ProtT5 protein embeddings
+- Aggregate proteins per organism
+- Multi-modal embedding space
 
-```bash
-uv run pytest
-```
+### 3. Additional Features
+Add organism features: genome size, GC content, habitat, etc.
 
-With coverage:
-```bash
-uv run pytest --cov=src/taxembed
-```
+**Use Cases:**
+- Predict missing features
+- Find organisms by phenotype
+- Better downstream predictions
 
-## Dependencies
+**Implementation:**
+- Feature vectors per organism
+- Graph Neural Network architecture
+- Joint embedding of structure + features
 
-### Core
-- **PyTorch** - Deep learning framework
-- **NumPy** - Numerical computing
-- **Pandas** - Data manipulation
-- **Cython** - Performance optimization
-- **tqdm** - Progress bars
+### 4. Word Descriptions
+Add natural language descriptions of organisms.
 
-### Optional
-- **UMAP** - Dimensionality reduction for visualization
-- **Matplotlib** - Plotting and visualization
-- **scikit-learn** - Machine learning utilities
+**Use Cases:**
+- Semantic search
+- Generate organism descriptions
+- Link to literature
 
-### Development
-- **Ruff** - Fast Python linter and formatter
-- **Pytest** - Testing framework
+**Implementation:**
+- Sentence embeddings (Sentence-BERT)
+- Align with taxonomy embeddings
+- Enable text-to-organism mapping
 
-## Configuration
+**Status:** Currently, we focus on graph structure (works excellently for hierarchy). Extensions will be added based on use cases.
 
-### Ruff Configuration
+## 🤝 Contributing
 
-Ruff is configured in `ruff.toml` with the following settings:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-- **Line length**: 100 characters
-- **Target Python version**: 3.8+
-- **Enabled rules**: E, W, F, I, C, B, UP (pycodestyle, pyflakes, isort, comprehensions, bugbear, pyupgrade)
-- **Ignored rules**: E501 (line too long), W503 (line break before binary operator)
-
-### Project Configuration
-
-All project metadata and dependencies are defined in `pyproject.toml` following PEP 518 standards.
-
-## Documentation
-
-- `IMPLEMENTATION_NOTES.md` - Detailed technical notes on fixes and improvements
-- `TRAINING_SUMMARY.md` - Training results and metrics
-- `FINAL_ASSESSMENT.md` - Quality assessment
-
-## References
+## 🎓 Citation
 
 If you find this code useful for your research, please cite the following paper:
 
