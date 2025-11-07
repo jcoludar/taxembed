@@ -1,18 +1,58 @@
+# Python
+*.py[cod]
+*$py.class
+__pycache__/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+env/
+venv/
+venv311/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Project specific - Model checkpoints
 *.pth
 *.pth.*
-*.so
-build
-__pycache__
-wordnet/*.csv
-hype/adjacency_matrix_dataset.cpp
-hype/graph_dataset.cpp
-.idea
-venv
-venv311
-data
-.DS_Store
+
+# Project specific - Generated files
 *.log
 training*.log
 nohup.out
+
+# Project specific - Visualizations
 *.png
+*.jpg
 umap*.png
+
+# Project specific - Data
+data/
+wordnet/*.csv
+
+# Project specific - Compiled extensions
+hype/adjacency_matrix_dataset.cpp
+hype/graph_dataset.cpp
+*.so
+
+# macOS
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Ruff
+.ruff_cache/

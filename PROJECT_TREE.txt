@@ -1,0 +1,123 @@
+taxembed/
+│
+├── 📁 src/
+│   └── 📁 taxembed/                    # Main package (src/ layout)
+│       ├── __init__.py                 # Package initialization
+│       ├── 📁 manifolds/               # Hyperbolic manifold implementations
+│       │   └── __init__.py
+│       ├── 📁 models/                  # Embedding models
+│       │   └── __init__.py
+│       ├── 📁 datasets/                # Data loading and processing
+│       │   └── __init__.py
+│       └── 📁 utils/                   # Utility functions
+│           └── __init__.py
+│
+├── 📁 scripts/                         # Standalone executable scripts
+│   ├── train.py                        # Main training script
+│   ├── prepare_data.py                 # Data preparation wrapper
+│   ├── remap_data.py                   # ID remapping wrapper
+│   ├── monitor.py                      # Training monitoring wrapper
+│   ├── evaluate.py                     # Model evaluation wrapper
+│   └── visualize.py                    # Visualization wrapper
+│
+├── 📁 tests/                           # Unit and integration tests
+│   ├── __init__.py
+│   └── test_example.py                 # Example test module
+│
+├── 📁 data/                            # Data directory (gitignored)
+│   ├── taxonomy_edges.edgelist         # Raw edge list
+│   ├── taxonomy_edges.mapped.edgelist  # Remapped edge list
+│   └── taxonomy_edges.mapping.tsv      # ID mapping
+│
+├── 📁 hype/                            # Original package (backward compatibility)
+│   ├── __init__.py
+│   ├── manifolds/
+│   ├── models/
+│   └── ... (original structure)
+│
+├── 📄 pyproject.toml                   # Project configuration (uv)
+├── 📄 ruff.toml                        # Ruff linter configuration
+├── 📄 Makefile                         # Convenient command shortcuts
+├── 📄 setup.py                         # Setup script for C++ extensions
+│
+├── 📄 README.md                        # Main project documentation
+├── 📄 QUICKSTART.md                    # Quick start guide
+├── 📄 GETTING_STARTED.md               # Getting started guide
+├── 📄 STRUCTURE.md                     # Project organization documentation
+├── 📄 CONTRIBUTING.md                  # Contribution guidelines
+├── 📄 RESTRUCTURING_SUMMARY.md         # Migration guide
+├── 📄 RESTRUCTURING_COMPLETE.md        # Restructuring summary
+├── 📄 PROJECT_TREE.txt                 # This file
+│
+├── 📄 LICENSE                          # CC-BY-NC 4.0 license
+├── 📄 .gitignore                       # Git ignore rules
+│
+└── 📁 .git/                            # Git repository
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 STATISTICS
+
+Files Created:
+  - Configuration: 3 (pyproject.toml, ruff.toml, Makefile)
+  - Documentation: 7 (README.md, QUICKSTART.md, GETTING_STARTED.md, etc.)
+  - Source Code: 5 (__init__.py files in src/taxembed/)
+  - Scripts: 6 (train.py, prepare_data.py, remap_data.py, etc.)
+  - Tests: 2 (__init__.py, test_example.py)
+  - Other: 2 (.gitignore, PROJECT_TREE.txt)
+
+Total New Files: 25+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 KEY DIRECTORIES
+
+src/taxembed/              → Main package code (src/ layout best practice)
+scripts/                   → Standalone executable scripts
+tests/                     → Unit and integration tests
+data/                      → Data files (gitignored)
+hype/                      → Original package (backward compatible)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION HIERARCHY
+
+START HERE:
+  └─ GETTING_STARTED.md (5-minute setup)
+     ├─ QUICKSTART.md (detailed quick start)
+     ├─ README.md (full documentation)
+     ├─ STRUCTURE.md (project organization)
+     ├─ CONTRIBUTING.md (development guidelines)
+     └─ RESTRUCTURING_SUMMARY.md (what changed)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚙️ COMMON COMMANDS
+
+make help              → Show all available commands
+make install           → Install dependencies with uv
+make build             → Build C++ extensions
+make lint              → Check code with ruff
+make format            → Format code with ruff
+make test              → Run tests with pytest
+make test-cov          → Run tests with coverage
+make clean             → Clean build artifacts
+
+uv run python scripts/train.py --help
+uv run python scripts/prepare_data.py
+uv run python scripts/evaluate.py --checkpoint model.pth
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ FEATURES
+
+✅ Professional Python project layout (src/ layout)
+✅ Fast dependency management with uv
+✅ Code quality enforcement with ruff
+✅ Comprehensive documentation
+✅ Testing framework (pytest)
+✅ Convenient Makefile commands
+✅ Backward compatibility maintained
+✅ IDE-ready with type hints support
+
+═══════════════════════════════════════════════════════════════════════════════

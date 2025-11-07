@@ -100,6 +100,13 @@ def main():
     df.to_csv(output_file, index=False)
     print(f"\n✓ Saved edge list to {output_file}")
     
+    # Also create edgelist format (no header, whitespace-separated)
+    edgelist_file = output_file.with_suffix('.edgelist')
+    with open(edgelist_file, 'w') as f:
+        for _, row in df.iterrows():
+            f.write(f"{int(row['id1'])} {int(row['id2'])}\n")
+    print(f"✓ Saved edgelist to {edgelist_file}")
+    
     # Print statistics
     print(f"\nStatistics:")
     print(f"  Total edges: {len(df)}")
