@@ -78,12 +78,12 @@ cdef class BatchedDataset:
         self.queue = queue.Queue(maxsize=num_workers)
 
     # Setup the weights datastructure and sampling tables
-    def _mk_weights(self, npc.ndarray[npc.long_t, ndim=2] idx, npc.ndarray[npc.double_t, ndim=1] weights):
+    def _mk_weights(self, npc.ndarray[npc.int64_t, ndim=2] idx, npc.ndarray[npc.float64_t, ndim=1] weights):
         cdef int i
         cdef long t, h
         cdef set Tl, Th
-        cdef npc.ndarray[npc.long_t, ndim=1] A
-        cdef npc.ndarray[npc.double_t, ndim=1] S
+        cdef npc.ndarray[npc.int64_t, ndim=1] A
+        cdef npc.ndarray[npc.float64_t, ndim=1] S
 
         self._weights.resize(self.N)
 
@@ -100,7 +100,7 @@ cdef class BatchedDataset:
             # See Lua Torch impl: https://github.com/torch/torch7/blob/master/lib/TH/generic/THTensorRandom.c
             # Alias method: https://en.wikipedia.org/wiki/Alias_method
             S = (self.counts / np.sum(self.counts)) * self.counts.shape[0]
-            A = np.arange(0, self.counts.shape[0], dtype=np.long)
+            A = np.arange(0, self.counts.shape[0], dtype=np.int64)
             Tl = set(list((S < 1).nonzero()[0]))
             Th = set(list((S > 1).nonzero()[0]))
 

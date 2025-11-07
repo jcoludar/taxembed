@@ -8,5 +8,11 @@ hype/adjacency_matrix_dataset.cpp
 hype/graph_dataset.cpp
 .idea
 venv
+venv311
 data
 .DS_Store
+*.log
+training*.log
+nohup.out
+*.png
+umap*.png

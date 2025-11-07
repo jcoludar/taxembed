@@ -66,14 +66,14 @@ cdef class AdjacencyDataset:
 
         cdef long j, k, i, start, end
         cdef set Tl, Th
-        cdef npc.ndarray[npc.long_t, ndim=1] A
-        cdef npc.ndarray[npc.double_t, ndim=1] S
+        cdef npc.ndarray[npc.int64_t, ndim=1] A
+        cdef npc.ndarray[npc.float64_t, ndim=1] S
 
         self.counts = np.bincount(self.neighbors, weights=self.weights, minlength=self.N)
         self.counts = self.counts ** self._sample_dampening
 
         S = (self.counts / np.sum(self.counts)) * self.counts.shape[0]
-        A = np.arange(0, self.counts.shape[0], dtype=np.long)
+        A = np.arange(0, self.counts.shape[0], dtype=np.int64)
         Tl = set(list((S < 1).nonzero()[0]))
         Th = set(list((S > 1).nonzero()[0]))
 

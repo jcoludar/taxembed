@@ -76,7 +76,14 @@ def load_adjacency_matrix(path, format='hdf5', symmetrize=False, objects=None):
 
 
 def load_edge_list(path, symmetrize=False):
-    df = pandas.read_csv(path, usecols=['id1', 'id2', 'weight'], engine='c')
+    # Try to load as CSV with columns, fall back to plain edgelist format
+    try:
+        df = pandas.read_csv(path, usecols=['id1', 'id2', 'weight'], engine='c')
+    except ValueError:
+        # Plain edgelist format: whitespace-separated, no header
+        df = pandas.read_csv(path, sep=r'\s+', header=None, names=['id1', 'id2'], engine='python')
+        df['weight'] = 1.0
+    
     df.dropna(inplace=True)
     if symmetrize:
         rev = df.copy().rename(columns={'id1' : 'id2', 'id2' : 'id1'})

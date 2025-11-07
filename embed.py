@@ -5,11 +5,19 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+# Suppress PyTorch verbose logging on startup
+import os
+os.environ['TORCH_CPP_LOG_LEVEL'] = 'ERROR'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import torch as th
 import numpy as np
 import logging
 import argparse
-from hype.adjacency_matrix_dataset import AdjacencyDataset
+try:
+    from hype.adjacency_matrix_dataset import AdjacencyDataset
+except Exception:
+    AdjacencyDataset = None
 from hype import train
 from hype.graph import load_adjacency_matrix, load_edge_list, eval_reconstruction
 from hype.checkpoint import LocalCheckpoint
@@ -20,7 +28,12 @@ import torch.multiprocessing as mp
 import shutil
 from hype.graph_dataset import BatchedDataset # @manual=fbcode//deeplearning/projects/hyperbolic-embeddings:graph_dataset/hype/graph_dataset
 from hype import MANIFOLDS, MODELS, build_model
-from hype.hypernymy_eval import main as hype_eval
+
+# Optional import for hypernymy evaluation
+try:
+    from hype.hypernymy_eval import main as hype_eval
+except ImportError:
+    hype_eval = None
 
 th.manual_seed(42)
 np.random.seed(42)
@@ -47,6 +60,8 @@ def reconstruction_eval(adj, opt, epoch, elapsed, loss, pth, best):
 
 
 def hypernymy_eval(epoch, elapsed, loss, pth, best):
+    if hype_eval is None:
+        raise RuntimeError("hypernymysuite is not installed. Install it or use -eval reconstruction")
     _, summary = hype_eval(pth, cpu=True)
     return {
         'epoch': epoch,
@@ -147,16 +162,27 @@ def main():
     log = logging.getLogger('lorentz')
     logging.basicConfig(level=log_level, format='%(message)s', stream=sys.stdout)
 
+    # set device - try MPS first on Apple Silicon, then CUDA, then CPU
+    if th.backends.mps.is_available() and opt.gpu >= 0:
+        device = th.device('mps')
+        log.info('Using Apple Silicon GPU (MPS)')
+        # MPS doesn't support float64, use float32
+        th.set_default_tensor_type('torch.FloatTensor')
+    else:
+        # set default tensor type to float64 for CPU/CUDA
+        th.set_default_tensor_type('torch.DoubleTensor')
+        if opt.gpu >= 0 and th.cuda.is_available():
+            device = th.device(f'cuda:{opt.gpu}')
+            log.info(f'Using CUDA GPU {opt.gpu}')
+        else:
+            device = th.device('cpu')
+            log.info('Using CPU')
+    
     if opt.gpu >= 0 and opt.train_threads > 1:
         opt.gpu = -1
         log.warning(f'Specified hogwild training with GPU, defaulting to CPU...')
 
-    # set default tensor type
-    th.set_default_tensor_type('torch.DoubleTensor')
-    # set device
-    device = th.device(f'cuda:{opt.gpu}' if opt.gpu >= 0 else 'cpu')
-
-    if 'csv' in opt.dset:
+    if 'csv' in opt.dset or 'edgelist' in opt.dset:
         log.info('Using edge list dataloader')
         idx, objects, weights = load_edge_list(opt.dset, opt.sym)
         data = BatchedDataset(idx, objects, weights, opt.negs, opt.batchsize,
@@ -196,15 +222,36 @@ def main():
     model.load_state_dict(state['model'])
     opt.epoch_start = state['epoch']
 
-    adj = {}
-    for inputs, _ in data:
-        for row in inputs:
-            x = row[0].item()
-            y = row[1].item()
-            if x in adj:
+    # Build adjacency dict from data - optimize by loading directly from file
+    # This is much faster than iterating through batches
+    log.info('Building adjacency structure from edge list...')
+    from collections import defaultdict
+    adj = defaultdict(set)
+    with open(opt.dset, 'r') as f:
+        # Check if file has header by peeking at first line
+        first_line = f.readline().strip()
+        
+        # Try to parse first line as integers - if it fails, it's a header
+        has_header = False
+        try:
+            parts = first_line.split()
+            int(parts[0])
+            int(parts[1])
+            # It's data, not a header - reset file pointer
+            f.seek(0)
+        except (ValueError, IndexError):
+            # It's a header - skip it (already read it)
+            has_header = True
+        
+        for i, line in enumerate(f):
+            if i % 100000 == 0:
+                log.info(f'  Processed {i:,} edges...')
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                x = int(parts[0])
+                y = int(parts[1])
                 adj[x].add(y)
-            else:
-                adj[x] = {y}
+    log.info(f'Built adjacency with {len(adj):,} nodes')
 
     controlQ, logQ = mp.Queue(), mp.Queue()
     control_thread = mp.Process(target=async_eval, args=(adj, controlQ, logQ, opt))
@@ -258,6 +305,13 @@ def main():
         lmsg, pth = logQ.get()
         shutil.move(pth, opt.checkpoint)
         log.info(f'json_stats: {json.dumps(lmsg)}')
+    
+    # Always save final model (enables early stopping)
+    log.info(f'Saving final model to {opt.checkpoint}...')
+    th.save({
+        "state_dict": model.state_dict(),
+        "objects": objects
+    }, opt.checkpoint)
 
 
 if __name__ == '__main__':

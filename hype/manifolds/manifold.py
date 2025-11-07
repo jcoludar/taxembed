@@ -23,7 +23,7 @@ class Manifold:
         """
         raise NotImplementedError
 
-    def init_weights(self, w, scale=1e-4):
+    def init_weights(self, w, scale=0.1):
         w.weight.data.uniform_(-scale, scale)
 
     @abstractmethod

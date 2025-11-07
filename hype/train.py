@@ -8,6 +8,7 @@
 import torch as th
 import timeit
 import gc
+import os
 from tqdm import tqdm
 from torch.utils import data as torch_data
 
@@ -48,6 +49,7 @@ def train(
                 log.info(f"Burn in negs={data.nnegatives()}, lr={lr}")
 
         loader_iter = tqdm(loader) if progress and rank == 1 else loader
+        elapsed = 0.0
         for i_batch, (inputs, targets) in enumerate(loader_iter):
             elapsed = timeit.default_timer() - t_start
             inputs = inputs.to(device)
@@ -66,6 +68,9 @@ def train(
             loss.backward()
             optimizer.step(lr=lr, counts=counts)
             epoch_loss[i_batch] = loss.cpu().item()
+        
+        # Calculate elapsed time for entire epoch
+        elapsed = timeit.default_timer() - t_start
         if rank == 1:
             if hasattr(data, "avg_queue_size"):
                 qsize = data.avg_queue_size()
@@ -87,5 +92,15 @@ def train(
                 )
             if checkpointer and hasattr(ctrl, "checkpoint") and ctrl.checkpoint:
                 checkpointer(model, epoch, epoch_loss)
+            
+            # Save checkpoint every epoch for early stopping
+            if rank == 1 and hasattr(opt, 'checkpoint'):
+                checkpoint_path = opt.checkpoint.replace('.pth', f'_epoch{epoch}.pth')
+                th.save({
+                    "state_dict": model.state_dict(),
+                    "epoch": epoch,
+                    "loss": th.mean(epoch_loss).item()
+                }, checkpoint_path)
+                log.info(f"Saved checkpoint: {checkpoint_path}")
 
         gc.collect()
