@@ -1,42 +1,79 @@
-* Poincaré Embeddings for Learning Hierarchical Representations
+* Poincaré Embeddings for NCBI Taxonomy
 
-PyTorch implementation of [[https://papers.nips.cc/paper/7213-poincare-embeddings-for-learning-hierarchical-representations][Poincaré Embeddings for Learning Hierarchical Representations]]
+Learning hierarchical embeddings of organisms using Poincaré geometry.
 
-[[file:wn-nouns.jpg]]
+This project builds on the [[https://github.com/facebookresearch/poincare-embeddings][PyTorch implementation of Poincaré Embeddings]] by Nickel & Kiela (2017), adapted to embed the NCBI taxonomy dataset.
+
+** Overview
+
+This project learns low-dimensional embeddings of ~2.7M organisms from the NCBI taxonomy in hyperbolic space. Taxonomically related organisms (e.g., primates, mammals) are closer together in the embedding space, capturing the hierarchical structure of biological taxonomy.
+
+** Key Features
+
+- Embeddings of 2.7M+ organisms from NCBI taxonomy
+- Hyperbolic geometry for natural hierarchy representation
+- Real-time training monitoring with clustering quality metrics
+- Per-epoch checkpointing for early stopping
+- Fixed initialization and data loading for proper training
 
 ** Installation
-Simply clone this repository via
+
 #+BEGIN_SRC sh
-  git clone https://github.com/facebookresearch/poincare-embeddings.git
-  cd poincare-embeddings
-  conda env create -f environment.yml
-  source activate poincare
+  git clone https://github.com/jcoludar/taxembed.git
+  cd taxembed
+  python -m venv venv
+  source venv/bin/activate
+  pip install -r requirements.txt
   python setup.py build_ext --inplace
 #+END_SRC
 
-** Example: Embedding WordNet Mammals
-To embed the transitive closure of the WordNet mammals subtree, first generate the data via
+** Quick Start
+
+*** Prepare Data
 #+BEGIN_SRC sh
-  cd wordnet
-  python transitive_closure.py
+  python prepare_taxonomy_data.py
+  python remap_edges.py
 #+END_SRC
-This will generate the transitive closure of the full noun hierarchy as well as of the mammals subtree of WordNet.
 
-To embed the mammals subtree in the reconstruction setting (i.e., without missing data), go to the /root directory/ of the project and run
+*** Train Model
 #+BEGIN_SRC sh
-  ./train-mammals.sh
+  python embed.py \
+    -dset data/taxonomy_edges.mapped.edgelist \
+    -checkpoint taxonomy_model.pth \
+    -dim 10 \
+    -epochs 50 \
+    -negs 50 \
+    -burnin 10 \
+    -batchsize 32 \
+    -model distance \
+    -manifold poincare \
+    -lr 0.1 \
+    -ndproc 1 \
+    -eval_each 999999 \
+    -fresh
 #+END_SRC
-This shell script includes the appropriate parameter settings for the mammals subtree and saves the trained model as =mammals.pth=.
 
-An identical script to learn embeddings of the entire noun hierarchy is located at =train-nouns.sh=. This script contains the hyperparameter setting to reproduce the results for 10-dimensional embeddings of [[https://papers.nips.cc/paper/7213-poincare-embeddings-for-learning-hierarchical-representations][(Nickel & Kiela, 2017)]]. The hyperparameter setting to reproduce the MAP results are provided as comments in the script.
+*** Monitor Training
+In a separate terminal:
+#+BEGIN_SRC sh
+  python monitor_training.py
+#+END_SRC
 
-The embeddings are trained via multithreaded async SGD. In the example above, the number of threads is set to a conservative setting (=NHTREADS=2=) which should run well even on smaller machines. On machines with many cores, increase =NTHREADS= for faster convergence.
+Shows real-time clustering quality (primate distances vs random pairs).
+
+** Documentation
+
+- =IMPLEMENTATION_NOTES.md= - Detailed technical notes on fixes and improvements
+- =TRAINING_SUMMARY.md= - Training results and metrics
+- =FINAL_ASSESSMENT.md= - Quality assessment
 
 ** Dependencies
-- Python 3 with NumPy
+
+- Python 3.8+
 - PyTorch
-- Scikit-Learn
-- NLTK (to generate the WordNet data)
+- NumPy
+- Pandas
+- UMAP (for visualization)
 
 ** References
 If you find this code useful for your research, please cite the following paper in your publication:
