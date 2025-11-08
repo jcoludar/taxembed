@@ -72,18 +72,23 @@ def load_mapping(map_path):
     return tax2idx, idx2tax
 
 
-def load_taxonomy_tree():
-    """Load NCBI taxonomy tree structure."""
+def load_taxonomy_tree(valid_taxids=None):
+    """Load NCBI taxonomy tree structure, optionally filtered to valid TaxIDs.
+    
+    Args:
+        valid_taxids: Set of TaxIDs to include. If None, loads all.
+    """
     try:
-        print("Loading taxonomy tree...")
-        
         # Load names
         names = {}
         with open("data/names.dmp", "r") as f:
             for line in f:
                 parts = [p.strip() for p in line.split("|")]
                 if len(parts) >= 4 and parts[3] == "scientific name":
-                    names[int(parts[0])] = parts[1]
+                    taxid = int(parts[0])
+                    # Only load if in valid set or loading all
+                    if valid_taxids is None or taxid in valid_taxids:
+                        names[taxid] = parts[1]
         
         # Load nodes (parent relationships)
         nodes = {}
@@ -94,9 +99,14 @@ def load_taxonomy_tree():
                     taxid = int(parts[0])
                     parent = int(parts[1])
                     rank = parts[2]
-                    nodes[taxid] = {"parent": parent, "rank": rank, "name": names.get(taxid, "")}
+                    # Only load if in valid set or loading all
+                    if valid_taxids is None or taxid in valid_taxids:
+                        nodes[taxid] = {"parent": parent, "rank": rank, "name": names.get(taxid, "")}
         
-        print(f"  ✓ Loaded {len(nodes):,} taxonomy nodes")
+        if valid_taxids:
+            print(f"  ✓ Loaded {len(nodes):,} taxonomy nodes (filtered to dataset)")
+        else:
+            print(f"  ✓ Loaded {len(nodes):,} taxonomy nodes")
         return nodes
     
     except FileNotFoundError:
@@ -254,10 +264,15 @@ def main():
     # Load mapping
     tax2idx, idx2tax = load_mapping(args.mapping)
     
-    # Load taxonomy if highlighting
+    # Get valid TaxIDs from the mapping (only organisms in training data)
+    valid_taxids = set(int(taxid) for taxid in idx2tax.values())
+    print(f"Dataset contains {len(valid_taxids):,} unique organisms")
+    
+    # Load taxonomy if highlighting (filtered to dataset organisms only)
     nodes = {}
     if args.highlight or args.only:
-        nodes = load_taxonomy_tree()
+        print("Loading taxonomy tree...")
+        nodes = load_taxonomy_tree(valid_taxids=valid_taxids)
     
     # Determine which indices to visualize
     if args.only:
