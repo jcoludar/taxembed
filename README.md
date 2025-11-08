@@ -27,8 +27,8 @@ This project extends Facebook Research's Poincaré embeddings with hierarchical 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/poincare-embeddings.git
-cd poincare-embeddings
+git clone https://github.com/jcoludar/taxembed.git
+cd taxembed
 
 # Create virtual environment
 python3.11 -m venv venv311
@@ -310,14 +310,14 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 👥 Authors
 
 - Based on Facebook Research's Poincaré embeddings
-- Extended for hierarchical taxonomy by [Your Name]
+- Extended for hierarchical taxonomy by @jcoludar
 - Development history in [JOURNEY.md](JOURNEY.md)
 
 ---
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/poincare-embeddings/issues)
+- **Issues**: [GitHub Issues](https://github.com/jcoludar/taxembed/issues)
 - **Documentation**: See [JOURNEY.md](JOURNEY.md) and [docs/](docs/)
 - **Quick Help**: See [QUICKSTART.md](QUICKSTART.md)
 

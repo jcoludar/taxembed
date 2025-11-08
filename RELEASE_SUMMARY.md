@@ -172,9 +172,9 @@ git push origin main
 
 After pushing to GitHub:
 
-1. **Update README links**
-   - Replace `[Your Name]` with actual name
-   - Replace `yourusername/poincare-embeddings` with actual URL
+1. **Update README links** ✅ Done!
+   - ✅ Replaced `[Your Name]` with @jcoludar
+   - ✅ Updated repository to jcoludar/taxembed
 
 2. **Create Release**
    - Tag: v0.1.0-alpha

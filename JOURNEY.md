@@ -406,7 +406,7 @@ The foundation is solid. Now we need to tune the system to actually learn the hi
 - Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations"
 - Facebook Research: https://github.com/facebookresearch/poincare-embeddings
 - NCBI Taxonomy: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
-- This project: [Your GitHub URL]
+- This project: https://github.com/jcoludar/taxembed
 
 ---
 
