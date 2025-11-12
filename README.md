@@ -43,13 +43,24 @@ A pre-trained model is included in `small_model_28epoch/`:
 git clone https://github.com/jcoludar/taxembed.git
 cd poincare-embeddings
 
-# Create virtual environment
-python3.11 -m venv venv311
-source venv311/bin/activate  # or venv311\Scripts\activate on Windows
+# Install with uv (recommended)
+make install
+# or: uv sync
 
-# Install dependencies
+# Alternative: pip
+python3.11 -m venv venv311
+source venv311/bin/activate
 pip install -r requirements.txt
 ```
+
+After installation, the following CLI commands are available:
+- `taxembed-download` - Download NCBI taxonomy
+- `taxembed-prepare` - Build transitive closure
+- `taxembed-train` - Train model
+- `taxembed-visualize` - Create UMAP plots
+- `taxembed-check` - Validate installation
+
+📖 See [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md) for detailed usage.
 
 ### **Using Pre-trained Model**
 
@@ -68,25 +79,35 @@ mapping = pd.read_csv('data/taxonomy_edges_small.mapping.tsv',
 
 ### **Train New Model**
 
+**Using CLI commands** (recommended):
 ```bash
-# Download NCBI taxonomy (if not already present)
-python prepare_taxonomy_data.py
+# 1. Download NCBI taxonomy
+taxembed-download
 
-# Build transitive closure (975K training pairs)
-python build_transitive_closure.py
+# 2. Build transitive closure (975K training pairs)
+taxembed-prepare
 
-# Train hierarchical model (~2.5 hours on M3 Mac CPU)
-python train_small.py
+# 3. Train model (~2.5 hours on M3 Mac CPU)
+taxembed-train
 
-# Or with custom parameters:
-python train_hierarchical.py \
-    --data data/taxonomy_edges_small_transitive.pkl \
-    --checkpoint my_model.pth \
-    --dim 10 \
-    --epochs 100 \
-    --early-stopping 10 \
-    --lr 0.005 \
-    --lambda-reg 0.1
+# 4. Visualize results
+taxembed-visualize taxonomy_model_small_best.pth
+
+# 5. Verify
+taxembed-check
+```
+
+**Using Python scripts directly**:
+```bash
+python prepare_taxonomy_data.py       # Download
+python build_transitive_closure.py    # Prepare
+python train_small.py                 # Train
+
+# With custom parameters:
+python train_small.py \
+    --epochs 50 \
+    --batch-size 128 \
+    --lr 0.003
 ```
 
 ### **Analyze Results**

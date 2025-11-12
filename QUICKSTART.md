@@ -1,18 +1,18 @@
 # Quick Start Guide
 
-Get started with taxembed in minutes.
+Get started with hierarchical Poincaré taxonomy embeddings in minutes.
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- [uv](https://github.com/astral-sh/uv) package manager
+- Python 3.11 or higher
+- [uv](https://github.com/astral-sh/uv) package manager (recommended)
 
 ## Installation
 
 1. **Clone the repository:**
 ```bash
 git clone https://github.com/jcoludar/taxembed.git
-cd taxembed
+cd poincare-embeddings
 ```
 
 2. **Install dependencies:**
@@ -21,88 +21,86 @@ make install
 # or: uv sync
 ```
 
-3. **Build C++ extensions:**
-```bash
-make build
-# or: python setup.py build_ext --inplace
+That's it! No compilation needed.
+
+## Use Pre-trained Model
+
+A production-ready model is included in `small_model_28epoch/`:
+
+```python
+import torch
+import pandas as pd
+
+# Load embeddings
+ckpt = torch.load('small_model_28epoch/taxonomy_model_small_best.pth')
+embeddings = ckpt['embeddings']  # 92,290 organisms × 10 dimensions
+
+# Load TaxID mapping
+mapping = pd.read_csv('data/taxonomy_edges_small.mapping.tsv', 
+                      sep='\t', header=None, names=['idx', 'taxid'])
 ```
 
-## Training
+## Train New Model
 
-### Step 1: Prepare Data
+### Step 1: Prepare Data (if needed)
 
-Download and process NCBI taxonomy data:
+Download NCBI taxonomy:
 ```bash
-uv run python scripts/prepare_data.py
+taxembed-download
+# or: python prepare_taxonomy_data.py
 ```
 
-Remap taxonomy IDs to sequential indices:
+Build transitive closure (975K training pairs):
 ```bash
-uv run python scripts/remap_data.py
+taxembed-prepare
+# or: python build_transitive_closure.py
 ```
 
-### Step 2: Train Model
+### Step 2: Train
 
-Start training with default parameters:
 ```bash
-uv run python scripts/train.py \
-  --dataset data/taxonomy_edges.mapped.edgelist \
-  --checkpoint taxonomy_model.pth \
-  --dim 10 \
-  --epochs 50 \
-  --negs 50 \
-  --burnin 10 \
-  --batchsize 32 \
-  --model distance \
-  --manifold poincare \
-  --lr 0.1 \
-  --ndproc 1 \
-  --eval-each 999999 \
-  --fresh
+taxembed-train
+# or: python train_small.py
 ```
 
-### Step 3: Monitor Training (Optional)
+Training takes ~2.5 hours on M3 Mac CPU. The script includes:
+- Real-time progress bars
+- Early stopping (patience=5)
+- Automatic best model saving
 
-In another terminal, monitor training progress:
+### Step 3: Visualize
+
 ```bash
-uv run python scripts/monitor.py
+taxembed-visualize small_model_28epoch/taxonomy_model_small_best.pth
+# or: python visualize_multi_groups.py small_model_28epoch/taxonomy_model_small_best.pth
 ```
 
-### Step 4: Evaluate Results
+Generates UMAP visualization with key taxonomic groups highlighted.
 
-After training completes:
+### Step 4: Verify
+
 ```bash
-uv run python scripts/evaluate.py --checkpoint taxonomy_model.pth
+taxembed-check
+# or: python final_sanity_check.py
 ```
 
-### Step 5: Visualize Embeddings
+Runs comprehensive validation of models and data files.
 
-Create 2D visualizations:
+## Development
+
+### Check Code Quality
+
 ```bash
-uv run python scripts/visualize.py --checkpoint taxonomy_model.pth
+make lint        # Check with ruff
+make format      # Format code
+make test        # Run tests
 ```
 
-## Code Quality
-
-### Check Code Style
+### Quick Sanity Check
 
 ```bash
-make lint
-# or: uv run ruff check src/ scripts/
-```
-
-### Fix Code Style Issues
-
-```bash
-make format
-# or: uv run ruff format src/ scripts/
-```
-
-### Run Tests
-
-```bash
-make test
-# or: uv run pytest
+make check       # Run final_sanity_check.py
+make train       # Train for 1 epoch (test)
 ```
 
 ## Common Commands
@@ -110,50 +108,44 @@ make test
 | Task | Command |
 |------|---------|
 | Install dependencies | `make install` |
-| Build extensions | `make build` |
+| Train (1 epoch test) | `make train` |
 | Check code quality | `make lint` |
 | Format code | `make format` |
 | Run tests | `make test` |
-| Clean build artifacts | `make clean` |
+| Sanity check | `make check` |
+| Clean artifacts | `make clean` |
 | Show help | `make help` |
 
 ## Troubleshooting
 
-### Issue: "ModuleNotFoundError: No module named 'hype'"
+### Missing data files
 
-**Solution:** Make sure you've installed dependencies and built extensions:
+If `train_small.py` fails with "Training data not found":
+```bash
+python build_transitive_closure.py
+```
+
+### Module not found
+
+Make sure you've installed dependencies:
 ```bash
 make install
-make build
 ```
 
-### Issue: "ruff: command not found"
-
-**Solution:** Use `uv run` to execute commands in the project environment:
+Or activate the virtual environment:
 ```bash
-uv run ruff check src/
-```
-
-### Issue: "CUDA out of memory"
-
-**Solution:** Use CPU training with `-gpu -1`:
-```bash
-uv run python scripts/train.py ... -gpu -1
-```
-
-### Issue: "Slow data loading"
-
-**Solution:** Reduce number of data loading processes:
-```bash
-uv run python scripts/train.py ... -ndproc 1
+source venv311/bin/activate  # if using venv
 ```
 
 ## Next Steps
 
-- Read [STRUCTURE.md](STRUCTURE.md) for project organization
-- Check [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
-- Review [README.md](README.md) for detailed documentation
+- See **docs/** for detailed guides:
+  - `docs/TRAIN_SMALL_GUIDE.md` - Training documentation
+  - `docs/JOURNEY.md` - Development history
+  - `docs/FINAL_STATUS.md` - Production status
+- Review **README.md** for architecture details
+- Check **small_model_28epoch/** for production model
 
 ## Support
 
-For issues and questions, please open a GitHub issue or refer to the documentation.
+For questions, see the documentation in **docs/** or open a GitHub issue.
