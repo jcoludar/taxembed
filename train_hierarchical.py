@@ -59,7 +59,7 @@ class HierarchicalPoincareEmbedding(nn.Module):
                 
                 # Radius increases with depth
                 # Root (depth 0): r ≈ 0.1
-                # Max depth: r ≈ 0.95 (near boundary)
+                # Max depth: r ≈ 0.95
                 target_radius = 0.1 + (depth / self.max_depth) * 0.85
                 
                 # Random direction on sphere
@@ -101,35 +101,36 @@ class HierarchicalPoincareEmbedding(nn.Module):
         
         return dist
     
-    def project_to_ball(self, indices=None, eps=1e-5):
+    def project_to_ball(self, indices=None, max_norm=0.999):
         """
         Project embeddings back into Poincaré ball with HARD constraint.
         
         Args:
             indices: If provided, only project these indices (more efficient).
                     If None, project all embeddings.
+            max_norm: Maximum allowed norm (default 0.999, essentially at boundary)
         """
         with torch.no_grad():
             if indices is not None:
                 # Only project updated embeddings
                 embs = self.embeddings.weight[indices]
                 norms = embs.norm(dim=1, keepdim=True)
-                # Hard projection: if norm >= 1-eps, scale it down
+                # Hard projection: if norm >= max_norm, scale it down
                 # Use where to only scale embeddings that need it
-                needs_projection = norms >= (1 - eps)
+                needs_projection = norms >= max_norm
                 scale = torch.where(
                     needs_projection,
-                    (1 - eps) / (norms + eps),
+                    max_norm / (norms + 1e-8),
                     torch.ones_like(norms)
                 )
                 self.embeddings.weight[indices] = embs * scale
             else:
                 # Project all embeddings
                 norms = self.embeddings.weight.norm(dim=1, keepdim=True)
-                needs_projection = norms >= (1 - eps)
+                needs_projection = norms >= max_norm
                 scale = torch.where(
                     needs_projection,
-                    (1 - eps) / (norms + eps),
+                    max_norm / (norms + 1e-8),
                     torch.ones_like(norms)
                 )
                 self.embeddings.weight.mul_(scale)
@@ -321,6 +322,7 @@ def train_hierarchical(model, dataloader, optimizer, n_epochs,
     for idx, depth in idx_to_depth.items():
         if idx < model.n_nodes:
             reg_indices.append(idx)
+            # Match initialization: 0.1 + depth/max * 0.85
             target_radius = 0.1 + (depth / max_depth) * 0.85
             reg_target_radii.append(target_radius)
     

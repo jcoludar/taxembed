@@ -598,6 +598,132 @@ Clean, documented, and ready for deployment:
 
 ---
 
+## Phase 9: Enhanced Training & Repository Organization (Nov 13-14, 2025)
+
+### **Training Script Evolution**
+
+#### **Three Training Approaches Now Available:**
+
+1. **`embed.py` - Original Facebook Trainer (Proven)**
+   - Battle-tested on 2.7M full dataset
+   - Uses simple `.mapped.edgelist` format
+   - Critical fix applied: embedding initialization scale = 0.1 (not 1e-4)
+   - Parameters validated from memory: `-lr 0.1 -burnin 10 -negs 50`
+   - Status: ✅ Fully working
+
+2. **`train_hierarchical.py` - Core Hierarchical Library**
+   - Implements advanced features:
+     - Depth-aware initialization
+     - Transitive closure training (975K pairs)
+     - Hard negative sampling (cousin nodes)
+     - Radial regularizer (depth → radius mapping)
+   - Proper Poincaré distance computation
+   - Early stopping with patience
+   - Status: ✅ Core implementation complete
+
+3. **`train_small.py` - Enhanced User Interface**
+   - Wrapper around `train_hierarchical.py`
+   - Enhanced terminal visualization:
+     - Color-coded improvements (green/red)
+     - Epoch-to-epoch comparisons (ΔLoss, % change)
+     - Real-time metrics (loss, reg, norm, outside%)
+     - Visual status indicators (✓ BETTER / ✗ WORSE)
+   - Better data handling (fills missing node depths)
+   - Automatic best model checkpointing
+   - Status: ✅ Production-ready for small dataset
+
+#### **Command for Extended Training:**
+```bash
+uv run python train_small.py --epochs 999999 --early-stopping 0
+```
+This runs indefinitely with enhanced visualization until manual stop (Ctrl+C).
+
+### **Repository Cleanup & Organization**
+
+#### **Archive Strategy Implemented:**
+
+**Moved to `docs/archive/debug_scripts/`:**
+- `analyze_embeddings.py` - Early analysis attempts
+- `analyze_messiness.py` - Hierarchy debugging
+- `compare_old_new.py`, `compare_old_vs_current.py` - Comparison tools
+- `diagnose_issues.py`, `find_what_broke.py` - Diagnostic scripts
+- `inspect_checkpoint.py` - Simple checkpoint inspector
+- `test_depth_coverage.py` - Test scripts
+- `verify_ball_safety.py`, `verify_fixes.py` - Verification tools
+- `visualize_trained_only.py` - Visualization variant
+
+**Moved to `docs/archive/`:**
+- `PERMANENT_FIX_PLAN.md` - Old fix plans
+- `PERMANENT_FIX_SUMMARY.md` - Fix summaries
+- `REVERT_HYPERPARAMS.md` - Hyperparameter experiments
+- `SAFETY_CHECK_BALL_CONSTRAINTS.md` - Constraint checks
+- `TRAINING_ISSUES_FIXED.md` - Training notes
+
+#### **Final Repository Structure:**
+
+```
+Root Level (Core Files Only):
+├── embed.py, train_hierarchical.py, train_small.py  # 3 training approaches
+├── prepare_taxonomy_data.py, build_transitive_closure.py  # Data pipeline
+├── analyze_hierarchy_hyperbolic.py, visualize_multi_groups.py  # Analysis
+├── sanity_check.py, final_sanity_check.py  # Validation
+├── README.md, QUICKSTART.md  # Documentation
+
+Subdirectories:
+├── hype/            # Original Facebook implementation
+├── src/taxembed/    # New package structure (uv/pyproject.toml)
+├── scripts/         # Utility scripts
+├── tests/           # Unit tests
+└── docs/
+    ├── archive/     # Historical docs & debug scripts
+    ├── JOURNEY.md   # This file
+    ├── FINAL_STATUS.md, CLI_COMMANDS.md, etc.
+```
+
+### **Current Status (Nov 14, 2025):**
+
+**✅ What Works:**
+- Three complementary training approaches
+- Clean, organized repository structure
+- Comprehensive documentation
+- All debugging tools archived (preserved for history)
+- Enhanced visualization for training progress
+- uv-based dependency management
+- Production-ready small model (28 epochs)
+
+**🎯 Ready For:**
+- Extended training runs (infinite epochs with early stop disabled)
+- Public repository sharing
+- Research collaboration
+- Production deployment
+
+**📊 Key Metrics (Small Dataset - Best Model):**
+- Organisms: 111,103
+- Training pairs: 975,000 (transitive closure)
+- Epochs: 28
+- Loss: 0.472
+- Ball constraint compliance: 100%
+- Visualization: Clear hierarchical clustering
+
+### **Lessons Learned:**
+
+1. **Multiple training approaches serve different purposes:**
+   - Original `embed.py` for validation and proven results
+   - `train_hierarchical.py` for core hierarchical features
+   - `train_small.py` for enhanced UX and monitoring
+
+2. **Preservation of development history is valuable:**
+   - Archived debug scripts document problem-solving journey
+   - Session notes capture decision rationale
+   - Future debugging benefits from traced history
+
+3. **Repository organization matters:**
+   - Clear separation: core scripts (root) vs utilities (scripts/) vs archives (docs/archive/)
+   - Gitignore properly excludes local artifacts (checkpoints, plots, data)
+   - Documentation structure supports different user needs
+
+---
+
 ## References
 
 - Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations"
@@ -607,4 +733,4 @@ Clean, documented, and ready for deployment:
 
 ---
 
-*Last Updated: November 10, 2025*
+*Last Updated: November 14, 2025*

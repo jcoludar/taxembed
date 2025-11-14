@@ -219,6 +219,108 @@ def create_training_data(all_pairs, valid_taxids, taxonomy):
     return training_data
 
 
+def ensure_complete_coverage(training_data, valid_taxids, taxonomy):
+    """
+    Ensure ALL nodes appear in training data.
+    
+    For nodes that never appear (typically leaf nodes with no descendants),
+    add parent→node pairs so they get training signal.
+    
+    This is CRITICAL for scalability - works for datasets of any size.
+    """
+    print("\n🔍 Checking coverage...")
+    
+    # Load mapping to get total node count
+    mapping_df = pd.read_csv("data/taxonomy_edges_small.mapping.tsv",
+                             sep="\t", header=None, names=["taxid", "idx"])
+    mapping_df['idx'] = pd.to_numeric(mapping_df['idx'], errors='coerce')
+    mapping_df['taxid'] = pd.to_numeric(mapping_df['taxid'], errors='coerce')
+    mapping_df = mapping_df.dropna()
+    mapping_df['idx'] = mapping_df['idx'].astype(int)
+    mapping_df['taxid'] = mapping_df['taxid'].astype(int)
+    
+    taxid_to_idx = dict(zip(mapping_df['taxid'], mapping_df['idx']))
+    idx_to_taxid = dict(zip(mapping_df['idx'], mapping_df['taxid']))
+    total_nodes = int(mapping_df['idx'].max()) + 1
+    
+    # Find nodes that appear in training
+    nodes_in_training = set()
+    for item in training_data:
+        nodes_in_training.add(item['ancestor_idx'])
+        nodes_in_training.add(item['descendant_idx'])
+    
+    missing_nodes = set(range(total_nodes)) - nodes_in_training
+    
+    print(f"  Total nodes in dataset: {total_nodes:,}")
+    print(f"  Nodes in training: {len(nodes_in_training):,} ({100*len(nodes_in_training)/total_nodes:.1f}%)")
+    print(f"  Missing nodes: {len(missing_nodes):,} ({100*len(missing_nodes)/total_nodes:.1f}%)")
+    
+    if len(missing_nodes) == 0:
+        print(f"  ✅ Perfect coverage - all nodes present!")
+        return training_data
+    
+    # Add parent→node pairs for missing nodes
+    print(f"\n  Adding parent→node pairs for missing nodes...")
+    added = 0
+    
+    for node_idx in sorted(missing_nodes):
+        node_taxid = idx_to_taxid.get(node_idx)
+        if node_taxid is None:
+            print(f"    ⚠️  Node {node_idx} has no TaxID in mapping")
+            continue
+        
+        if node_taxid not in taxonomy:
+            print(f"    ⚠️  TaxID {node_taxid} not in taxonomy")
+            continue
+        
+        parent_taxid = taxonomy[node_taxid]['parent']
+        
+        # Root node (parent_taxid == 1) or self-parent
+        if parent_taxid == node_taxid or parent_taxid == 1:
+            # Add self-loop
+            parent_idx = node_idx
+            parent_taxid = node_taxid
+        elif parent_taxid not in taxid_to_idx:
+            # Parent not in dataset, skip
+            print(f"    ⚠️  Parent {parent_taxid} of node {node_taxid} not in dataset")
+            continue
+        else:
+            parent_idx = taxid_to_idx[parent_taxid]
+        
+        # Get depths
+        node_depth = taxonomy[node_taxid]['depth']
+        parent_depth = taxonomy[parent_taxid]['depth'] if parent_taxid != node_taxid else node_depth
+        depth_diff = node_depth - parent_depth
+        
+        training_data.append({
+            'ancestor_idx': parent_idx,
+            'descendant_idx': node_idx,
+            'depth_diff': depth_diff,
+            'ancestor_depth': parent_depth,
+            'descendant_depth': node_depth,
+            'ancestor_taxid': parent_taxid,
+            'descendant_taxid': node_taxid
+        })
+        added += 1
+    
+    print(f"  ✅ Added {added:,} parent→node pairs")
+    
+    # Verify final coverage
+    final_nodes = set()
+    for item in training_data:
+        final_nodes.add(item['ancestor_idx'])
+        final_nodes.add(item['descendant_idx'])
+    
+    final_coverage = len(final_nodes)
+    print(f"  ✅ Final coverage: {final_coverage:,} / {total_nodes:,} ({100*final_coverage/total_nodes:.1f}%)")
+    
+    if final_coverage < total_nodes:
+        still_missing = total_nodes - final_coverage
+        print(f"  ⚠️  Still missing {still_missing:,} nodes - check data integrity")
+    
+    return training_data
+
+
 def save_training_data(training_data, output_file):
     """Save training data in multiple formats."""
     
@@ -287,6 +389,9 @@ def main():
     
     # Step 5: Create training data with metadata
     training_data = create_training_data(all_pairs, valid_taxids, taxonomy)
+    
+    # Step 5.5: Ensure complete coverage (CRITICAL for all nodes to be trained)
+    training_data = ensure_complete_coverage(training_data, valid_taxids, taxonomy)
     
     # Step 6: Save
     output_file = "data/taxonomy_edges_small_transitive.tsv"

@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import pandas as pd
 import pickle
 import argparse
 import os
@@ -137,7 +138,7 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
     print(f"\nConfiguration:")
     print(f"  Margin: {margin}")
     print(f"  Regularization: λ={lambda_reg}")
-    print(f"  Early stopping: {early_stopping_patience} epochs")
+    print(f"  Early stopping: {'disabled' if early_stopping_patience == 0 else f'{early_stopping_patience} epochs'}")
     print(f"  Device: {device}")
     print(f"  Max epochs: {n_epochs}")
     
@@ -287,7 +288,8 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
         else:
             epochs_without_improvement += 1
             
-            if epochs_without_improvement >= early_stopping_patience:
+            # Only check early stopping if patience > 0 (0 means disabled)
+            if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
                 print(f"\n🛑 Early stopping triggered after {epoch} epochs")
                 print(f"   Best loss: {tracker.best_loss:.6f} (epoch {tracker.best_epoch})")
                 break
@@ -341,20 +343,56 @@ def main():
         training_data = pickle.load(f)
     print(f"  ✓ Loaded {len(training_data):,} training pairs")
     
-    # Get dataset info
-    n_nodes = max(max(item['ancestor_idx'], item['descendant_idx']) 
-                  for item in training_data) + 1
+    # Get dataset info - CRITICAL: use mapping file, not training data!
+    # Training data may not include all nodes (e.g., leaf nodes, isolated nodes)
+    print("Loading mapping to determine true n_nodes...")
+    mapping_df = pd.read_csv("data/taxonomy_edges_small.mapping.tsv",
+                             sep="\t", header=None, names=["taxid", "idx"])
+    mapping_df['idx'] = pd.to_numeric(mapping_df['idx'], errors='coerce')
+    mapping_df['taxid'] = pd.to_numeric(mapping_df['taxid'], errors='coerce')
+    mapping_df = mapping_df.dropna()
+    mapping_df['idx'] = mapping_df['idx'].astype(int)
+    mapping_df['taxid'] = mapping_df['taxid'].astype(int)
+    n_nodes = int(mapping_df['idx'].max()) + 1
+    
     max_depth = max(item['descendant_depth'] for item in training_data)
     
     print(f"  Nodes: {n_nodes:,}")
     print(f"  Max depth: {max_depth}")
     
-    # Build depth mapping
+    # Build depth mapping from training data
     idx_to_depth = {}
     for item in training_data:
         idx_to_depth[item['descendant_idx']] = item['descendant_depth']
         if item['ancestor_idx'] not in idx_to_depth:
             idx_to_depth[item['ancestor_idx']] = item['ancestor_depth']
+    
+    # For nodes NOT in training data, load their depths from full taxonomy
+    nodes_in_training = set(idx_to_depth.keys())
+    missing_nodes = n_nodes - len(nodes_in_training)
+    
+    if missing_nodes > 0:
+        print(f"\n⚠️  {missing_nodes:,} nodes not in training data - loading their depths from taxonomy...")
+        
+        # Build TaxID -> depth mapping from training data
+        taxid_to_depth = {}
+        for item in training_data:
+            taxid_to_depth[item['ancestor_taxid']] = item['ancestor_depth']
+            taxid_to_depth[item['descendant_taxid']] = item['descendant_depth']
+        
+        # Map missing indices to depths via TaxID lookup
+        for idx in range(n_nodes):
+            if idx not in idx_to_depth:
+                # Find TaxID for this index
+                taxid = mapping_df[mapping_df['idx'] == idx]['taxid'].values[0]
+                if taxid in taxid_to_depth:
+                    idx_to_depth[idx] = taxid_to_depth[taxid]
+                else:
+                    # Node not in taxonomy at all - likely a leaf, assign max depth
+                    idx_to_depth[idx] = max_depth
+        
+        print(f"  ✓ Assigned depths to {missing_nodes:,} additional nodes")
+        print(f"  ✓ Total nodes with depth info: {len(idx_to_depth):,} / {n_nodes:,}")
     
     # Create model
     print("\nInitializing model with depth-aware embeddings...")
