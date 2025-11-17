@@ -53,11 +53,11 @@ source venv311/bin/activate
 pip install -r requirements.txt
 ```
 
-After installation, the following CLI commands are available:
-- `taxembed-download` - Download NCBI taxonomy
-- `taxembed-prepare` - Build transitive closure
-- `taxembed-train` - Train model
-- `taxembed-visualize` - Create UMAP plots
+After installation, the unified CLI is available:
+- `taxembed train <clade> -as <tag>` - Train model for any clade (auto-builds dataset)
+- `taxembed visualize <tag>` - Visualize results with automatic best checkpoint
+- `taxembed-download` - Download NCBI taxonomy (legacy, auto-handled by train)
+- `taxembed-prepare` - Build transitive closure (legacy, auto-handled by train)
 - `taxembed-check` - Validate installation
 
 📖 See [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md) for detailed usage.
@@ -79,7 +79,20 @@ mapping = pd.read_csv('data/taxonomy_edges_small.mapping.tsv',
 
 ### **Train New Model**
 
-**Using CLI commands** (recommended):
+**Using unified CLI** (recommended - easiest):
+```bash
+# Train any clade by name or TaxID (auto-builds dataset, downloads taxonomy if needed)
+taxembed train Cnidaria -as cnidaria --epochs 100 --lambda 0.1
+taxembed train 6073 -as echinoderms --epochs 50
+
+# Visualize results (automatically uses best checkpoint)
+taxembed visualize cnidaria
+taxembed visualize echinoderms --children 1  # Color by grandchildren
+
+# All artifacts saved to artifacts/tags/<tag>/
+```
+
+**Using legacy CLI commands**:
 ```bash
 # 1. Download NCBI taxonomy
 taxembed-download
@@ -92,9 +105,6 @@ taxembed-train
 
 # 4. Visualize results
 taxembed-visualize taxonomy_model_small_best.pth
-
-# 5. Verify
-taxembed-check
 ```
 
 **Using Python scripts directly**:
@@ -226,6 +236,58 @@ python build_transitive_closure.py
 # Validate data
 python scripts/validate_data.py small
 ```
+
+### **Unified CLI: Train & Visualize Any Clade**
+
+The `taxembed` command provides a streamlined workflow:
+
+```bash
+# Train any clade by name or TaxID (auto-builds dataset, downloads taxonomy if needed)
+taxembed train Cnidaria -as cnidaria --epochs 100 --lambda 0.1
+taxembed train 6073 -as echinoderms --epochs 50
+
+# Visualize results (automatically uses best checkpoint for the tag)
+taxembed visualize cnidaria
+taxembed visualize echinoderms --children 1  # Color by grandchildren (--children 0 = children, 1 = grandchildren, etc.)
+
+# All artifacts saved to artifacts/tags/<tag>/
+# - run.json: metadata (config, paths, dataset info)
+# - <tag>.pth: checkpoints
+# - <tag>_best.pth: best checkpoint
+# - <tag>_umap.png: visualizations
+```
+
+**Features:**
+- **Automatic dataset building**: Uses [TaxoPy](https://pypi.org/project/taxopy/) to query NCBI taxonomy and build datasets on-the-fly
+- **Smart checkpoint selection**: Visualization automatically uses the best checkpoint for each tag
+- **Hierarchical coloring**: `--children` flag controls depth (0=children, 1=grandchildren, 2=great-grandchildren, etc.)
+- **Informative titles**: Plots show clade name, children level, epochs, and loss
+- **Organized artifacts**: All outputs stored in `artifacts/tags/<tag>/` with full metadata
+
+**Advanced usage:**
+```bash
+# Use pre-built dataset files
+taxembed train --file data/my_transitive.pkl --mapping data/my.mapping.tsv -as custom_tag
+
+# Override visualization settings
+taxembed visualize cnidaria --sample 15000 --output custom_plot.png --root-taxid 6072
+```
+
+### **Build Custom Clade Datasets (Standalone)**
+```bash
+# Example: build the Metazoa (animals) subset with automatic mapping
+uv run python scripts/build_clade_dataset.py \
+    --root-taxid 33208 \
+    --dataset-name animals
+```
+
+This leverages [TaxoPy](https://pypi.org/project/taxopy/) to:
+- Query NCBI taxonomy for all descendants of the requested root
+- Emit raw and remapped edgelists (`data/taxopy/<name>/taxonomy_edges_<name>.edgelist`)
+- Write mapping + manifest files for reproducible provenance
+- Generate transitive-closure datasets ready for `train_small.py`
+
+Use `--max-depth` to truncate deep subtrees or point `--taxdump-dir` at an alternate taxonomy download.
 
 ---
 
@@ -365,4 +427,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **⭐ If you find this useful, please star the repository!**
 
-*Last Updated: November 8, 2025*
+*Last Updated: December 2025*

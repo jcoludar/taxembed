@@ -4,9 +4,13 @@ Parse NCBI taxonomy data and generate edge list for Poincaré embeddings.
 Extracts parent-child relationships from nodes.dmp and creates a CSV file.
 """
 
-import pandas as pd
 import sys
+import shutil
+import tarfile
+import urllib.request
 from pathlib import Path
+
+import pandas as pd
 from tqdm import tqdm
 
 def parse_nodes_dmp(nodes_file):
@@ -69,19 +73,40 @@ def parse_names_dmp(names_file):
     
     return names_map
 
+TAXDUMP_URL = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
+
+
+def ensure_taxdump(data_dir: Path) -> tuple[Path, Path, Path | None]:
+    """Download/extract the NCBI taxdump files if they are missing."""
+
+    nodes_file = data_dir / "nodes.dmp"
+    names_file = data_dir / "names.dmp"
+    merged_file = data_dir / "merged.dmp"
+
+    if nodes_file.exists() and names_file.exists():
+        return nodes_file, names_file, merged_file if merged_file.exists() else None
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = data_dir / "new_taxdump.tar.gz"
+
+    print(f"Downloading NCBI taxonomy → {archive_path}")
+    with urllib.request.urlopen(TAXDUMP_URL) as response, archive_path.open("wb") as out_f:
+        shutil.copyfileobj(response, out_f)
+
+    print("Extracting taxdump archive...")
+    with tarfile.open(archive_path, "r:gz") as tar:
+        for member_name in ("nodes.dmp", "names.dmp", "merged.dmp"):
+            member = tar.getmember(member_name)
+            tar.extract(member, path=data_dir)
+
+    print("  ✓ nodes.dmp, names.dmp, merged.dmp ready")
+    return nodes_file, names_file, merged_file
+
+
 def main():
-    data_dir = Path(__file__).parent / 'data'
-    nodes_file = data_dir / 'nodes.dmp'
-    names_file = data_dir / 'names.dmp'
-    output_file = data_dir / 'taxonomy_edges.csv'
-    
-    # Verify input files exist
-    if not nodes_file.exists():
-        print(f"Error: {nodes_file} not found")
-        sys.exit(1)
-    if not names_file.exists():
-        print(f"Error: {names_file} not found")
-        sys.exit(1)
+    data_dir = Path(__file__).parent / "data"
+    nodes_file, names_file, _ = ensure_taxdump(data_dir)
+    output_file = data_dir / "taxonomy_edges.csv"
     
     # Parse taxonomy data
     edges = parse_nodes_dmp(nodes_file)

@@ -177,6 +177,47 @@ taxembed-check
 
 ---
 
+## Unified Pipeline (`taxembed`)
+
+### `taxembed train`
+
+```bash
+uv run taxembed train <TaxID-or-name> -as <tag> [options]
+```
+
+- Resolves `identifier` as either a numeric TaxID or an NCBI-recognized clade name
+- Builds the dataset on the fly via TaxoPy (unless `--file` and `--mapping` are supplied)
+- Invokes `train_small.py` with customizable hyperparameters (`--epochs`, `--lr`, `--margin`, `--lambda-reg`, etc.)
+- Stores checkpoints and metadata under `artifacts/tags/<tag>/run.json`
+
+Examples:
+
+```bash
+uv run taxembed train 33208 -as animals --epochs 40 --lr 0.003
+uv run taxembed train "Fungi" -as fungi
+uv run taxembed train --file data/custom_transitive.pkl \
+    --mapping data/custom.mapping.tsv \
+    -as custom_run
+```
+
+### `taxembed visualize`
+
+```bash
+uv run taxembed visualize <tag> [--sample N] [--output PATH]
+```
+
+- Reuses metadata recorded during `taxembed train`
+- Runs `visualize_multi_groups.py` with the correct checkpoint + mapping
+- Supports overrides for sample size, output path, or even custom checkpoint/mapping if needed
+
+```bash
+uv run taxembed visualize animals --sample 15000 --output animals_umap.png
+```
+
+- Colors default to the immediate child taxa of the trained clade (legend included automatically). Use `--root-taxid` to choose a different root, or `--names/--nodes` to point at custom taxonomy dumps.
+
+---
+
 ## Alternative: Direct Python Scripts
 
 All CLI commands are thin wrappers around Python scripts. You can also run:
@@ -187,7 +228,10 @@ python build_transitive_closure.py    # = taxembed-prepare
 python train_small.py                 # = taxembed-train
 python visualize_multi_groups.py ...  # = taxembed-visualize
 python final_sanity_check.py          # = taxembed-check
+python scripts/build_clade_dataset.py --root-taxid 33208 --dataset-name animals
 ```
+
+`scripts/build_clade_dataset.py` taps into TaxoPy so you can materialize on-demand datasets for any clade (output stored under `data/taxopy/<name>/` with manifest + transitive closure files).
 
 ---
 
@@ -197,6 +241,7 @@ CLI commands are defined in `pyproject.toml`:
 
 ```toml
 [project.scripts]
+taxembed = "taxembed.cli.main:main"
 taxembed-download = "taxembed.cli.download:main"
 taxembed-prepare = "taxembed.cli.prepare:main"
 taxembed-train = "taxembed.cli.train:main"

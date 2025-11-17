@@ -7,3 +7,4 @@ cython
 tqdm
 numpy>=1.21.0,<2.0
 torch>=2.0.0
+taxopy>=0.14.0

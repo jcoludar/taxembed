@@ -304,6 +304,8 @@ def main():
                        help='Training data (default: small dataset)')
     parser.add_argument('--checkpoint', default='taxonomy_model_small.pth',
                        help='Output checkpoint path')
+    parser.add_argument('--mapping', default='data/taxonomy_edges_small.mapping.tsv',
+                       help='Mapping file path aligned with training data')
     parser.add_argument('--dim', type=int, default=10,
                        help='Embedding dimension')
     parser.add_argument('--epochs', type=int, default=100,
@@ -345,12 +347,27 @@ def main():
     
     # Get dataset info - CRITICAL: use mapping file, not training data!
     # Training data may not include all nodes (e.g., leaf nodes, isolated nodes)
-    print("Loading mapping to determine true n_nodes...")
-    mapping_df = pd.read_csv("data/taxonomy_edges_small.mapping.tsv",
-                             sep="\t", header=None, names=["taxid", "idx"])
+    print(f"Loading mapping to determine true n_nodes from {args.mapping}...")
+    if not os.path.exists(args.mapping):
+        print(f"❌ Error: Mapping file not found at {args.mapping}")
+        sys.exit(1)
+    
+    mapping_df = pd.read_csv(args.mapping, sep="\t", dtype=str)
+    if "taxid" not in mapping_df.columns or "idx" not in mapping_df.columns:
+        # Re-read assuming headerless file
+        mapping_df = pd.read_csv(
+            args.mapping,
+            sep="\t",
+            dtype=str,
+            header=None,
+            names=["taxid", "idx"],
+        )
+    else:
+        mapping_df = mapping_df[["taxid", "idx"]]
+    
     mapping_df['idx'] = pd.to_numeric(mapping_df['idx'], errors='coerce')
     mapping_df['taxid'] = pd.to_numeric(mapping_df['taxid'], errors='coerce')
-    mapping_df = mapping_df.dropna()
+    mapping_df = mapping_df.dropna(subset=['idx', 'taxid'])
     mapping_df['idx'] = mapping_df['idx'].astype(int)
     mapping_df['taxid'] = mapping_df['taxid'].astype(int)
     n_nodes = int(mapping_df['idx'].max()) + 1

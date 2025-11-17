@@ -38,6 +38,7 @@ umap*.png
 
 # Project specific - Data
 data/
+artifacts/
 wordnet/*.csv
 
 # Project specific - Compiled extensions

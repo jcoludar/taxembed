@@ -724,13 +724,181 @@ Subdirectories:
 
 ---
 
+## Phase 10: Unified CLI & Enhanced Visualization (Dec 2025)
+
+### **Streamlined Training & Visualization Pipeline**
+
+#### **The Vision**
+Create a unified CLI that allows users to:
+1. Train models for any clade with a single command: `taxembed train <clade> -as <tag>`
+2. Visualize results automatically: `taxembed visualize <tag>`
+3. Build custom datasets on-the-fly using TaxoPy
+4. Track all artifacts (checkpoints, metadata, plots) in organized tag directories
+
+#### **Implementation: Unified CLI**
+
+**Created `src/taxembed/cli/main.py`:**
+- Single entry point: `taxembed` command with `train` and `visualize` subcommands
+- Automatic TaxID/clade name resolution using TaxoPy
+- Dynamic dataset building via `taxopy_clade.py` builder
+- Artifact management: all outputs stored in `artifacts/tags/<tag>/`
+- Metadata tracking: `run.json` stores training config, paths, dataset info
+
+**Key Features:**
+```bash
+# Train any clade by name or TaxID
+taxembed train Cnidaria -as cnidaria --epochs 100 --lambda 0.1
+taxembed train 6073 -as echinoderms --epochs 50
+
+# Visualize with automatic best checkpoint selection
+taxembed visualize cnidaria
+taxembed visualize echinoderms --children 1  # Color by grandchildren
+```
+
+#### **Dynamic Dataset Building**
+
+**Created `src/taxembed/builders/taxopy_clade.py`:**
+- Queries NCBI taxonomy via TaxoPy for all descendants of a clade
+- Builds parent-child edges automatically
+- Computes transitive closure (all ancestor-descendant pairs)
+- Remaps to sequential indices for efficient training
+- Writes manifest with provenance (root TaxID, name, node counts, etc.)
+- Progress bars for long-running operations
+
+**Benefits:**
+- No manual data preparation needed
+- Works for any taxonomic group
+- Automatic handling of merged/obsolete TaxIDs
+- Reproducible dataset generation
+
+#### **Enhanced Visualization**
+
+**Updated `visualize_multi_groups.py`:**
+- Automatic best checkpoint selection per tag
+- Hierarchical coloring: `--children` flag controls depth (0=children, 1=grandchildren, etc.)
+- Informative titles: `"TaxEmbed: {CLADE}, Children Level {X}, epochs {Y}, Loss {L}"`
+- Robust path resolution: works regardless of current working directory
+- TaxoPy fallback: uses TaxoPy if local dump files are missing
+
+**Visualization Features:**
+- UMAP dimensionality reduction with proper Poincaré distance
+- Color-coded by taxonomic groups (children/grandchildren of root)
+- Automatic legend with group names and counts
+- High-quality output suitable for publications
+
+#### **Artifact Management**
+
+**Organized Structure:**
+```
+artifacts/tags/
+├── cnidaria/
+│   ├── run.json              # Metadata (config, paths, dataset info)
+│   ├── cnidaria.pth          # Checkpoints
+│   ├── cnidaria_best.pth     # Best checkpoint
+│   └── cnidaria_umap.png     # Visualizations
+├── echinoderms/
+│   └── ...
+└── mammals/
+    └── ...
+```
+
+**Metadata (`run.json`) includes:**
+- Tag and slug
+- Creation timestamp
+- Dataset info (root TaxID, name, node counts, paths)
+- Training config (epochs, learning rate, regularization, etc.)
+- Paths to all artifacts (checkpoints, mapping files, data)
+
+#### **Progress Feedback**
+
+**User Experience Improvements:**
+- Progress bars during dataset building (transitive closure computation)
+- Color-coded training output (green for improvements, red for regressions)
+- Clear status messages at each stage
+- Automatic checkpoint path resolution
+
+#### **Technical Achievements**
+
+1. **Robust Path Handling:**
+   - Scripts resolve paths relative to their own location
+   - Works regardless of current working directory
+   - Handles both absolute and relative checkpoint paths
+
+2. **Error Handling:**
+   - Graceful fallbacks (TaxoPy if dump files missing)
+   - Clear error messages with actionable guidance
+   - Validation of inputs before processing
+
+3. **Code Organization:**
+   - Shared utilities in `src/taxembed/utils/`
+   - Modular builders in `src/taxembed/builders/`
+   - Clean separation of concerns
+
+#### **Example Workflow**
+
+```bash
+# 1. Train a model for Cnidaria (jellyfish, corals, etc.)
+taxembed train Cnidaria -as cnidaria --epochs 100 --lambda 0.1
+
+# This automatically:
+# - Resolves "Cnidaria" to TaxID 6072
+# - Builds dataset with all descendants
+# - Trains model with specified hyperparameters
+# - Saves checkpoints and metadata to artifacts/tags/cnidaria/
+
+# 2. Visualize results
+taxembed visualize cnidaria --children 0  # Color by immediate children
+
+# 3. Try different coloring depths
+taxembed visualize cnidaria --children 1  # Color by grandchildren
+```
+
+#### **Files Created/Modified**
+
+**New Files:**
+- `src/taxembed/cli/main.py` - Unified CLI entry point
+- `src/taxembed/builders/taxopy_clade.py` - Dynamic dataset builder
+- `src/taxembed/utils/data_validation.py` - Shared validation utilities
+- `scripts/build_clade_dataset.py` - Standalone dataset builder script
+
+**Modified Files:**
+- `visualize_multi_groups.py` - Enhanced with hierarchical coloring and informative titles
+- `train_small.py` - Updated to handle dynamic mapping files
+- `pyproject.toml` - Added `taxopy` dependency and unified CLI entry point
+- `README.md` - Updated with new CLI usage examples
+
+#### **Lessons Learned**
+
+1. **User Experience Matters:**
+   - Single command workflows are much better than multi-step processes
+   - Progress bars prevent perceived "hangs" during long operations
+   - Informative titles help users understand what they're looking at
+
+2. **Robustness is Critical:**
+   - Path resolution must work from any directory
+   - Fallbacks (TaxoPy) prevent failures when files are missing
+   - Clear error messages save debugging time
+
+3. **Metadata is Essential:**
+   - Storing run metadata enables automatic visualization
+   - Provenance tracking (dataset info) ensures reproducibility
+   - Organized artifact structure makes it easy to find results
+
+4. **Modular Design:**
+   - Shared utilities prevent code duplication
+   - Builders can be used standalone or via CLI
+   - Clear separation allows independent testing
+
+---
+
 ## References
 
 - Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations"
 - Facebook Research: https://github.com/facebookresearch/poincare-embeddings
 - NCBI Taxonomy: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
+- TaxoPy: https://pypi.org/project/taxopy/
 - This project: https://github.com/jcoludar/taxembed
 
 ---
 
-*Last Updated: November 14, 2025*
+*Last Updated: December 2025*

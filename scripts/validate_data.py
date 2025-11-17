@@ -9,9 +9,19 @@ Checks:
 4. Node indices are sequential
 """
 
+from __future__ import annotations
+
 import sys
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from taxembed.utils.data_validation import coverage_from_indices, load_mapping
 
 
 def validate_edgelist(filepath):
@@ -80,25 +90,20 @@ def validate_mapping(filepath):
     print(f"\n📋 Validating mapping: {filepath}")
     
     try:
-        df = pd.read_csv(filepath, sep='\t', dtype={'taxid': str, 'idx': int})
+        df = load_mapping(Path(filepath))
     except Exception as e:
         print(f"  ❌ Failed to read: {e}")
         return False
     
     print(f"  ✓ Total mappings: {len(df):,}")
     
-    # Check for non-numeric taxids (likely headers)
-    non_numeric = []
-    for i, row in df.iterrows():
-        try:
-            int(row['taxid'])
-        except ValueError:
-            non_numeric.append(f"Row {i}: taxid='{row['taxid']}' is not numeric")
-    
-    if non_numeric:
+    invalid_mask = ~df["taxid"].str.isnumeric()
+    non_numeric = df[invalid_mask]
+
+    if not non_numeric.empty:
         print(f"  ❌ Found {len(non_numeric)} non-numeric TaxIDs:")
-        for issue in non_numeric[:10]:
-            print(f"     {issue}")
+        for idx, row in non_numeric.head(10).iterrows():
+            print(f"     Row {idx}: taxid='{row['taxid']}' is not numeric")
         return False
     
     # Check if indices are sequential
@@ -145,7 +150,7 @@ def validate_consistency(edgelist_file, mapping_file):
                     pass
     
     # Load mapping
-    df = pd.read_csv(mapping_file, sep='\t', dtype={'taxid': str, 'idx': int})
+    df = load_mapping(Path(mapping_file))
     
     # Filter out non-numeric taxids
     numeric_df = df[df['taxid'].str.isnumeric()]
@@ -162,12 +167,17 @@ def validate_consistency(edgelist_file, mapping_file):
     else:
         print(f"  ✓ All edgelist nodes are in mapping")
     
-    # Check if all mapping indices are in edgelist
-    unused = mapped_indices - nodes
-    if unused:
-        print(f"  ⚠️  {len(unused)} indices in mapping not used in edgelist")
-    else:
+    report = coverage_from_indices(numeric_df, nodes)
+    if report.is_perfect:
         print(f"  ✓ All mapping indices are used in edgelist")
+    else:
+        print(
+            f"  ⚠️  Coverage gap: {report.missing_count} indices missing "
+            f"({report.coverage_ratio * 100:.1f}% covered)"
+        )
+        sample = sorted(report.missing_indices)[:10]
+        if sample:
+            print(f"     Examples: {sample}")
     
     return len(unmapped) == 0
 
