@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """Build transitive closure for hierarchical training."""
 
-import sys
-import os
-
-# Add root to path to import existing script
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
-from build_transitive_closure import main as build_main
+from taxembed.data.transitive import main as build_transitive_closure
 
 
 def main():
     """Build transitive closure from taxonomy edges."""
-    build_main()
+    build_transitive_closure()
 
 
 if __name__ == "__main__":

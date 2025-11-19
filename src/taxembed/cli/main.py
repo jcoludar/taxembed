@@ -7,17 +7,16 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
-import torch
 import taxopy
+import torch
 
 from taxembed.builders import build_clade_dataset
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]  # .../poincare-embeddings/src/taxembed/cli -> repo root
+PROJECT_ROOT = Path(__file__).resolve().parents[3]  # .../taxembed/src/taxembed/cli -> repo root
 DATA_DIR = PROJECT_ROOT / "data"
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "tags"
 
@@ -68,7 +67,9 @@ def resolve_taxid(identifier: str, taxdump_dir: Path) -> tuple[int, str]:
         try:
             taxid = int(choices[0])
         except (TypeError, ValueError) as exc:  # pragma: no cover
-            raise SystemExit(f"❌ Failed to interpret TaxID for '{identifier}': {choices[0]!r}") from exc
+            raise SystemExit(
+                f"❌ Failed to interpret TaxID for '{identifier}': {choices[0]!r}"
+            ) from exc
 
     name = taxdb.taxid2name.get(str(taxid)) or taxdb.taxid2name.get(taxid, str(taxid))
     return taxid, name
@@ -87,7 +88,7 @@ def handle_train(args: argparse.Namespace) -> None:
     tag_dir = ARTIFACTS_DIR / slug
     tag_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset_record: Dict[str, Any]
+    dataset_record: dict[str, Any]
     training_data_path: Path
     mapping_path: Path
 
@@ -138,11 +139,12 @@ def handle_train(args: argparse.Namespace) -> None:
         )
 
     checkpoint_base = tag_dir / f"{slug}.pth"
-    train_script = PROJECT_ROOT / "train_small.py"
 
+    # Use the installed taxembed-train command from the package
     train_cmd = [
         sys.executable,
-        str(train_script),
+        "-m",
+        "taxembed.cli.train",
         "--data",
         str(training_data_path),
         "--mapping",
@@ -193,7 +195,7 @@ def handle_train(args: argparse.Namespace) -> None:
         metadata = {
             "tag": args.as_tag,
             "slug": slug,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "identifier": args.identifier,
             "dataset": dataset_record,
             "training": {
@@ -241,19 +243,19 @@ def handle_visualize(args: argparse.Namespace) -> None:
     dataset_meta = metadata.get("dataset", {})
     paths = metadata.get("training", {}).get("paths", {})
 
-    checkpoint_path_str = args.checkpoint or paths.get("best_checkpoint") or paths.get("checkpoint_base", "")
+    checkpoint_path_str = (
+        args.checkpoint or paths.get("best_checkpoint") or paths.get("checkpoint_base", "")
+    )
     if not checkpoint_path_str:
         raise SystemExit(f"❌ No checkpoint path found in metadata for tag '{args.tag}'")
-    
+
     checkpoint_path = Path(checkpoint_path_str)
     if not checkpoint_path.is_absolute():
         checkpoint_path = (tag_dir / checkpoint_path_str).resolve()
     else:
         checkpoint_path = checkpoint_path.resolve()
 
-    mapping_path = Path(
-        args.mapping or paths.get("mapping", "")
-    ).resolve()
+    mapping_path = Path(args.mapping or paths.get("mapping", "")).resolve()
 
     if not checkpoint_path.exists():
         raise SystemExit(f"❌ Checkpoint not found: {checkpoint_path}")
@@ -262,10 +264,11 @@ def handle_visualize(args: argparse.Namespace) -> None:
 
     output_path = Path(args.output) if args.output else tag_dir / f"{slug}_umap.png"
 
-    viz_script = PROJECT_ROOT / "visualize_multi_groups.py"
+    # Use the installed taxembed visualization module
     viz_cmd = [
         sys.executable,
-        str(viz_script),
+        "-m",
+        "taxembed.visualization.umap_viz",
         str(checkpoint_path),
         "--mapping",
         str(mapping_path),
@@ -283,19 +286,21 @@ def handle_visualize(args: argparse.Namespace) -> None:
         viz_cmd.extend(["--root-taxid", str(root_taxid)])
     # Always pass children depth (default is 0 for immediate children)
     viz_cmd.extend(["--children", str(args.children)])
-    
+
     # Extract title information from checkpoint and metadata
-    clade_name = dataset_meta.get("root_name") or dataset_meta.get("dataset_name") or args.tag.title()
+    clade_name = (
+        dataset_meta.get("root_name") or dataset_meta.get("dataset_name") or args.tag.title()
+    )
     epoch = None
     loss = None
-    
+
     try:
         ckpt = torch.load(checkpoint_path, map_location="cpu")
         epoch = ckpt.get("epoch", None)
         loss = ckpt.get("loss", None)
     except Exception:
         pass
-    
+
     if clade_name:
         viz_cmd.extend(["--clade-name", str(clade_name)])
     if epoch is not None:
@@ -313,15 +318,26 @@ def handle_visualize(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="taxembed", description="Unified CLI for taxonomy embeddings")
+    parser = argparse.ArgumentParser(
+        prog="taxembed", description="Unified CLI for taxonomy embeddings"
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     train_parser = subparsers.add_parser("train", help="Build dataset and train embeddings")
-    train_parser.add_argument("identifier", nargs="?", help="TaxID or clade name recognized by NCBI")
-    train_parser.add_argument("-as", "--as-tag", required=True, help="Tag name used to reference this run")
+    train_parser.add_argument(
+        "identifier", nargs="?", help="TaxID or clade name recognized by NCBI"
+    )
+    train_parser.add_argument(
+        "-as", "--as-tag", required=True, help="Tag name used to reference this run"
+    )
     train_parser.add_argument("--file", help="Path to prebuilt transitive dataset (.pkl)")
     train_parser.add_argument("--mapping", help="Mapping file (required with --file)")
-    train_parser.add_argument("--max-depth", type=int, default=None, help="Limit descendant depth when building clades")
+    train_parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=None,
+        help="Limit descendant depth when building clades",
+    )
     train_parser.add_argument("--epochs", type=int, default=100)
     train_parser.add_argument("--dim", type=int, default=10)
     train_parser.add_argument("--batch-size", type=int, default=64)
@@ -335,21 +351,43 @@ def build_parser() -> argparse.ArgumentParser:
 
     visualize_parser = subparsers.add_parser("visualize", help="Visualize a trained tag with UMAP")
     visualize_parser.add_argument("tag", help="Tag used during `taxembed train ... -as TAG`")
-    visualize_parser.add_argument("--sample", type=int, default=25000, help="Number of points for UMAP sampling")
+    visualize_parser.add_argument(
+        "--sample", type=int, default=25000, help="Number of points for UMAP sampling"
+    )
     visualize_parser.add_argument("--output", help="Output image path")
     visualize_parser.add_argument("--checkpoint", help="Override checkpoint path")
     visualize_parser.add_argument("--mapping", help="Override mapping path")
     visualize_parser.add_argument("--names", help="Override names.dmp path")
     visualize_parser.add_argument("--nodes", help="Override nodes.dmp path")
     visualize_parser.add_argument("--root-taxid", type=int, help="Override root TaxID for coloring")
-    visualize_parser.add_argument("--children", type=int, default=0,
-                                 help="Depth level for coloring (0=children, 1=grandchildren, 2=great-grandchildren, etc.)")
+    visualize_parser.add_argument(
+        "--children",
+        type=int,
+        default=0,
+        help="Depth level for coloring (0=children, 1=grandchildren, 2=great-grandchildren, etc.)",
+    )
     visualize_parser.set_defaults(func=handle_visualize)
+
+    analyze_parser = subparsers.add_parser(
+        "analyze", help="Analyze hierarchy quality of embeddings"
+    )
+    analyze_parser.add_argument("checkpoint", help="Checkpoint file to analyze")
+    analyze_parser.add_argument("--mapping", help="Override mapping path")
+    analyze_parser.set_defaults(func=handle_analyze)
 
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> None:
+def handle_analyze(args: argparse.Namespace) -> None:
+    """Handle analyze subcommand."""
+    from taxembed.analysis import analyze_hierarchy
+
+    # For now, just call the main function
+    # TODO: Update to accept checkpoint argument
+    analyze_hierarchy()
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):
@@ -360,4 +398,3 @@ def main(argv: Optional[list[str]] = None) -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Set
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ class CoverageReport:
 
     total_nodes: int
     used_nodes: int
-    missing_indices: Set[int]
+    missing_indices: set[int]
 
     @property
     def missing_count(self) -> int:
@@ -49,7 +49,7 @@ def load_mapping(mapping_path: Path) -> pd.DataFrame:
     return df
 
 
-def mapping_indices(df: pd.DataFrame) -> Set[int]:
+def mapping_indices(df: pd.DataFrame) -> set[int]:
     """Return the set of sequential indices present in a mapping dataframe."""
 
     return set(df["idx"].astype(int).tolist())
@@ -74,4 +74,3 @@ __all__ = [
     "load_mapping",
     "mapping_indices",
 ]
-

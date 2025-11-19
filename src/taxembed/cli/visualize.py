@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 """Visualize taxonomy embeddings with UMAP."""
 
-import sys
-import os
-import argparse
-
-# Add root to path to import existing script
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
-from visualize_multi_groups import main as viz_main
+from taxembed.visualization import visualize_embeddings
 
 
 def main():
     """Create UMAP visualization of embeddings."""
-    viz_main()
+    visualize_embeddings()
 
 
 if __name__ == "__main__":
