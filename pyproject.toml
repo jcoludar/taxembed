@@ -1,15 +1,43 @@
+# =============================================================================
+# Build System & Configuration
+# =============================================================================
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/taxembed"]
+
+# =============================================================================
+# Project Metadata
+# =============================================================================
 [project]
 name = "taxembed"
-version = "0.2.0"
-description = "Hierarchical Poincaré embeddings for NCBI biological taxonomy"
+version = "1.0.0"
+description = "Hierarchical Poincaré embeddings for biological taxonomy"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Joha Coludar", email = "jcoludar@gmail.com" }
+    { name = "Thomas Senoner", email = "info@example.com" }
+]
+keywords = [
+    "taxonomy",
+    "embeddings",
+    "hyperbolic",
+    "poincare",
+    "hierarchical",
+    "ncbi",
+    "biology",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -23,14 +51,6 @@ dependencies = [
     "taxopy>=0.14.0",
 ]
 
-[project.scripts]
-taxembed = "taxembed.cli.main:main"
-taxembed-download = "taxembed.cli.download:main"
-taxembed-prepare = "taxembed.cli.prepare:main"
-taxembed-train = "taxembed.cli.train:main"
-taxembed-visualize = "taxembed.cli.visualize:main"
-taxembed-check = "taxembed.cli.check:main"
-
 [project.optional-dependencies]
 dev = [
     "ruff>=0.6.0",
@@ -39,22 +59,64 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+[project.scripts]
+taxembed = "taxembed.cli.main:main"
+taxembed-download = "taxembed.cli.download:main"
+taxembed-prepare = "taxembed.cli.prepare:main"
+taxembed-train = "taxembed.cli.train:main"
+taxembed-visualize = "taxembed.cli.visualize:main"
+taxembed-check = "taxembed.cli.check:main"
+taxembed-analyze = "taxembed.cli.analyze:main"
+
 [project.urls]
 Repository = "https://github.com/jcoludar/taxembed"
 Documentation = "https://github.com/jcoludar/taxembed/blob/main/README.md"
 Issues = "https://github.com/jcoludar/taxembed/issues"
 
-[dependency-groups]
-dev = [
-    "ruff>=0.6.0",
-    "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "mypy>=1.0.0",
+# =============================================================================
+# Development Tools Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# MyPy: Static Type Checking
+# -----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+strict_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true  # Allow untyped third-party libraries
+
+# Gradual typing: temporarily allow untyped defs in these modules
+# Remove modules from this list as you add complete type annotations
+[[tool.mypy.overrides]]
+module = [
+    "taxembed.analysis.*",
+    "taxembed.builders.*",
+    "taxembed.cli.*",
+    "taxembed.data.*",
+    "taxembed.models.*",
+    "taxembed.training.*",
+    "taxembed.validation.*",
+    "taxembed.visualization.*",
 ]
+disallow_untyped_defs = false
+check_untyped_defs = false
+warn_return_any = false
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/taxembed"]
+# -----------------------------------------------------------------------------
+# Pytest: Testing Framework
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--cov=src/taxembed --cov-report=term-missing"
 
+# -----------------------------------------------------------------------------
+# Ruff: Linting and Formatting
+# -----------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -68,7 +130,8 @@ exclude = [
     "__pycache__",
     ".pytest_cache",
     ".ruff_cache",
-    "hype",  # Original Facebook code
+    "*.egg-info",
+    "_vendor",  # Facebook's original code (backup)
 ]
 
 [tool.ruff.lint]
@@ -83,24 +146,19 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
-    "W503",   # line break before binary operator
+    "E203",   # whitespace before ':'
     "B008",   # function calls in argument defaults
+    "C901",   # function is too complex (acceptable for now)
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["taxembed"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+"tests/*" = ["F841"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "--cov=src/taxembed --cov-report=term-missing"
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false  # Gradual typing
