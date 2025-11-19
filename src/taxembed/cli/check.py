@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """Check and validate trained models."""
 
-import sys
-import os
-
-# Add root to path to import existing script
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
-from final_sanity_check import main as check_main
+from taxembed.validation import run_checks
 
 
 def main():
     """Run comprehensive sanity checks."""
-    check_main()
+    run_checks()
 
 
 if __name__ == "__main__":

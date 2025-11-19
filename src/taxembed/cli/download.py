@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 """Download and prepare NCBI taxonomy data."""
 
-import sys
-import os
-
-# Add root to path to import existing script
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-
-from prepare_taxonomy_data import main as prepare_main
+from taxembed.data import download_taxonomy
 
 
 def main():
     """Download NCBI taxonomy data."""
-    prepare_main()
+    download_taxonomy()
 
 
 if __name__ == "__main__":

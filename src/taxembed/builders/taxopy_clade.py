@@ -6,9 +6,9 @@ import json
 import pickle
 import re
 from collections import defaultdict, deque
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import taxopy
@@ -17,7 +17,7 @@ from tqdm.auto import tqdm
 from taxembed.utils.data_validation import coverage_from_indices
 
 TaxId = int
-Edge = Tuple[TaxId, TaxId]
+Edge = tuple[TaxId, TaxId]
 
 
 @dataclass
@@ -31,7 +31,7 @@ class CladeBuildResult:
     max_depth: int
     pairs_count: int
     output_dir: Path
-    files: Dict[str, Path]
+    files: dict[str, Path]
 
 
 def slugify(text: str) -> str:
@@ -41,8 +41,8 @@ def slugify(text: str) -> str:
     return slug or "clade"
 
 
-def _build_children_index(parent_map: Dict[int, int]) -> Dict[int, List[int]]:
-    children: Dict[int, List[int]] = defaultdict(list)
+def _build_children_index(parent_map: dict[int, int]) -> dict[int, list[int]]:
+    children: dict[int, list[int]] = defaultdict(list)
     for child, parent in parent_map.items():
         if child == parent:
             continue
@@ -51,14 +51,14 @@ def _build_children_index(parent_map: Dict[int, int]) -> Dict[int, List[int]]:
 
 
 def _collect_clade(
-    children_map: Dict[int, List[int]],
+    children_map: dict[int, list[int]],
     root_taxid: int,
-    max_depth: Optional[int] = None,
-) -> Tuple[Dict[int, int], List[Edge]]:
-    depth_by_taxid: Dict[int, int] = {}
-    edges: List[Edge] = []
+    max_depth: int | None = None,
+) -> tuple[dict[int, int], list[Edge]]:
+    depth_by_taxid: dict[int, int] = {}
+    edges: list[Edge] = []
 
-    queue: deque[Tuple[int, int]] = deque([(root_taxid, 0)])
+    queue: deque[tuple[int, int]] = deque([(root_taxid, 0)])
     visited: set[int] = set()
 
     while queue:
@@ -78,7 +78,7 @@ def _collect_clade(
     return depth_by_taxid, edges
 
 
-def _build_mapping(depths: Dict[int, int]) -> Tuple[pd.DataFrame, Dict[int, int], Dict[int, int]]:
+def _build_mapping(depths: dict[int, int]) -> tuple[pd.DataFrame, dict[int, int], dict[int, int]]:
     sorted_taxids = sorted(depths.keys())
     mapping_df = pd.DataFrame(
         {
@@ -86,17 +86,17 @@ def _build_mapping(depths: Dict[int, int]) -> Tuple[pd.DataFrame, Dict[int, int]
             "idx": list(range(len(sorted_taxids))),
         }
     )
-    taxid_to_idx = dict(zip(mapping_df["taxid"], mapping_df["idx"]))
+    taxid_to_idx = dict(zip(mapping_df["taxid"], mapping_df["idx"], strict=False))
     idx_to_taxid = {idx: taxid for taxid, idx in taxid_to_idx.items()}
     return mapping_df, taxid_to_idx, idx_to_taxid
 
 
 def _build_transitive_pairs(
-    depths: Dict[int, int],
-    parent_map: Dict[int, int],
-    taxid_to_idx: Dict[int, int],
-) -> List[Dict[str, int]]:
-    pairs: List[Dict[str, int]] = []
+    depths: dict[int, int],
+    parent_map: dict[int, int],
+    taxid_to_idx: dict[int, int],
+) -> list[dict[str, int]]:
+    pairs: list[dict[str, int]] = []
 
     iterator = depths.items()
     for taxid, depth in tqdm(iterator, desc="Building ancestor-descendant pairs", unit="node"):
@@ -122,13 +122,13 @@ def _build_transitive_pairs(
 
 
 def _ensure_coverage(
-    pairs: List[Dict[str, int]],
+    pairs: list[dict[str, int]],
     mapping_df: pd.DataFrame,
-    depths: Dict[int, int],
-    parent_map: Dict[int, int],
+    depths: dict[int, int],
+    parent_map: dict[int, int],
 ) -> None:
-    idx_to_taxid = dict(zip(mapping_df["idx"], mapping_df["taxid"]))
-    taxid_to_idx = dict(zip(mapping_df["taxid"], mapping_df["idx"]))
+    idx_to_taxid = dict(zip(mapping_df["idx"], mapping_df["taxid"], strict=False))
+    taxid_to_idx = dict(zip(mapping_df["taxid"], mapping_df["idx"], strict=False))
 
     covered = {entry["ancestor_idx"] for entry in pairs}
     covered.update(entry["descendant_idx"] for entry in pairs)
@@ -168,7 +168,7 @@ def _write_edges(edges: Sequence[Edge], path: Path) -> None:
             handle.write(f"{parent} {child}\n")
 
 
-def _write_mapped_edges(edges: Sequence[Edge], mapping: Dict[int, int], path: Path) -> None:
+def _write_mapped_edges(edges: Sequence[Edge], mapping: dict[int, int], path: Path) -> None:
     with path.open("w") as handle:
         for parent, child in edges:
             if parent in mapping and child in mapping:
@@ -179,7 +179,7 @@ def _write_mapping(mapping_df: pd.DataFrame, path: Path) -> None:
     mapping_df.to_csv(path, sep="\t", index=False)
 
 
-def _write_transitive(training_pairs: List[Dict[str, int]], prefix: Path) -> Dict[str, Path]:
+def _write_transitive(training_pairs: list[dict[str, int]], prefix: Path) -> dict[str, Path]:
     tsv_path = prefix.with_name(f"{prefix.name}.tsv")
     edgelist_path = prefix.with_name(f"{prefix.name}.edgelist")
     pkl_path = prefix.with_name(f"{prefix.name}.pkl")
@@ -211,7 +211,7 @@ def _write_manifest(
     edge_count: int,
     max_depth: int,
     pairs_count: int,
-    max_depth_requested: Optional[int],
+    max_depth_requested: int | None,
 ) -> None:
     manifest = {
         "dataset_name": dataset_name,
@@ -229,10 +229,10 @@ def _write_manifest(
 def build_clade_dataset(
     root_taxid: int,
     *,
-    dataset_name: Optional[str] = None,
+    dataset_name: str | None = None,
     output_dir: Path | str = Path("data") / "taxopy",
     taxdump_dir: Path | str = Path("data"),
-    max_depth: Optional[int] = None,
+    max_depth: int | None = None,
 ) -> CladeBuildResult:
     """Materialize a dataset for ``root_taxid`` and its descendants."""
 
@@ -252,10 +252,14 @@ def build_clade_dataset(
     mapping_df, taxid_to_idx, idx_to_taxid = _build_mapping(depths)
 
     if not dataset_name:
-        root_name = taxdb.taxid2name.get(str(root_taxid)) or taxdb.taxid2name.get(root_taxid, str(root_taxid))
+        root_name = taxdb.taxid2name.get(str(root_taxid)) or taxdb.taxid2name.get(
+            root_taxid, str(root_taxid)
+        )
         dataset_name = slugify(root_name)
     else:
-        root_name = taxdb.taxid2name.get(str(root_taxid)) or taxdb.taxid2name.get(root_taxid, str(root_taxid))
+        root_name = taxdb.taxid2name.get(str(root_taxid)) or taxdb.taxid2name.get(
+            root_taxid, str(root_taxid)
+        )
 
     dataset_dir = output_dir / dataset_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -272,9 +276,9 @@ def build_clade_dataset(
     training_pairs = _build_transitive_pairs(depths, parent_map, taxid_to_idx)
     _ensure_coverage(training_pairs, mapping_df, depths, parent_map)
 
-    used_indices = {
-        entry["ancestor_idx"] for entry in training_pairs
-    } | {entry["descendant_idx"] for entry in training_pairs}
+    used_indices = {entry["ancestor_idx"] for entry in training_pairs} | {
+        entry["descendant_idx"] for entry in training_pairs
+    }
     coverage = coverage_from_indices(mapping_df, used_indices)
     if not coverage.is_perfect:
         missing_taxids = [idx_to_taxid[idx] for idx in sorted(coverage.missing_indices)]
@@ -283,7 +287,9 @@ def build_clade_dataset(
             f"Missing indices: {missing_taxids[:10]}"
         )
 
-    transitive_paths = _write_transitive(training_pairs, prefix.with_name(f"{prefix.name}_transitive"))
+    transitive_paths = _write_transitive(
+        training_pairs, prefix.with_name(f"{prefix.name}_transitive")
+    )
 
     manifest_path = prefix.with_name(f"{prefix.name}_manifest.json")
     _write_manifest(
@@ -316,4 +322,3 @@ def build_clade_dataset(
         output_dir=dataset_dir,
         files=files,
     )
-
