@@ -1,19 +1,13 @@
 # Python
 *.py[cod]
-*$py.class
 __pycache__/
 *.so
 *.egg
 *.egg-info/
 dist/
 build/
-.Python
-env/
 venv/
-venv311/
-.venv
-pip-log.txt
-pip-delete-this-directory.txt
+.venv/
 
 # IDE
 .idea/
@@ -28,32 +22,25 @@ pip-delete-this-directory.txt
 
 # Project specific - Generated files
 *.log
-training*.log
-nohup.out
 
 # Project specific - Visualizations
 *.png
 *.jpg
-umap*.png
 
-# Project specific - Data
-data/
-artifacts/
-wordnet/*.csv
+# Project specific - Data (only root, not src/taxembed/data/)
+/data/
+/artifacts/
 
-# Project specific - Compiled extensions
-hype/adjacency_matrix_dataset.cpp
-hype/graph_dataset.cpp
-*.so
+# Examples output
+examples/*.pth
+examples/*.png
 
 # macOS
 .DS_Store
 
-# Testing
+# Testing & Code Quality
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
-
-# Ruff
 .ruff_cache/
+.mypy_cache/
