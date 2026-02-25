@@ -16,19 +16,38 @@ import numpy as np
 import pandas as pd
 import torch
 import taxopy
+from numba import njit
 from umap import UMAP
+
+
+@njit(fastmath=True)
+def _poincare_dist_numba(u, v):
+    """Poincaré ball distance for UMAP custom metric."""
+    eps = 1e-5
+    u_sqnorm = 0.0
+    v_sqnorm = 0.0
+    diff_sqnorm = 0.0
+    for i in range(u.shape[0]):
+        u_sqnorm += u[i] * u[i]
+        v_sqnorm += v[i] * v[i]
+        d = u[i] - v[i]
+        diff_sqnorm += d * d
+    u_sqnorm = min(u_sqnorm, 1.0 - eps)
+    v_sqnorm = min(v_sqnorm, 1.0 - eps)
+    x = 2.0 * diff_sqnorm / ((1.0 - u_sqnorm) * (1.0 - v_sqnorm) + eps)
+    return np.arccosh(1.0 + x + eps)
 
 
 def load_embeddings(ckpt_path):
     """Load embeddings from checkpoint."""
     print(f"Loading embeddings from {ckpt_path}...")
-    ckpt = torch.load(ckpt_path, map_location="cpu")
-    
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
     if "state_dict" in ckpt:
         sd = ckpt["state_dict"]
         emb = sd["lt.weight"].detach().cpu().numpy()
     elif "embeddings" in ckpt:
-        emb = ckpt["embeddings"].cpu().numpy()
+        emb = ckpt["embeddings"].detach().cpu().numpy()
     else:
         raise ValueError("Cannot find embeddings in checkpoint")
     
@@ -55,64 +74,53 @@ def load_mapping(map_path):
 
 
 def load_taxonomy_tree(valid_taxids=None, base_dir: Path = Path("data")):
-    """Load NCBI taxonomy tree structure from dump files or TaxoPy fallback."""
+    """Load NCBI taxonomy tree via TaxoPy.
+
+    Handles both old (names.dmp/nodes.dmp) and new (rankedlineage.dmp/
+    taxidlineage.dmp) NCBI taxdump formats transparently.
+
+    Returns (names, nodes) dicts mapping int taxid -> name/parent_taxid,
+    or (None, None) on failure.
+    """
     names = {}
     nodes = {}
-    
-    # Try loading from dump files first
-    names_path = base_dir / "names.dmp"
-    nodes_path = base_dir / "nodes.dmp"
-    
-    if names_path.exists() and nodes_path.exists():
-        try:
-            # Load names
-            with names_path.open("r") as f:
-                for line in f:
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) >= 4 and parts[3] == "scientific name":
-                        taxid = int(parts[0])
-                        if valid_taxids is None or taxid in valid_taxids:
-                            names[taxid] = parts[1]
-            
-            # Load nodes (parent relationships)
-            with nodes_path.open("r") as f:
-                for line in f:
-                    parts = [p.strip() for p in line.split("|")]
-                    if len(parts) >= 5:
-                        taxid = int(parts[0])
-                        parent = int(parts[1])
-                        if valid_taxids is None or taxid in valid_taxids:
-                            nodes[taxid] = parent
-            
-            print(f"Loading taxonomy tree from dump files...")
-            print(f"  ✓ Loaded {len(nodes):,} taxonomy nodes (filtered to dataset)")
-            return names, nodes
-        except Exception as e:
-            print(f"⚠️  Error reading dump files: {e}, falling back to TaxoPy...")
-    
-    # Fallback to TaxoPy
+    base_dir = Path(base_dir)
+
+    print(f"Loading taxonomy tree via TaxoPy from {base_dir}...")
+
+    # Build TaxDb with explicit file paths when available
     try:
-        print(f"Loading taxonomy tree via TaxoPy (dump files not found)...")
-        taxdb = taxopy.TaxDb(taxdb_dir=str(base_dir))
-        
-        # Build names dict
-        for taxid_str, name in taxdb.taxid2name.items():
-            taxid = int(taxid_str)
-            if valid_taxids is None or taxid in valid_taxids:
-                names[taxid] = name
-        
-        # Build nodes dict (parent relationships)
-        for taxid_str, parent_str in taxdb.taxid2parent.items():
-            taxid = int(taxid_str)
-            parent = int(parent_str)
-            if valid_taxids is None or taxid in valid_taxids:
-                nodes[taxid] = parent
-        
-        print(f"  ✓ Loaded {len(nodes):,} taxonomy nodes via TaxoPy (filtered to dataset)")
-        return names, nodes
+        nodes_path = base_dir / "nodes.dmp"
+        names_path = base_dir / "names.dmp"
+        merged_path = base_dir / "merged.dmp"
+
+        if nodes_path.exists() and names_path.exists():
+            taxdb = taxopy.TaxDb(
+                nodes_dmp=str(nodes_path),
+                names_dmp=str(names_path),
+                merged_dmp=str(merged_path) if merged_path.exists() else None,
+                keep_files=True,
+            )
+        else:
+            taxdb = taxopy.TaxDb(taxdb_dir=str(base_dir))
     except Exception as e:
-        print(f"⚠️  Could not load taxonomy tree: {e}")
+        print(f"  Could not load taxonomy: {e}")
         return None, None
+
+    # TaxoPy uses int keys — iterate and filter to valid_taxids
+    for taxid, name in taxdb.taxid2name.items():
+        taxid = int(taxid)
+        if valid_taxids is None or taxid in valid_taxids:
+            names[taxid] = name
+
+    for taxid, parent in taxdb.taxid2parent.items():
+        taxid = int(taxid)
+        parent = int(parent)
+        if valid_taxids is None or taxid in valid_taxids:
+            nodes[taxid] = parent
+
+    print(f"  Loaded {len(nodes):,} taxonomy nodes (filtered to dataset)")
+    return names, nodes
 
 
 # Taxonomic groups with their root TaxIDs
@@ -165,6 +173,7 @@ def visualize_multi_groups(
     clade_name=None,
     epoch=None,
     loss=None,
+    metric="euclidean",
 ):
     """Create UMAP visualization with multiple highlighted groups.
     
@@ -282,8 +291,12 @@ def visualize_multi_groups(
     sample_emb = emb[sampled_indices]
     
     # Run UMAP
-    print(f"\nRunning UMAP on {len(sampled_indices):,} points...")
-    umap_model = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
+    print(f"\nRunning UMAP on {len(sampled_indices):,} points (metric={metric})...")
+    if metric == "poincare":
+        umap_model = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1,
+                          metric=_poincare_dist_numba)
+    else:
+        umap_model = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
     projection = umap_model.fit_transform(sample_emb)
     
     # Plot
@@ -362,15 +375,17 @@ def main():
     parser.add_argument("--mapping", help="Path to mapping file (auto-detected if not specified)")
     parser.add_argument("--sample", type=int, default=25000, help="Number of points to sample")
     parser.add_argument("--output", help="Output filename")
-    parser.add_argument("--names", help="Path to names.dmp (default: data/names.dmp)")
-    parser.add_argument("--nodes", help="Path to nodes.dmp (default: data/nodes.dmp)")
+    parser.add_argument("--names", help="Path to names.dmp (legacy, used to locate data dir)")
+    parser.add_argument("--nodes", help="Path to nodes.dmp (legacy, used to locate data dir)")
     parser.add_argument("--root-taxid", type=int, help="Root TaxID for child-level coloring")
     parser.add_argument("--children", type=int, default=0, 
                        help="Depth level for coloring (0=children, 1=grandchildren, 2=great-grandchildren, etc.)")
     parser.add_argument("--clade-name", help="Name of the clade for title")
     parser.add_argument("--epoch", type=int, help="Training epoch for title")
     parser.add_argument("--loss", type=float, help="Training loss for title")
-    
+    parser.add_argument("--metric", choices=["euclidean", "poincare"], default="poincare",
+                       help="UMAP distance metric (default: poincare)")
+
     args = parser.parse_args()
     
     # Load embeddings
@@ -401,14 +416,13 @@ def main():
     # Load taxonomy tree - find data directory relative to script location
     script_dir = Path(__file__).resolve().parent
     default_data_dir = script_dir / "data"
-    
+
     if args.names or args.nodes:
-        names_path = Path(args.names).resolve() if args.names else default_data_dir / "names.dmp"
-        nodes_path = Path(args.nodes).resolve() if args.nodes else names_path.parent / "nodes.dmp"
-        base_dir = names_path.parent
+        # Use parent directory of the provided dump file as base
+        ref_path = Path(args.names or args.nodes).resolve()
+        base_dir = ref_path.parent if ref_path.is_file() else ref_path
         names, nodes = load_taxonomy_tree(valid_taxids, base_dir=base_dir)
     else:
-        # Use data directory relative to script location
         names, nodes = load_taxonomy_tree(valid_taxids, base_dir=default_data_dir)
     if names is None or nodes is None:
         print("❌ Could not load taxonomy tree")
@@ -433,6 +447,7 @@ def main():
         clade_name=args.clade_name,
         epoch=args.epoch,
         loss=args.loss,
+        metric=args.metric,
     )
 
 

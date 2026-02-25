@@ -1,5 +1,8 @@
 .PHONY: help install lint format test clean train check
 
+# Prevent parent venv from causing uv warnings when SpeciesEmbedding venv is active
+unexport VIRTUAL_ENV
+
 help:
 	@echo "taxembed - Hierarchical Poincaré Embeddings for Taxonomy"
 	@echo ""

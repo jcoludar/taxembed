@@ -1,1 +1,0 @@
-"""Hyperbolic manifold implementations."""

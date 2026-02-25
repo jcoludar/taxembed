@@ -30,6 +30,8 @@ pip-delete-this-directory.txt
 *.log
 training*.log
 nohup.out
+PROGRESS.md
+TRAINING_LOG.md
 
 # Project specific - Visualizations
 *.png
@@ -39,11 +41,11 @@ umap*.png
 # Project specific - Data
 data/
 artifacts/
+artifacts_archive/
+small_model_28epoch/
 wordnet/*.csv
 
 # Project specific - Compiled extensions
-hype/adjacency_matrix_dataset.cpp
-hype/graph_dataset.cpp
 *.so
 
 # macOS

@@ -174,7 +174,7 @@ python visualize_multi_groups.py taxonomy_model_full_best.pth
 
 ### 4. Analyze Hierarchy
 ```bash
-python analyze_hierarchy_hyperbolic.py
+python scripts/analyze_hierarchy_hyperbolic.py
 ```
 
 ---

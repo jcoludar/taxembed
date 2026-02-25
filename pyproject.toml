@@ -31,14 +31,6 @@ taxembed-train = "taxembed.cli.train:main"
 taxembed-visualize = "taxembed.cli.visualize:main"
 taxembed-check = "taxembed.cli.check:main"
 
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.6.0",
-    "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "mypy>=1.0.0",
-]
-
 [project.urls]
 Repository = "https://github.com/jcoludar/taxembed"
 Documentation = "https://github.com/jcoludar/taxembed/blob/main/README.md"
@@ -68,7 +60,7 @@ exclude = [
     "__pycache__",
     ".pytest_cache",
     ".ruff_cache",
-    "hype",  # Original Facebook code
+    "docs/archive",  # Legacy code
 ]
 
 [tool.ruff.lint]
@@ -83,7 +75,6 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
-    "W503",   # line break before binary operator
     "B008",   # function calls in argument defaults
 ]
 

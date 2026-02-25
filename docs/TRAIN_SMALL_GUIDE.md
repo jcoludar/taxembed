@@ -100,7 +100,7 @@ After training:
 
 1. **Analyze hierarchy quality:**
    ```bash
-   python analyze_hierarchy_hyperbolic.py
+   python scripts/analyze_hierarchy_hyperbolic.py
    ```
 
 2. **Visualize embeddings:**
