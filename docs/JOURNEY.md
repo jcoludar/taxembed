@@ -891,6 +891,161 @@ taxembed visualize cnidaria --children 1  # Color by grandchildren
 
 ---
 
+## Phase 11: v10a Architecture & Scaling (Feb 2026)
+
+### **Architecture Evolution: v5 through v10a**
+
+After the unified CLI (Phase 10), extensive experimentation refined the training architecture across ~20 tagged runs on Echinodermata and Mollusca.
+
+#### **Key Architectural Discoveries**
+
+**RiemannianAdam is Harmful (v5-v6):**
+The Riemannian optimizer's conformal factor `((1-||p||^2)^2/4)` causes 110x gradient reduction at norm 0.9, destroying angular clustering for deep nodes. Depth-norm correlation r=+0.936 (great radial order) but angular clustering r=0.065 (destroyed).
+
+**Euclidean Adam + Radial Nudge (v4/v9d) is the Answer:**
+Post-step radial correction nudges norms toward depth-based targets without touching angular directions:
+```python
+new_norm = (1 - alpha) * current_norm + alpha * target_norm  # alpha = 0.05
+```
+This achieves BOTH radial hierarchy AND angular separation. Echinodermata v9d reached **r=+0.990 depth-norm, 1.68x class separation**.
+
+**Euclidean Parametrization (v9+):**
+`--euclidean-param` learns embeddings in R^d and maps to the Poincaré ball via `tanh(||z||/2)`. Eliminates gradient vanishing at the boundary entirely — gradients flow through tanh back to unconstrained z-space.
+
+**Tiered Negative Sampling (v10a):**
+Instead of uniform hard negatives, use 50% cousins (same depth) + 30% same class + 20% random. Vectorized by depth groups: O(unique_depths) instead of O(batch_size).
+
+#### **Scaling Analysis: Dimension vs Clade Size**
+
+| Clade | Nodes | Dim | Nodes/Dim | Depth-Norm r | Class Sep | Status |
+|-------|-------|-----|-----------|-------------|-----------|--------|
+| Echinodermata (v9d) | 7,833 | 10 | 783 | +0.990 | 1.68x | Excellent |
+| Echinodermata (v4) | 7,833 | 10 | 783 | +0.950 | 1.21x | Good |
+| Cnidaria (v10a) | 5,145 | 20 | 257 | — | — | Complete |
+| Mammalia (v10a) | ~5,800 | 30 | ~193 | — | — | Complete |
+| Mollusca (v10a-v11) | 53,720 | 100 | 537 | +0.650 | 1.11x | Needs improvement |
+
+**Heuristic:** Keep nodes/dim in range 100-1000. Default dim=10 works for ~10K nodes but is grossly insufficient for 50K+.
+
+#### **What Works (v10a Architecture)**
+
+- Euclidean Adam optimizer (preserves angular gradients)
+- Radial nudge 0.05 (enforces depth-radius without touching directions)
+- Euclidean parametrization (eliminates boundary gradient vanishing)
+- Curriculum learning for large/deep trees (`--curriculum --curriculum-phases 1:1,25:3,50:7`)
+- Tiered negative sampling for large clades (`--tiered-negatives`)
+- lambda_reg=0.1 (strong radial regularization)
+- Per-batch ball projection (100% constraint compliance)
+
+#### **What Didn't Work**
+
+- RiemannianAdam (crushes angular gradients for deep nodes)
+- dim=10 for clades >30K nodes (insufficient capacity)
+- Short training (<5 epochs) — early stopping bug masked this initially
+- Weak regularization (lambda < 0.05) — embeddings escape ball
+- Euclidean distance in UMAP (must use Poincaré metric)
+- MPS GPU acceleration — works but provides ~1.0x speedup (batch-granular sync overhead)
+
+---
+
+## Phase 12: Taxonomy Data Cleanup (Feb 2026)
+
+### **The Problem: NCBI Taxonomy Noise**
+
+An audit of Mollusca (53.7K nodes) revealed **51% of nodes are noise**:
+- "sp." entries (unnamed species, barcoding vouchers): 33.6%
+- "cf./aff./nr." (uncertain identifications): 5.1%
+- Stale taxids (not in current NCBI dump): 8.5%
+- "unclassified X" containers, environmental samples, hybrids
+
+Training on noisy data produces artificially low loss (easy-to-place junk leaves) with degraded hierarchy quality.
+
+### **Solution: `--clean` Flag**
+
+Integrated noise filtering directly into `build_clade_dataset()` with a `--clean` flag:
+
+```bash
+# Build and train on cleaned taxonomy
+taxembed train Arthropoda -as arthropoda_clean_v2 --clean --dim 200 --epochs 100
+taxembed build Mollusca --clean  # Pre-build clean dataset
+```
+
+**Filtering strategy (bottom-up leaf pruning):**
+1. Remove leaf nodes matching noise patterns (sp., cf., environmental, uncultured, unidentified, hybrid)
+2. Remove leaf nodes not found in current NCBI dump (stale taxids)
+3. Collapse container nodes ("unclassified X", "incertae sedis") whose children are all removed
+4. Repeat until stable
+5. Re-parent through removed internal nodes to preserve tree structure
+
+**Results:**
+
+| Clade | Before | After | Removed | Speedup |
+|-------|--------|-------|---------|---------|
+| Arthropoda | 979,570 | 275,651 | 71.9% | ~3.4x fewer pairs |
+| Mollusca | 53,720 | ~26,000 | ~51% | ~3.5x fewer pairs |
+
+### **MPS GPU Benchmark**
+
+Benchmarked Apple Silicon MPS against CPU at all scales up to Arthropoda 980K x 400:
+- **Result: ~1.0x speedup** (effectively no benefit)
+- Root cause: per-batch sync overhead in the training loop (sparse embedding lookups, `torch.unique` projection)
+- **Conclusion:** Data cleanup (3.4x fewer nodes) is the real optimization, not GPU acceleration
+
+### **Training Loop Optimizations**
+
+Despite MPS not helping, several loop optimizations were implemented:
+- **Fused batch transfer:** Concatenate all index tensors, transfer once to device, then slice back (reduces 4 syncs to 2)
+- **Deferred projection:** `project_to_ball` with `torch.unique` runs every 50 batches instead of every batch
+- **MPS mixed precision:** `torch.amp.autocast` extended to MPS backend (previously CUDA-only)
+- **MPS device selection:** Enabled MPS in device selection (was previously disabled with misleading "can hang" comment)
+
+### **First Arthropoda Training Run**
+
+With the clean dataset, Arthropoda became trainable on a laptop:
+- **275,651 clean nodes** (was 979,570), **4.5M pairs** (was 15.4M)
+- dim=200, batch=128, n_neg=100, tiered negatives, euclidean param, curriculum
+- **1 epoch: ~5 min on M3 CPU, loss=0.850**
+- Norms: [0.228, 0.794, 0.991] (proper depth stratification from epoch 1)
+
+---
+
+## Current State (Feb 2026)
+
+### **Production Models**
+
+| Tag | Clade | Nodes | Dim | Depth-Norm r | Class Sep | Notes |
+|-----|-------|-------|-----|-------------|-----------|-------|
+| `echino_v9d` | Echinodermata | 7,833 | 10 | +0.990 | 1.68x | Best small-clade model |
+| `echino_v4` | Echinodermata | 7,833 | 10 | +0.950 | 1.21x | Baseline |
+| `cnidaria_v10a` | Cnidaria | 5,145 | 20 | — | — | Complete |
+| `mammalia_v10a` | Mammalia | ~5,800 | 30 | — | — | Complete |
+| `mollusca_v11` | Mollusca | 53,720 | 100 | TBD | TBD | Latest attempt |
+| `arthropoda_clean_v2` | Arthropoda | 275,651 | 200 | TBD | TBD | First clean run (1 epoch) |
+
+### **Recommended Hyperparameters by Clade Size**
+
+| Size | Nodes | Dim | Batch | N-Neg | Epochs | Extras |
+|------|-------|-----|-------|-------|--------|--------|
+| Small | <10K | 10 | 64 | 50 | 100 | — |
+| Medium | 10-30K | 20-30 | 64 | 50 | 100 | `--curriculum` |
+| Large | 30-100K | 100 | 128 | 50-100 | 100-200 | `--curriculum --tiered-negatives --clean` |
+| Very Large | >100K | 200+ | 128 | 100 | 100+ | `--curriculum --tiered-negatives --clean` |
+
+All runs should use: `--euclidean-param --radial-nudge 0.05 --optimizer adam`
+
+### **Key Files Modified in Phase 12**
+
+| File | Change |
+|------|--------|
+| `src/taxembed/builders/taxopy_clade.py` | `--clean`/`--exclude-patterns` filtering, bottom-up leaf pruning |
+| `src/taxembed/cli/main.py` | `--clean` flag on `build` and `train`, `--amp` for MPS |
+| `train_small.py` | MPS device selection, fused batch transfer, deferred projection, MPS AMP |
+| `train_hierarchical.py` | MPS device selection, fused batch transfer, deferred projection |
+| `scripts/audit_taxonomy_noise.py` | Audit noise in any clade dataset |
+| `scripts/build_clean_dataset.py` | Build filtered dataset from allowlist |
+
+---
+
 ## References
 
 - Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations"
@@ -901,4 +1056,4 @@ taxembed visualize cnidaria --children 1  # Color by grandchildren
 
 ---
 
-*Last Updated: December 2025*
+*Last Updated: February 2026*

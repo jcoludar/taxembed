@@ -82,11 +82,14 @@ def run_subprocess(cmd: list[str]) -> None:
         raise SystemExit(f"❌ Command failed: {' '.join(cmd)}")
 
 
-def _canonical_dataset_name(name: str, taxid: int, max_depth: int | None = None) -> str:
+def _canonical_dataset_name(
+    name: str, taxid: int, max_depth: int | None = None, clean: bool = False,
+) -> str:
     """Canonical dataset name based on clade, not training tag."""
     base = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or str(taxid)
     suffix = f"_d{max_depth}" if max_depth is not None else ""
-    return f"{base}_{taxid}{suffix}"
+    clean_suffix = "_clean" if clean else ""
+    return f"{base}_{taxid}{suffix}{clean_suffix}"
 
 
 def _find_cached_dataset(
@@ -135,7 +138,8 @@ def handle_build(args: argparse.Namespace) -> None:
     taxid, name = resolve_taxid(args.identifier, DATA_DIR)
     print(f"  ↳ TaxID {taxid} ({name})")
 
-    dataset_name = _canonical_dataset_name(name, taxid, args.max_depth)
+    use_clean = getattr(args, "clean", False)
+    dataset_name = _canonical_dataset_name(name, taxid, args.max_depth, clean=use_clean)
     dataset_dir = DEFAULT_OUTPUT_DIR / dataset_name
 
     # Check cache
@@ -147,7 +151,8 @@ def handle_build(args: argparse.Namespace) -> None:
         print(f"  Use --force to rebuild.")
         return
 
-    print(f"🧱 Building clade dataset '{dataset_name}'...")
+    clean_msg = " (with noise filtering)" if use_clean else ""
+    print(f"🧱 Building clade dataset '{dataset_name}'{clean_msg}...")
     build_result = build_clade_dataset(
         taxid,
         dataset_name=dataset_name,
@@ -155,6 +160,7 @@ def handle_build(args: argparse.Namespace) -> None:
         taxdump_dir=DATA_DIR,
         max_depth=args.max_depth,
         max_pairs=args.max_pairs,
+        clean=use_clean,
     )
     print(
         f"  ✓ Dataset ready: {build_result.node_count:,} nodes, "
@@ -219,8 +225,10 @@ def handle_train(args: argparse.Namespace) -> None:
         taxid, name = resolve_taxid(args.identifier, DATA_DIR)
         print(f"  ↳ TaxID {taxid} ({name})")
 
+        use_clean = getattr(args, "clean", False)
+
         # Check for cached dataset with canonical name
-        canonical = _canonical_dataset_name(name, taxid, args.max_depth)
+        canonical = _canonical_dataset_name(name, taxid, args.max_depth, clean=use_clean)
         cached = _find_cached_dataset(canonical, DEFAULT_OUTPUT_DIR, args.max_pairs)
 
         if cached:
@@ -237,9 +245,11 @@ def handle_train(args: argparse.Namespace) -> None:
                 "dataset_dir": str(cached["dataset_dir"]),
                 "max_depth": m["max_depth_observed"],
                 "pairs": m["transitive_pairs"],
+                "clean": m.get("clean", False),
             }
         else:
-            print(f"🧱 Building clade dataset '{canonical}' (this may take a while)...")
+            clean_msg = " with noise filtering" if use_clean else ""
+            print(f"🧱 Building clade dataset '{canonical}'{clean_msg} (this may take a while)...")
             build_result = build_clade_dataset(
                 taxid,
                 dataset_name=canonical,
@@ -247,6 +257,7 @@ def handle_train(args: argparse.Namespace) -> None:
                 taxdump_dir=DATA_DIR,
                 max_depth=args.max_depth,
                 max_pairs=args.max_pairs,
+                clean=use_clean,
             )
             # Prefer .npz (columnar, ~30x smaller) over pickle when available
             training_data_path = build_result.files.get("transitive_npz") or build_result.files["transitive_pickle"]
@@ -384,6 +395,7 @@ def handle_train(args: argparse.Namespace) -> None:
                     "class_balanced": args.class_balanced,
                     "class_weighted_loss": args.class_weighted_loss,
                     "euclidean_param": args.euclidean_param,
+                    "clean": getattr(args, "clean", False),
                 },
                 "paths": {
                     "data": str(training_data_path),
@@ -568,6 +580,8 @@ def build_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("identifier", help="TaxID or clade name recognized by NCBI")
     build_parser.add_argument("--max-depth", type=int, default=None, help="Limit descendant depth")
     build_parser.add_argument("--max-pairs", type=int, default=None, help="Cap total training pairs")
+    build_parser.add_argument("--clean", action="store_true",
+                              help="Filter taxonomy noise (sp., cf., environmental, etc.) via bottom-up leaf pruning")
     build_parser.add_argument("--force", action="store_true", help="Rebuild even if cached dataset exists")
     build_parser.set_defaults(func=handle_build)
 
@@ -615,7 +629,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--grad-accum-steps", type=int, default=1,
                               help="Gradient accumulation steps (default: 1)")
     train_parser.add_argument("--amp", action="store_true",
-                              help="Enable mixed precision training (CUDA only)")
+                              help="Enable mixed precision training (CUDA/MPS)")
     train_parser.add_argument("--tiered-negatives", action="store_true",
                               help="Use tiered negative sampling (hard/medium/easy); best for large clades")
     train_parser.add_argument("--class-balanced", action="store_true",
@@ -624,6 +638,8 @@ def build_parser() -> argparse.ArgumentParser:
                               help="Upweight minority class pair losses by inverse sqrt frequency")
     train_parser.add_argument("--euclidean-param", action="store_true",
                               help="Learn in R^d with tanh map to Poincare ball (fixes gradient vanishing)")
+    train_parser.add_argument("--clean", action="store_true",
+                              help="Filter taxonomy noise (sp., cf., environmental, etc.) via bottom-up leaf pruning")
     train_parser.set_defaults(func=handle_train)
 
     visualize_parser = subparsers.add_parser("visualize", help="Visualize a trained tag with UMAP")

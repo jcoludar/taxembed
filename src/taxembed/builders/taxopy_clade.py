@@ -8,7 +8,7 @@ import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,24 @@ from taxembed.utils.data_validation import coverage_from_indices
 
 TaxId = int
 Edge = Tuple[TaxId, TaxId]
+
+# Default noise patterns for taxonomy cleanup.
+# These match noisy LEAF nodes (unnamed species, uncertain IDs, etc.).
+DEFAULT_NOISE_PATTERNS: list[str] = [
+    r"\bsp\.",                      # Genus sp. (unnamed species, barcoding vouchers)
+    r"\b(?:nr|cf|aff)\.\s",        # Near/confer/affinity (uncertain IDs)
+    r"\benvironmental\b",           # Environmental samples
+    r"\buncultured\b",              # Uncultured organisms
+    r"\bunidentified\b",            # Unidentified
+    r"\b[Hh]ybrid\b",              # Hybrid taxa
+]
+
+# Container nodes that group junk — only removed bottom-up when all children are gone.
+CONTAINER_PATTERNS: list[tuple[str, str]] = [
+    ("unclassified", r"^unclassified\s"),
+    ("incertae sedis", r"\bincertae\s+sedis\b"),
+    ("environmental samples", r"^environmental\s+samples$"),
+]
 
 
 @dataclass
@@ -49,6 +67,133 @@ def _build_children_index(parent_map: Dict[int, int]) -> Dict[int, List[int]]:
             continue
         children[parent].append(child)
     return children
+
+
+def _compile_noise_filter(
+    patterns: list[str],
+) -> Callable[[str], bool]:
+    """Compile regex patterns into a single filter function.
+
+    Returns a callable that returns True if the name is noisy.
+    """
+    compiled = [re.compile(p, re.IGNORECASE) for p in patterns]
+
+    def _is_noisy(name: str) -> bool:
+        return any(rx.search(name) for rx in compiled)
+
+    return _is_noisy
+
+
+def _is_container_node(name: str) -> bool:
+    """Return True if name matches a container pattern (unclassified X, incertae sedis)."""
+    return any(re.search(pat, name, re.IGNORECASE) for _, pat in CONTAINER_PATTERNS)
+
+
+def _filter_clade_noise(
+    depths: Dict[int, int],
+    edges: list[Edge],
+    taxid2name: dict,
+    noise_filter: Callable[[str], bool],
+    root_taxid: int,
+) -> Tuple[Dict[int, int], list[Edge], int]:
+    """Remove noisy leaf nodes via bottom-up pruning, then collapse empty containers.
+
+    Strategy:
+    1. Mark leaves whose scientific name matches noise patterns -> remove
+    2. Mark leaves with no name in taxid2name (stale taxids) -> remove
+    3. After removing noisy leaves, if a container node has ALL children removed -> remove
+    4. Repeat until stable
+
+    Returns (filtered_depths, filtered_edges, n_removed).
+    """
+    all_taxids = set(depths.keys())
+
+    # Build mutable children-of from edge list
+    children_of: Dict[int, set[int]] = defaultdict(set)
+    parent_of: Dict[int, int] = {}
+    for parent, child in edges:
+        if parent in all_taxids and child in all_taxids:
+            children_of[parent].add(child)
+            parent_of[child] = parent
+
+    removed: set[int] = set()
+
+    # Resolve names for all taxids (handle both str and int keys)
+    def _get_name(tid: int) -> str | None:
+        return taxid2name.get(str(tid)) or taxid2name.get(tid)
+
+    # Iterative bottom-up pruning
+    changed = True
+    while changed:
+        changed = False
+        for tid in list(all_taxids - removed):
+            if tid == root_taxid:
+                continue
+            # Skip if has live children (not a leaf)
+            alive_kids = children_of.get(tid, set()) - removed
+            if alive_kids:
+                continue
+
+            name = _get_name(tid)
+
+            # Stale taxid: not in NCBI dump
+            if name is None:
+                removed.add(tid)
+                changed = True
+                continue
+
+            # Name matches noise pattern
+            if noise_filter(name):
+                removed.add(tid)
+                changed = True
+                continue
+
+        # Container collapse pass
+        for tid in list(all_taxids - removed):
+            if tid == root_taxid:
+                continue
+            name = _get_name(tid)
+            if name is None:
+                continue
+            if not _is_container_node(name):
+                continue
+            alive_kids = children_of.get(tid, set()) - removed
+            if not alive_kids:
+                removed.add(tid)
+                changed = True
+
+    # Rebuild depths and edges from kept nodes
+    kept = all_taxids - removed
+    filtered_depths = {tid: d for tid, d in depths.items() if tid in kept}
+
+    # Re-parent through removed internal nodes
+    new_parent: Dict[int, int] = {}
+    for tid in kept:
+        if tid == root_taxid:
+            continue
+        p = parent_of.get(tid)
+        while p is not None and p not in kept:
+            p = parent_of.get(p)
+        if p is not None and p != tid:
+            new_parent[tid] = p
+
+    # Rebuild edges and recompute depths via BFS from root
+    new_children: Dict[int, list[int]] = defaultdict(list)
+    for child, parent in new_parent.items():
+        new_children[parent].append(child)
+
+    bfs_depths: Dict[int, int] = {root_taxid: 0}
+    filtered_edges: list[Edge] = []
+    queue: deque[int] = deque([root_taxid])
+    while queue:
+        node = queue.popleft()
+        for child in new_children.get(node, []):
+            if child not in bfs_depths:
+                bfs_depths[child] = bfs_depths[node] + 1
+                filtered_edges.append((node, child))
+                queue.append(child)
+
+    return bfs_depths, filtered_edges, len(removed)
 
 
 def _collect_clade(
@@ -372,6 +517,7 @@ def _write_manifest(
     max_depth: int,
     pairs_count: int,
     max_depth_requested: Optional[int],
+    clean: bool = False,
 ) -> None:
     manifest = {
         "dataset_name": dataset_name,
@@ -382,6 +528,7 @@ def _write_manifest(
         "max_depth_observed": max_depth,
         "max_depth_requested": max_depth_requested,
         "transitive_pairs": pairs_count,
+        "clean": clean,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
@@ -394,8 +541,20 @@ def build_clade_dataset(
     taxdump_dir: Path | str = Path("data"),
     max_depth: Optional[int] = None,
     max_pairs: Optional[int] = None,
+    clean: bool = False,
+    exclude_patterns: list[str] | None = None,
 ) -> CladeBuildResult:
-    """Materialize a dataset for ``root_taxid`` and its descendants."""
+    """Materialize a dataset for ``root_taxid`` and its descendants.
+
+    Parameters
+    ----------
+    clean : bool
+        When True, apply default noise filtering (sp., cf., environmental, etc.)
+        via bottom-up leaf pruning. Removes ~30-50% of nodes in typical NCBI clades.
+    exclude_patterns : list[str] | None
+        Custom regex patterns for additional noise filtering. Merged with defaults
+        when ``clean=True``, or used standalone otherwise.
+    """
 
     output_dir = Path(output_dir)
     taxdump_dir = Path(taxdump_dir)
@@ -409,6 +568,21 @@ def build_clade_dataset(
     depths, edges = _collect_clade(children_map, root_taxid, max_depth=max_depth)
     if root_taxid not in depths:
         depths[root_taxid] = 0
+
+    # Noise filtering
+    if clean or exclude_patterns:
+        patterns = list(DEFAULT_NOISE_PATTERNS) if clean else []
+        if exclude_patterns:
+            patterns.extend(exclude_patterns)
+        noise_filter = _compile_noise_filter(patterns)
+        n_before = len(depths)
+        depths, edges, n_removed = _filter_clade_noise(
+            depths, edges, taxdb.taxid2name, noise_filter, root_taxid
+        )
+        print(
+            f"  Noise filtering: {n_before:,} -> {len(depths):,} nodes "
+            f"({n_removed:,} removed, {100 * n_removed / n_before:.1f}%)"
+        )
 
     mapping_df, taxid_to_idx, idx_to_taxid = _build_mapping(depths)
 
@@ -464,6 +638,7 @@ def build_clade_dataset(
         max_depth=max(depths.values()) if depths else 0,
         pairs_count=len(training_pairs),
         max_depth_requested=max_depth,
+        clean=clean or bool(exclude_patterns),
     )
 
     files = {

@@ -7,8 +7,9 @@
 **Learn hierarchical embeddings of NCBI's biological taxonomy in hyperbolic space.**
 
 ✅ **v10a architecture:** Euclidean Adam + radial nudge + tiered negatives + class-weighted loss
-📊 **Validated:** Echinodermata r=+0.990 (1.68x sep), Mollusca r=+0.65, clear UMAP separation
+📊 **Validated:** Echinodermata r=+0.990 (1.68x sep), Arthropoda 275K nodes (cleaned from 980K)
 📁 **Models:** `artifacts/tags/<tag>/` (run `taxembed train <clade> -as <tag>`)
+🧹 **NEW:** `--clean` flag removes NCBI taxonomy noise (sp., cf., environmental — 50-70% of nodes)
 
 This project extends Facebook Research's Poincaré embeddings with hierarchical features specifically designed for deep taxonomic hierarchies (38 levels, 2.7M organisms).
 
@@ -36,11 +37,14 @@ This project extends Facebook Research's Poincaré embeddings with hierarchical 
 
 Models are stored in `artifacts/tags/<tag>/` with full metadata in `run.json`:
 
-| Tag | Clade | Nodes | Depth-Norm r | Class Sep | Status |
-|-----|-------|-------|-------------|-----------|--------|
-| `echino_v9d` | Echinodermata | 7,833 | +0.990 | 1.68x | Production |
-| `echino_v4` | Echinodermata | 7,833 | +0.950 | 1.21x | Production |
-| `mollusca_v4` | Mollusca | 53,720 | +0.650 | 1.11x | Experimental |
+| Tag | Clade | Nodes | Dim | Depth-Norm r | Class Sep | Status |
+|-----|-------|-------|-----|-------------|-----------|--------|
+| `echino_v9d` | Echinodermata | 7,833 | 10 | +0.990 | 1.68x | Production |
+| `echino_v4` | Echinodermata | 7,833 | 10 | +0.950 | 1.21x | Production |
+| `cnidaria_v10a` | Cnidaria | 5,145 | 20 | — | — | Complete |
+| `mammalia_v10a` | Mammalia | ~5,800 | 30 | — | — | Complete |
+| `mollusca_v11` | Mollusca | 53,720 | 100 | TBD | TBD | In progress |
+| `arthropoda_clean_v2` | Arthropoda | 275,651 | 200 | TBD | TBD | First clean run |
 
 Legacy model in `small_model_28epoch/` (92K organisms, pre-v4 architecture).
 
@@ -84,12 +88,16 @@ mapping = pd.read_csv('data/taxonomy_edges_small.mapping.tsv',
 **Using unified CLI** (recommended - easiest):
 ```bash
 # Train any clade by name or TaxID (auto-builds dataset, downloads taxonomy if needed)
-# v4 defaults: Euclidean Adam + radial nudge (0.05) + lambda_reg 0.1
-taxembed train Echinodermata -as echino_v4 --epochs 100
-taxembed train Mollusca -as mollusca_v4 --epochs 100
+# v10a defaults: Euclidean Adam + radial nudge (0.05) + lambda_reg 0.1 + euclidean param
+taxembed train Echinodermata -as echino_v4 --epochs 100 --euclidean-param
+taxembed train Cnidaria -as cnidaria_v10a --dim 20 --curriculum --euclidean-param --epochs 100
 
-# For large clades (>30K nodes), increase capacity:
-taxembed train Mollusca -as mollusca_v5 --dim 20 --curriculum --n-negatives 100 --epochs 200
+# For large clades (>30K nodes), scale dim and use --clean to filter taxonomy noise:
+taxembed train Mollusca -as mollusca_v11 --clean --dim 100 --curriculum --tiered-negatives --euclidean-param --epochs 100
+
+# For very large clades (>100K nodes):
+taxembed train Arthropoda -as arthropoda_clean_v2 --clean --dim 200 --batch-size 128 --n-negatives 100 \
+    --curriculum --tiered-negatives --euclidean-param --epochs 100
 
 # Visualize results (automatically uses best checkpoint)
 taxembed visualize echino_v4 --children 2
@@ -215,24 +223,30 @@ Key components:
 
 ### **Results**
 
-| Clade | Nodes | Depth-Norm r | Class Sep | Order Sep | Status |
-|-------|-------|-------------|-----------|-----------|--------|
-| Echinodermata (v9d) | 7,833 | +0.990 | 1.68x (STRONG) | — | ✅ Excellent |
-| Echinodermata (v4) | 7,833 | +0.950 | 1.21x (MODERATE) | 1.32x (MODERATE) | ✅ Good |
-| Mollusca (v4) | 53,720 | +0.650 | 1.11x (POOR) | 1.12x (POOR) | ⚠️ Needs tuning |
+| Clade | Nodes | Dim | Depth-Norm r | Class Sep | Status |
+|-------|-------|-----|-------------|-----------|--------|
+| Echinodermata (v9d) | 7,833 | 10 | +0.990 | 1.68x (STRONG) | ✅ Excellent |
+| Echinodermata (v4) | 7,833 | 10 | +0.950 | 1.21x (MODERATE) | ✅ Good |
+| Cnidaria (v10a) | 5,145 | 20 | — | — | ✅ Complete |
+| Mammalia (v10a) | ~5,800 | 30 | — | — | ✅ Complete |
+| Mollusca (v11) | 53,720 | 100 | TBD | TBD | ⚠️ In progress |
+| Arthropoda (clean_v2) | 275,651 | 200 | TBD | TBD | ⚠️ First run |
 
 ### **What Works ✅**
-- ✅ Depth-norm correlation consistently positive (+0.65 to +0.95)
+- ✅ Depth-norm correlation consistently positive (+0.65 to +0.99)
 - ✅ Clear UMAP clustering visible for major taxonomic groups
 - ✅ Both Euclidean and Poincaré distance UMAP supported
-- ✅ Unified CLI (`taxembed train/visualize`) with automatic dataset building
+- ✅ Unified CLI (`taxembed train/visualize/build`) with automatic dataset building
 - ✅ Full metadata tracking in `run.json` per tag
-- ✅ Curriculum learning support for large trees
+- ✅ Curriculum learning for large trees
+- ✅ `--clean` taxonomy noise filtering (removes 50-70% of junk nodes)
+- ✅ Euclidean parametrization eliminates boundary gradient vanishing
+- ✅ MPS device support (works, though ~1.0x speedup)
 
 ### **What Needs Work ⚠️**
-- ⚠️ Large clades (>30K nodes) need higher dimensionality (`--dim 20+`)
+- ⚠️ Arthropoda needs extended training (only 1 epoch so far)
 - ⚠️ Imbalanced trees (e.g., Gastropoda = 70% of Mollusca) reduce class separation
-- ⚠️ Default hyperparameters optimized for ~10K nodes; larger trees need tuning
+- ⚠️ Default dim=10 only suitable for <10K nodes; scale dim with clade size
 
 ---
 
@@ -370,13 +384,17 @@ This validates:
 
 ### **Optimizations Applied**
 - **Regularizer**: Vectorized (1000x faster, 1.7B → 111K ops/epoch)
-- **Projection**: Selective (30x faster, only updated embeddings)
+- **Projection**: Selective + deferred (every 50 batches instead of every batch)
 - **Tensor Creation**: Pre-allocated arrays (10-100x faster)
-- **Device**: CPU-only on macOS (stable, no MPS hanging)
+- **Fused Batch Transfer**: Single device transfer per batch (reduces GPU/MPS sync)
+- **Taxonomy Cleanup**: `--clean` removes 50-70% of nodes (unnamed species, stale taxids, etc.)
+- **Device**: CPU, CUDA, or MPS (MPS works but ~1.0x speedup due to batch-granular sync)
 
-### **Training Speed**
-- Small dataset (111K organisms): ~3 min/epoch on M3 Mac
-- Full dataset (2.7M organisms): ~60 min/epoch on M3 Mac
+### **Training Speed (M3 Mac CPU)**
+- Echinodermata (7.8K nodes, dim=10): ~30 sec/epoch
+- Mollusca (53.7K nodes, dim=100): ~5 min/epoch
+- Arthropoda clean (275K nodes, dim=200): ~5 min/epoch
+- Arthropoda unfiltered (980K nodes): ~15 min/epoch (estimated)
 
 ---
 

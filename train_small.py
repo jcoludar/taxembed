@@ -590,11 +590,12 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
     epochs_without_improvement = 0
     checkpoint_queue = deque(maxlen=5)
 
-    # Mixed precision (AMP) setup for GPU training
-    amp_enabled = use_amp and device.type == 'cuda'
-    scaler = torch.amp.GradScaler('cuda') if amp_enabled else None
+    # Mixed precision (AMP) setup for GPU training (CUDA and MPS)
+    amp_enabled = use_amp and device.type in ('cuda', 'mps')
+    amp_device = device.type if amp_enabled else 'cuda'
+    scaler = torch.amp.GradScaler(amp_device) if amp_enabled and device.type == 'cuda' else None
     if amp_enabled:
-        print(f"  Mixed precision: enabled (GradScaler)")
+        print(f"  Mixed precision: enabled ({device.type}" + (", GradScaler" if scaler else "") + ")")
     if grad_accum_steps > 1:
         print(f"  Gradient accumulation: {grad_accum_steps} steps (effective batch = {grad_accum_steps * dataloader.batch_size})")
 
@@ -651,16 +652,28 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
                    mininterval=0.5)
 
         for ancestors, descendants, negatives, depths in pbar:
-            ancestors = ancestors.to(device)
-            descendants = descendants.to(device)
-            negatives = negatives.to(device)
-            depths = depths.to(device)
+            # Fused batch transfer: move all index tensors in one call to reduce sync overhead
+            if device.type in ('cuda', 'mps'):
+                idx_batch = torch.cat([ancestors, descendants, negatives.flatten()])
+                idx_batch = idx_batch.to(device, non_blocking=True)
+                n_anc = ancestors.shape[0]
+                n_desc = descendants.shape[0]
+                n_neg_flat = negatives.numel()
+                ancestors = idx_batch[:n_anc]
+                descendants = idx_batch[n_anc:n_anc + n_desc]
+                negatives = idx_batch[n_anc + n_desc:].view(negatives.shape)
+                depths = depths.to(device, non_blocking=True)
+            else:
+                ancestors = ancestors.to(device)
+                descendants = descendants.to(device)
+                negatives = negatives.to(device)
+                depths = depths.to(device)
 
             if n_batches % grad_accum_steps == 0:
                 optimizer.zero_grad()
 
             # Forward pass (with optional AMP autocast)
-            with torch.amp.autocast('cuda', enabled=amp_enabled):
+            with torch.amp.autocast(amp_device, enabled=amp_enabled):
                 # Ranking loss
                 loss = ranking_loss_with_margin(
                     model, ancestors, descendants, negatives,
@@ -695,10 +708,13 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                     optimizer.step()
 
-            # Per-batch projection to keep embeddings inside the Poincaré ball
+            # Projection to keep embeddings inside the Poincaré ball.
+            # Deferred to every 50 batches to reduce torch.unique sync overhead.
+            # The ball constraint is soft during training; frequent projection fights the optimizer.
             updated_indices = torch.cat([ancestors, descendants, negatives.flatten()])
-            updated_indices = torch.unique(updated_indices)
-            model.project_to_ball(updated_indices)
+            if n_batches % 50 == 0:
+                updated_indices = torch.unique(updated_indices)
+                model.project_to_ball(updated_indices)
 
             if n_batches % 500 == 0:
                 model.project_to_ball(indices=None)
@@ -944,9 +960,12 @@ def main():
         print("   Use --optimizer adam (default) with --euclidean-param.")
         sys.exit(1)
     
-    # Device
+    # Device selection: CUDA > MPS > CPU
     if args.gpu >= 0 and torch.cuda.is_available():
         device = torch.device(f'cuda:{args.gpu}')
+    elif args.gpu >= 0 and torch.backends.mps.is_available():
+        # MPS works but provides ~1.0x speedup for this workload (batch-granular, sparse lookups)
+        device = torch.device('mps')
     else:
         device = torch.device('cpu')
     
