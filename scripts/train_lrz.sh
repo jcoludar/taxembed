@@ -35,6 +35,10 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate
 elif [ -n "${CONDA_PREFIX:-}" ]; then
     echo "Using conda env: $CONDA_PREFIX"
+else
+    echo "ERROR: No .venv directory and no CONDA_PREFIX set. Refusing to run with system python." >&2
+    echo "  Set up an env first: 'uv sync' (creates .venv) or activate a conda env." >&2
+    exit 1
 fi
 
 # Run training with GPU, AMP, gradient accumulation, and all improvements

@@ -61,12 +61,13 @@ make install
 ```
 
 After installation, the unified CLI is available:
-- `taxembed train <clade> -as <tag>` - Train model for any clade (auto-builds dataset)
+- `taxembed download` - Download NCBI taxdump into data/ (also auto-invoked by build/train when missing)
+- `taxembed build <clade>` (alias: `taxembed prepare`) - Build a clade's transitive-closure dataset
+- `taxembed train <clade> -as <tag>` - Train embeddings; auto-builds dataset if needed
 - `taxembed visualize <tag>` - Visualize results with automatic best checkpoint
 - `taxembed visualize <tag> --metric poincare` - Poincaré distance UMAP
-- `taxembed-download` - Download NCBI taxonomy (legacy, auto-handled by train)
-- `taxembed-prepare` - Build transitive closure (legacy, auto-handled by train)
-- `taxembed-check` - Validate installation
+- `taxembed dim <clade>` - Recommend embedding dimensionality for a clade
+- `taxembed check` - Runtime smoke test (imports, columnar I/O, model forward+backward)
 
 ### **Using Pre-trained Model**
 
@@ -109,33 +110,6 @@ python scripts/analyze_hierarchy_hyperbolic.py --tag echino_v4
 # All artifacts saved to artifacts/tags/<tag>/
 ```
 
-**Using legacy CLI commands**:
-```bash
-# 1. Download NCBI taxonomy
-taxembed-download
-
-# 2. Build transitive closure (975K training pairs)
-taxembed-prepare
-
-# 3. Train model (~2.5 hours on M3 Mac CPU)
-taxembed-train
-
-# 4. Visualize results
-taxembed-visualize taxonomy_model_small_best.pth
-```
-
-**Using Python scripts directly**:
-```bash
-python prepare_taxonomy_data.py       # Download
-python build_transitive_closure.py    # Prepare
-python train_small.py                 # Train
-
-# With custom parameters:
-python train_small.py \
-    --epochs 50 \
-    --batch-size 128 \
-    --lr 0.003
-```
 
 ### **Analyze Results**
 
@@ -143,8 +117,8 @@ python train_small.py \
 # Check hierarchy quality
 python scripts/analyze_hierarchy_hyperbolic.py
 
-# Visualize embeddings
-python scripts/visualize_embeddings.py my_model.pth --highlight mammals
+# Visualize embeddings (use the unified CLI)
+taxembed visualize <tag> --metric poincare
 ```
 
 ---

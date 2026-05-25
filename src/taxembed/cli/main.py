@@ -17,6 +17,8 @@ import taxopy
 
 from taxembed.builders import build_clade_dataset
 from taxembed.analysis.dimension import angular_packing_dim, participation_ratio, recommend_dim
+from taxembed.utils.taxdump import ensure_taxdump, load_taxdb
+from taxembed.utils.training_pairs import TrainingPairs
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]  # .../poincare-embeddings/src/taxembed/cli -> repo root
@@ -37,19 +39,10 @@ def ensure_dirs() -> None:
 
 
 def resolve_taxid(identifier: str, taxdump_dir: Path) -> tuple[int, str]:
-    nodes_path = taxdump_dir / "nodes.dmp"
-    names_path = taxdump_dir / "names.dmp"
-    merged_path = taxdump_dir / "merged.dmp"
-
-    if nodes_path.exists() and names_path.exists():
-        taxdb = taxopy.TaxDb(
-            nodes_dmp=str(nodes_path),
-            names_dmp=str(names_path),
-            merged_dmp=str(merged_path) if merged_path.exists() else None,
-            keep_files=True,
-        )
-    else:
-        taxdb = taxopy.TaxDb(taxdb_dir=str(taxdump_dir))
+    # ``load_taxdb`` auto-downloads if needed and threads ``keep_files=True`` so
+    # the dmp files survive — required for offline LRZ compute nodes and for any
+    # multi-build CLI session.
+    taxdb = load_taxdb(taxdump_dir)
 
     if identifier.isdigit():
         taxid = int(identifier)
@@ -128,6 +121,83 @@ def _find_cached_dataset(
         "manifest": manifest,
         "dataset_dir": dataset_dir,
     }
+
+
+def handle_download(args: argparse.Namespace) -> None:
+    """Handle `taxembed download` — fetch the NCBI taxdump into DATA_DIR."""
+    ensure_dirs()
+    ensure_taxdump(DATA_DIR, force=args.force)
+
+
+def handle_check(args: argparse.Namespace) -> None:
+    """Handle `taxembed check` — runtime smoke covering imports, columnar I/O, and a forward+backward pass.
+
+    This is NOT the same as ``final_sanity_check.py`` (file-existence only). It
+    actually exercises the production runtime so a fresh install can confirm the
+    code path that produces embeddings runs.
+    """
+    import tempfile
+
+    print("[1/5] Core imports")
+    for name, mod in (("torch", torch), ("numpy", np), ("taxopy", taxopy)):
+        print(f"      {name} {getattr(mod, '__version__', '?')}")
+
+    print("[2/5] TrainingPairs columnar round-trip")
+    sample = [
+        {
+            "ancestor_idx": 0,
+            "descendant_idx": i + 1,
+            "depth_diff": 1,
+            "ancestor_depth": 0,
+            "descendant_depth": 1,
+            "ancestor_taxid": 1,
+            "descendant_taxid": 100 + i,
+        }
+        for i in range(8)
+    ]
+    tp = TrainingPairs.from_list(sample)
+    if len(tp) != 8:
+        raise SystemExit(f"❌ TrainingPairs.from_list size mismatch ({len(tp)} vs 8)")
+    with tempfile.TemporaryDirectory() as tmp:
+        npz_path = Path(tmp) / "smoke.npz"
+        tp.save(npz_path)
+        loaded = TrainingPairs.load(npz_path)
+        if len(loaded) != len(tp) or not (loaded.ancestor_idx == tp.ancestor_idx).all():
+            raise SystemExit("❌ TrainingPairs .npz round-trip failed")
+    print("      ✓ save/load roundtrip with 8 pairs")
+
+    print("[3/5] Hyperbolic model instantiation")
+    # train_hierarchical lives at the repo root and is on sys.path via PROJECT_ROOT
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from train_hierarchical import HierarchicalPoincareEmbedding
+
+    model = HierarchicalPoincareEmbedding(n_nodes=20, dim=4, max_depth=4, euclidean_param=True)
+    print("      ✓ 20 nodes × 4-dim model")
+
+    print("[4/5] Forward + backward pass")
+    anc = torch.tensor([0, 1, 2, 3])
+    desc = torch.tensor([5, 6, 7, 8])
+    u = model(anc)
+    v = model(desc)
+    loss = model.poincare_distance(u, v).mean()
+    loss.backward()
+    if torch.isnan(loss):
+        raise SystemExit("❌ loss is NaN")
+    if torch.isnan(model.embeddings.weight.grad).any():
+        raise SystemExit("❌ grad has NaN")
+    print(f"      ✓ loss={loss.item():.4f}, grads finite")
+
+    print("[5/5] Optimizer step")
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+    pre = model.embeddings.weight.detach().clone()
+    opt.step()
+    delta = (model.embeddings.weight - pre).abs().max().item()
+    if delta <= 0:
+        raise SystemExit("❌ optimizer step did not update weights")
+    print(f"      ✓ max weight delta={delta:.6f}")
+
+    print("\n✓ All runtime smoke checks passed")
 
 
 def handle_build(args: argparse.Namespace) -> None:
@@ -541,8 +611,8 @@ def handle_dim(args: argparse.Namespace) -> None:
         clade_name = name
         print(f"  ↳ TaxID {taxid} ({name})")
 
-        # Count nodes via TaxoPy
-        taxdb = taxopy.TaxDb(taxdb_dir=str(DATA_DIR))
+        # Count nodes via TaxoPy (keep_files=True via load_taxdb so dmp survives)
+        taxdb = load_taxdb(DATA_DIR)
         parent_map = {int(c): int(p) for c, p in taxdb.taxid2parent.items()}
         from taxembed.builders.taxopy_clade import _build_children_index, _collect_clade
         children_map = _build_children_index(parent_map)
@@ -575,8 +645,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="taxembed", description="Unified CLI for taxonomy embeddings")
     subparsers = parser.add_subparsers(dest="command")
 
-    # --- build subcommand ---
-    build_parser = subparsers.add_parser("build", help="Pre-build a clade dataset for reuse across training runs")
+    # --- download subcommand ---
+    download_parser = subparsers.add_parser(
+        "download",
+        help="Download the NCBI taxdump (nodes.dmp + names.dmp + merged.dmp) into data/",
+    )
+    download_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-download even if the dmp files already exist",
+    )
+    download_parser.set_defaults(func=handle_download)
+
+    # --- check subcommand ---
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Runtime smoke test: imports, TrainingPairs I/O, model forward+backward",
+    )
+    check_parser.set_defaults(func=handle_check)
+
+    # --- build subcommand (alias: prepare) ---
+    build_parser = subparsers.add_parser(
+        "build",
+        aliases=["prepare"],
+        help="Pre-build a clade dataset for reuse across training runs",
+    )
     build_parser.add_argument("identifier", help="TaxID or clade name recognized by NCBI")
     build_parser.add_argument("--max-depth", type=int, default=None, help="Limit descendant depth")
     build_parser.add_argument("--max-pairs", type=int, default=None, help="Cap total training pairs")

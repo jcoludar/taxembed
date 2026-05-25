@@ -6,14 +6,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-# Python deps (install before copying code for cache efficiency)
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
-
-# Copy source
+# Copy source. (We can't split deps and source into separate layers the usual
+# way: hatchling's metadata validation reads README.md and the wheel build
+# needs src/taxembed, so `pip install .` against pyproject.toml alone fails
+# during metadata prep. The base image already has torch + cuda, so the
+# remaining pip install is fast anyway.)
 COPY . .
 
-# Install taxembed package
+# Install taxembed (editable for in-place dev when bind-mounting source).
 RUN pip install --no-cache-dir -e .
 
 # Default entrypoint: taxembed CLI

@@ -1,0 +1,43 @@
+# Local dev cruft — never put it in the image
+.venv/
+venv/
+venv311/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Data + artifacts: regenerable; would bloat the image enormously
+data/
+artifacts/
+artifacts_archive/
+small_model_28epoch/
+*.pth
+*.pth.*
+*.log
+training*.log
+nohup.out
+
+# Visualizations
+*.png
+*.jpg
+umap*.png
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git history not needed inside the image
+.git/
+.gitignore
+
+# Docker-specific (avoid recursion)
+Dockerfile
+.dockerignore

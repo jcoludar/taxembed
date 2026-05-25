@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import pickle
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -16,6 +15,8 @@ import taxopy
 from tqdm.auto import tqdm
 
 from taxembed.utils.data_validation import coverage_from_indices
+from taxembed.utils.taxdump import load_taxdb
+from taxembed.utils.training_pairs import TrainingPairs
 
 TaxId = int
 Edge = Tuple[TaxId, TaxId]
@@ -241,65 +242,19 @@ def _build_transitive_pairs(
     depths: Dict[int, int],
     parent_map: Dict[int, int],
     taxid_to_idx: Dict[int, int],
-    max_pairs: int | None = None,
-) -> List[Dict[str, int]]:
-    """Build all ancestor-descendant pairs via parent-chain traversal.
+) -> TrainingPairs:
+    """Build all ancestor-descendant pairs columnarly.
 
-    For very large clades (>500K nodes), uses a columnar pre-allocation
-    strategy to avoid list-of-dicts memory overhead.
+    Returns a TrainingPairs whose seven numpy arrays hold the (ancestor, descendant)
+    pairs reachable via parent-chain traversal. Memory footprint scales as
+    ``~14 * n_pairs`` bytes (int32 + int16 fields), not ``~430 * n_pairs`` for the
+    legacy list-of-dicts shape.
     """
+
     n_nodes = len(depths)
-
-    # For large clades, estimate pairs and pre-allocate numpy arrays
-    if n_nodes > 500_000:
-        return _build_transitive_pairs_columnar(depths, parent_map, taxid_to_idx, max_pairs)
-
-    pairs: List[Dict[str, int]] = []
-
-    iterator = depths.items()
-    for taxid, depth in tqdm(iterator, desc="Building ancestor-descendant pairs", unit="node"):
-        descendant_idx = taxid_to_idx[taxid]
-        ancestor = parent_map.get(taxid)
-
-        while ancestor is not None and ancestor in depths:
-            ancestor_depth = depths[ancestor]
-            pairs.append(
-                {
-                    "ancestor_idx": taxid_to_idx[ancestor],
-                    "descendant_idx": descendant_idx,
-                    "depth_diff": depth - ancestor_depth,
-                    "ancestor_depth": ancestor_depth,
-                    "descendant_depth": depth,
-                    "ancestor_taxid": ancestor,
-                    "descendant_taxid": taxid,
-                }
-            )
-            ancestor = parent_map.get(ancestor)
-
-    return pairs
-
-
-def _build_transitive_pairs_columnar(
-    depths: Dict[int, int],
-    parent_map: Dict[int, int],
-    taxid_to_idx: Dict[int, int],
-    max_pairs: int | None = None,
-) -> List[Dict[str, int]]:
-    """Memory-efficient columnar pair builder for large clades (>500K nodes).
-
-    Pre-computes ancestor chains and writes directly to numpy arrays,
-    then converts to list-of-dicts at the end. For 2.4M nodes, this avoids
-    the ~16GB dict overhead of the naive approach.
-    """
-    n_nodes = len(depths)
-    # Estimate total pairs: avg_depth * n_nodes (conservative upper bound)
     avg_depth = sum(depths.values()) / max(n_nodes, 1)
-    est_pairs = int(avg_depth * n_nodes * 1.1)
-    if max_pairs is not None:
-        est_pairs = min(est_pairs, max_pairs * 2)  # allocate extra, trim later
-    print(f"  Columnar builder: {n_nodes:,} nodes, est. {est_pairs:,} pairs")
+    est_pairs = max(int(avg_depth * n_nodes * 1.1), 16)
 
-    # Pre-allocate columnar arrays
     ancestor_idx_arr = np.empty(est_pairs, dtype=np.int32)
     descendant_idx_arr = np.empty(est_pairs, dtype=np.int32)
     depth_diff_arr = np.empty(est_pairs, dtype=np.int16)
@@ -309,13 +264,12 @@ def _build_transitive_pairs_columnar(
     descendant_taxid_arr = np.empty(est_pairs, dtype=np.int32)
 
     idx = 0
-    for taxid, depth in tqdm(depths.items(), desc="Building pairs (columnar)", unit="node", total=n_nodes):
+    for taxid, depth in tqdm(depths.items(), desc="Building pairs", unit="node", total=n_nodes):
         desc_idx = taxid_to_idx[taxid]
         ancestor = parent_map.get(taxid)
 
         while ancestor is not None and ancestor in depths:
             if idx >= len(ancestor_idx_arr):
-                # Grow arrays (double capacity)
                 new_size = len(ancestor_idx_arr) * 2
                 ancestor_idx_arr = np.resize(ancestor_idx_arr, new_size)
                 descendant_idx_arr = np.resize(descendant_idx_arr, new_size)
@@ -336,42 +290,48 @@ def _build_transitive_pairs_columnar(
             idx += 1
             ancestor = parent_map.get(ancestor)
 
-    # Trim to actual size
-    total = idx
-    print(f"  ✓ Built {total:,} pairs (columnar)")
-
-    # Convert to list-of-dicts for backward compatibility with downstream code
-    pairs = []
-    for i in range(total):
-        pairs.append({
-            "ancestor_idx": int(ancestor_idx_arr[i]),
-            "descendant_idx": int(descendant_idx_arr[i]),
-            "depth_diff": int(depth_diff_arr[i]),
-            "ancestor_depth": int(ancestor_depth_arr[i]),
-            "descendant_depth": int(descendant_depth_arr[i]),
-            "ancestor_taxid": int(ancestor_taxid_arr[i]),
-            "descendant_taxid": int(descendant_taxid_arr[i]),
-        })
-
-    return pairs
+    # Slice + copy releases the preallocated buffer's tail.
+    return TrainingPairs(
+        ancestor_idx=ancestor_idx_arr[:idx].copy(),
+        descendant_idx=descendant_idx_arr[:idx].copy(),
+        depth_diff=depth_diff_arr[:idx].copy(),
+        ancestor_depth=ancestor_depth_arr[:idx].copy(),
+        descendant_depth=descendant_depth_arr[:idx].copy(),
+        ancestor_taxid=ancestor_taxid_arr[:idx].copy(),
+        descendant_taxid=descendant_taxid_arr[:idx].copy(),
+    )
 
 
 def _ensure_coverage(
-    pairs: List[Dict[str, int]],
+    pairs: TrainingPairs,
     mapping_df: pd.DataFrame,
     depths: Dict[int, int],
     parent_map: Dict[int, int],
-) -> None:
+) -> TrainingPairs:
+    """Append parent-node pairs for any mapped index that doesn't appear in ``pairs``.
+
+    Returns a new TrainingPairs covering all mapped indices. If every index is
+    already covered, returns the input unchanged.
+    """
+
     idx_to_taxid = dict(zip(mapping_df["idx"], mapping_df["taxid"]))
     taxid_to_idx = dict(zip(mapping_df["taxid"], mapping_df["idx"]))
 
-    covered = {entry["ancestor_idx"] for entry in pairs}
-    covered.update(entry["descendant_idx"] for entry in pairs)
+    covered = np.union1d(np.unique(pairs.ancestor_idx), np.unique(pairs.descendant_idx))
+    mapped_indices = mapping_df["idx"].to_numpy(dtype=np.int64)
+    missing = np.setdiff1d(mapped_indices, covered, assume_unique=False)
+    if missing.size == 0:
+        return pairs
 
-    all_indices = set(mapping_df["idx"])
-    missing = sorted(all_indices - covered)
+    extra_anc_idx: list[int] = []
+    extra_desc_idx: list[int] = []
+    extra_depth_diff: list[int] = []
+    extra_anc_depth: list[int] = []
+    extra_desc_depth: list[int] = []
+    extra_anc_taxid: list[int] = []
+    extra_desc_taxid: list[int] = []
 
-    for idx in missing:
+    for idx in missing.tolist():
         taxid = idx_to_taxid[idx]
         parent_taxid = parent_map.get(taxid)
 
@@ -384,17 +344,24 @@ def _ensure_coverage(
             parent_depth = depths[parent_taxid]
 
         node_depth = depths.get(taxid, parent_depth)
-        pairs.append(
-            {
-                "ancestor_idx": parent_idx,
-                "descendant_idx": idx,
-                "depth_diff": max(node_depth - parent_depth, 0),
-                "ancestor_depth": parent_depth,
-                "descendant_depth": node_depth,
-                "ancestor_taxid": parent_taxid,
-                "descendant_taxid": taxid,
-            }
-        )
+        extra_anc_idx.append(int(parent_idx))
+        extra_desc_idx.append(int(idx))
+        extra_depth_diff.append(int(max(node_depth - parent_depth, 0)))
+        extra_anc_depth.append(int(parent_depth))
+        extra_desc_depth.append(int(node_depth))
+        extra_anc_taxid.append(int(parent_taxid))
+        extra_desc_taxid.append(int(taxid))
+
+    extra = TrainingPairs(
+        ancestor_idx=np.asarray(extra_anc_idx, dtype=np.int32),
+        descendant_idx=np.asarray(extra_desc_idx, dtype=np.int32),
+        depth_diff=np.asarray(extra_depth_diff, dtype=np.int16),
+        ancestor_depth=np.asarray(extra_anc_depth, dtype=np.int16),
+        descendant_depth=np.asarray(extra_desc_depth, dtype=np.int16),
+        ancestor_taxid=np.asarray(extra_anc_taxid, dtype=np.int32),
+        descendant_taxid=np.asarray(extra_desc_taxid, dtype=np.int32),
+    )
+    return TrainingPairs.concat(pairs, extra)
 
 
 def _write_edges(edges: Sequence[Edge], path: Path) -> None:
@@ -414,96 +381,63 @@ def _write_mapping(mapping_df: pd.DataFrame, path: Path) -> None:
     mapping_df.to_csv(path, sep="\t", index=False)
 
 
-def _write_transitive(training_pairs: List[Dict[str, int]], prefix: Path) -> Dict[str, Path]:
-    tsv_path = prefix.with_name(f"{prefix.name}.tsv")
+def _write_outputs(training_pairs: TrainingPairs, prefix: Path) -> Dict[str, Path]:
+    """Write the canonical .npz plus a diagnostic .edgelist consumed by audit scripts.
+
+    The legacy ``.tsv`` and ``.pkl`` outputs are no longer written: they were never
+    read by the production CLI or training entry points, and for large clades the
+    list-of-dicts they required allocated ~30x more memory than the data itself.
+    Old workflows that depend on those files should regenerate them on demand from
+    the .npz via ``TrainingPairs.load``.
+    """
+
     edgelist_path = prefix.with_name(f"{prefix.name}.edgelist")
-    pkl_path = prefix.with_name(f"{prefix.name}.pkl")
-
-    df = pd.DataFrame(training_pairs)
-    df.to_csv(tsv_path, sep="\t", index=False)
-
-    with edgelist_path.open("w") as handle:
-        for item in training_pairs:
-            handle.write(f"{item['ancestor_idx']} {item['descendant_idx']}\n")
-
-    with pkl_path.open("wb") as handle:
-        pickle.dump(training_pairs, handle)
-
+    npz_path = prefix.with_name(f"{prefix.name}.npz")
+    training_pairs.write_edgelist(edgelist_path)
+    training_pairs.save(npz_path)
     return {
-        "transitive_tsv": tsv_path,
         "transitive_edgelist": edgelist_path,
-        "transitive_pickle": pkl_path,
+        "transitive_npz": npz_path,
     }
 
 
-def _write_transitive_npz(training_pairs: List[Dict[str, int]], prefix: Path) -> Dict[str, Path]:
-    """Write training pairs in memory-efficient .npz format (columnar arrays)."""
-    npz_path = prefix.with_name(f"{prefix.name}.npz")
-    n = len(training_pairs)
-
-    ancestor_idx = np.empty(n, dtype=np.int32)
-    descendant_idx = np.empty(n, dtype=np.int32)
-    depth_diff = np.empty(n, dtype=np.int16)
-    ancestor_depth = np.empty(n, dtype=np.int16)
-    descendant_depth = np.empty(n, dtype=np.int16)
-    ancestor_taxid = np.empty(n, dtype=np.int32)
-    descendant_taxid = np.empty(n, dtype=np.int32)
-
-    for i, p in enumerate(training_pairs):
-        ancestor_idx[i] = p["ancestor_idx"]
-        descendant_idx[i] = p["descendant_idx"]
-        depth_diff[i] = p["depth_diff"]
-        ancestor_depth[i] = p["ancestor_depth"]
-        descendant_depth[i] = p["descendant_depth"]
-        ancestor_taxid[i] = p["ancestor_taxid"]
-        descendant_taxid[i] = p["descendant_taxid"]
-
-    np.savez_compressed(
-        npz_path,
-        ancestor_idx=ancestor_idx,
-        descendant_idx=descendant_idx,
-        depth_diff=depth_diff,
-        ancestor_depth=ancestor_depth,
-        descendant_depth=descendant_depth,
-        ancestor_taxid=ancestor_taxid,
-        descendant_taxid=descendant_taxid,
-    )
-    return {"transitive_npz": npz_path}
-
-
 def _stratified_subsample(
-    training_pairs: List[Dict[str, int]], max_pairs: int
-) -> List[Dict[str, int]]:
-    """Subsample pairs while preserving the depth_diff distribution."""
-    if len(training_pairs) <= max_pairs:
-        return training_pairs
+    training_pairs: TrainingPairs, max_pairs: int
+) -> TrainingPairs:
+    """Subsample pairs while preserving the depth_diff distribution.
 
-    # Group by depth_diff
-    buckets: Dict[int, List[int]] = defaultdict(list)
-    for i, p in enumerate(training_pairs):
-        buckets[p["depth_diff"]].append(i)
+    Operates directly on the columnar arrays; never materializes dicts.
+    """
 
     total = len(training_pairs)
-    selected: List[int] = []
+    if total <= max_pairs:
+        return training_pairs
 
-    for dd, indices in buckets.items():
-        # Proportional allocation: this bucket gets (bucket_size / total) * max_pairs
-        n_select = max(1, int(len(indices) / total * max_pairs))
-        n_select = min(n_select, len(indices))
-        chosen = np.random.choice(indices, n_select, replace=False).tolist()
-        selected.extend(chosen)
+    rng = np.random.default_rng()
+    unique_depths, inverse = np.unique(training_pairs.depth_diff, return_inverse=True)
 
-    # If rounding caused us to get too many, trim; too few, add random extras
-    if len(selected) > max_pairs:
-        selected = list(np.random.choice(selected, max_pairs, replace=False))
-    elif len(selected) < max_pairs:
-        remaining = set(range(total)) - set(selected)
-        extra_needed = max_pairs - len(selected)
-        if remaining:
-            extra = list(np.random.choice(list(remaining), min(extra_needed, len(remaining)), replace=False))
-            selected.extend(extra)
+    selected_parts: list[np.ndarray] = []
+    for u_idx in range(len(unique_depths)):
+        bucket_idx = np.where(inverse == u_idx)[0]
+        n_in_bucket = bucket_idx.size
+        n_select = max(1, int(n_in_bucket / total * max_pairs))
+        n_select = min(n_select, n_in_bucket)
+        chosen = rng.choice(bucket_idx, n_select, replace=False)
+        selected_parts.append(chosen)
 
-    return [training_pairs[i] for i in sorted(selected)]
+    selected = np.concatenate(selected_parts) if selected_parts else np.empty(0, dtype=np.int64)
+
+    if selected.size > max_pairs:
+        selected = rng.choice(selected, max_pairs, replace=False)
+    elif selected.size < max_pairs:
+        remaining = np.setdiff1d(np.arange(total), selected, assume_unique=False)
+        extra_needed = max_pairs - int(selected.size)
+        if extra_needed > 0 and remaining.size > 0:
+            extra = rng.choice(remaining, min(extra_needed, int(remaining.size)), replace=False)
+            selected = np.concatenate([selected, extra])
+
+    selected.sort()
+    return training_pairs[selected]
 
 
 def _write_manifest(
@@ -559,7 +493,11 @@ def build_clade_dataset(
     output_dir = Path(output_dir)
     taxdump_dir = Path(taxdump_dir)
 
-    taxdb = taxopy.TaxDb(taxdb_dir=str(taxdump_dir))
+    # load_taxdb auto-downloads the dmp files if missing AND passes keep_files=True
+    # so they survive this load — without it, taxopy deletes them by default and
+    # the next CLI invocation re-downloads from NCBI (KI: discovered in S0 metazoa
+    # build; would burn pre-staged taxdumps on offline LRZ compute nodes).
+    taxdb = load_taxdb(taxdump_dir)
     parent_map = {int(child): int(parent) for child, parent in taxdb.taxid2parent.items()}
     if root_taxid not in parent_map:
         raise ValueError(f"TaxID {root_taxid} not found in taxonomy data at {taxdump_dir}")
@@ -605,17 +543,18 @@ def build_clade_dataset(
     _write_mapping(mapping_df, mapping_path)
 
     training_pairs = _build_transitive_pairs(depths, parent_map, taxid_to_idx)
-    _ensure_coverage(training_pairs, mapping_df, depths, parent_map)
+    training_pairs = _ensure_coverage(training_pairs, mapping_df, depths, parent_map)
 
     # Stratified subsampling if max_pairs is set
     if max_pairs and len(training_pairs) > max_pairs:
         print(f"  Subsampling {len(training_pairs):,} pairs to {max_pairs:,} (stratified by depth_diff)")
         training_pairs = _stratified_subsample(training_pairs, max_pairs)
 
-    used_indices = {
-        entry["ancestor_idx"] for entry in training_pairs
-    } | {entry["descendant_idx"] for entry in training_pairs}
-    coverage = coverage_from_indices(mapping_df, used_indices)
+    used_indices = np.union1d(
+        np.unique(training_pairs.ancestor_idx),
+        np.unique(training_pairs.descendant_idx),
+    )
+    coverage = coverage_from_indices(mapping_df, used_indices.tolist())
     if not coverage.is_perfect:
         missing_taxids = [idx_to_taxid[idx] for idx in sorted(coverage.missing_indices)]
         raise RuntimeError(
@@ -623,9 +562,7 @@ def build_clade_dataset(
             f"Missing indices: {missing_taxids[:10]}"
         )
 
-    transitive_paths = _write_transitive(training_pairs, prefix.with_name(f"{prefix.name}_transitive"))
-    npz_paths = _write_transitive_npz(training_pairs, prefix.with_name(f"{prefix.name}_transitive"))
-    transitive_paths.update(npz_paths)
+    transitive_paths = _write_outputs(training_pairs, prefix.with_name(f"{prefix.name}_transitive"))
 
     manifest_path = prefix.with_name(f"{prefix.name}_manifest.json")
     _write_manifest(
