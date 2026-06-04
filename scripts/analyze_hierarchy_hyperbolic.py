@@ -251,8 +251,14 @@ def analyze_depth_vs_norm(emb, idx2tax, taxonomy, output_dir):
     return pearson_r, spearman_r
 
 
-def analyze_hierarchical_clustering_hyperbolic(emb, idx2tax, taxonomy, rank, output_dir):
-    """Analyze hierarchical clustering using HYPERBOLIC distance."""
+def analyze_hierarchical_clustering_hyperbolic(emb, idx2tax, taxonomy, rank, output_dir,
+                                               seed=0, repeats=1):
+    """Analyze hierarchical clustering using HYPERBOLIC distance.
+
+    The separation ratio is estimated from a random subsample of groups/pairs, so it carries
+    sampling noise. With `repeats>1` the estimate is run that many times under seeds
+    `seed, seed+1, ...` and the mean±std is reported (the magnitude of the headline ratios is far
+    beyond this noise, but the writeup wants it locked). Returns (sep_mean, sep_std, quality)."""
     print(f"\n{'=' * 80}")
     print(f"HIERARCHICAL CLUSTERING - {rank.upper()} (HYPERBOLIC DISTANCE)")
     print(f"{'=' * 80}\n")
@@ -292,45 +298,53 @@ def analyze_hierarchical_clustering_hyperbolic(emb, idx2tax, taxonomy, rank, out
 
     print(f"\nComputing pairwise HYPERBOLIC distances...")
 
-    max_per_group = 100
-    sampled_groups = {}
-    for gid, indices in large_groups.items():
-        if len(indices) > max_per_group:
-            sampled_groups[gid] = list(np.random.choice(indices, max_per_group, replace=False))
-        else:
-            sampled_groups[gid] = list(indices)
+    def _one_estimate(rng_seed):
+        """One seeded estimate: subsample groups/pairs, return (separation, intra, inter)."""
+        np.random.seed(rng_seed)
+        max_per_group = 100
+        sampled_groups = {}
+        for gid, indices in large_groups.items():
+            if len(indices) > max_per_group:
+                sampled_groups[gid] = list(np.random.choice(indices, max_per_group, replace=False))
+            else:
+                sampled_groups[gid] = list(indices)
 
-    intra_distances = []
-    inter_distances = []
+        intra, inter = [], []
+        group_list = list(sampled_groups.items())
+        for i, (gid1, indices1) in enumerate(group_list):
+            if len(indices1) >= 2:
+                for ii in range(len(indices1)):
+                    for jj in range(ii + 1, min(ii + 20, len(indices1))):
+                        intra.append(poincare_distance(emb[indices1[ii]], emb[indices1[jj]]))
+            for j in range(i + 1, min(i + 10, len(group_list))):
+                gid2, indices2 = group_list[j]
+                for _ in range(min(100, len(indices1) * len(indices2))):
+                    idx1 = np.random.choice(indices1)
+                    idx2 = np.random.choice(indices2)
+                    inter.append(poincare_distance(emb[idx1], emb[idx2]))
+        intra = np.array(intra)
+        inter = np.array(inter)
+        sep = (np.mean(inter) / np.mean(intra)) if (len(intra) and len(inter)) else float("nan")
+        return sep, intra, inter
 
-    group_list = list(sampled_groups.items())
+    seps = []
+    intra_distances = inter_distances = None
+    for r in range(max(1, repeats)):
+        sep_r, intra_distances, inter_distances = _one_estimate(seed + r)
+        seps.append(sep_r)
 
-    for i, (gid1, indices1) in enumerate(group_list):
-        if len(indices1) >= 2:
-            for ii in range(len(indices1)):
-                for jj in range(ii + 1, min(ii + 20, len(indices1))):
-                    dist = poincare_distance(emb[indices1[ii]], emb[indices1[jj]])
-                    intra_distances.append(dist)
-
-        for j in range(i + 1, min(i + 10, len(group_list))):
-            gid2, indices2 = group_list[j]
-            for _ in range(min(100, len(indices1) * len(indices2))):
-                idx1 = np.random.choice(indices1)
-                idx2 = np.random.choice(indices2)
-                dist = poincare_distance(emb[idx1], emb[idx2])
-                inter_distances.append(dist)
-
-    intra_distances = np.array(intra_distances)
-    inter_distances = np.array(inter_distances)
-
-    if len(intra_distances) == 0 or len(inter_distances) == 0:
-        which = "intra" if len(intra_distances) == 0 else "inter"
+    if intra_distances is None or len(intra_distances) == 0 or len(inter_distances) == 0:
+        which = "intra" if (intra_distances is None or len(intra_distances) == 0) else "inter"
         print(f"\n  Skipping {rank}: no {which}-group distances "
               f"(need >=2 groups with >={min_size} members)")
-        return float("nan"), "N/A (single group)"
+        return float("nan"), float("nan"), "N/A (single group)"
+
+    seps = np.array(seps, dtype=float)
+    separation = float(np.mean(seps))      # mean over repeats
+    sep_std = float(np.std(seps))          # 0.0 when repeats==1
 
     print(f"\n{'=' * 80}")
-    print(f"HYPERBOLIC DISTANCE STATISTICS")
+    print(f"HYPERBOLIC DISTANCE STATISTICS (last of {len(seps)} seeded repeat(s))")
     print(f"{'=' * 80}")
     print(f"\nIntra-{rank} distances:")
     print(f"  Count:  {len(intra_distances):,}")
@@ -344,8 +358,11 @@ def analyze_hierarchical_clustering_hyperbolic(emb, idx2tax, taxonomy, rank, out
     print(f"  Median: {np.median(inter_distances):.6f}")
     print(f"  Std:    {np.std(inter_distances):.6f}")
 
-    separation = np.mean(inter_distances) / np.mean(intra_distances)
-    print(f"\nSeparation Ratio: {separation:.3f}x")
+    if len(seps) > 1:
+        print(f"\nSeparation Ratio: {separation:.3f}x ± {sep_std:.3f} "
+              f"(mean±std over {len(seps)} seeds: {', '.join(f'{s:.3f}' for s in seps)})")
+    else:
+        print(f"\nSeparation Ratio: {separation:.3f}x")
 
     if separation > 2.0:
         quality = "EXCELLENT"
@@ -379,7 +396,7 @@ def analyze_hierarchical_clustering_hyperbolic(emb, idx2tax, taxonomy, rank, out
     print(f"\nSaved plot: {out}")
     plt.close()
 
-    return separation, quality
+    return separation, sep_std, quality
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +439,10 @@ def main():
                         help=f"Taxonomy dump directory (default: {DATA_DIR})")
     parser.add_argument("--ranks", nargs="+", default=["phylum", "class", "order"],
                         help="Taxonomic ranks to analyze (default: phylum class order)")
+    parser.add_argument("--seed", type=int, default=0,
+                        help="Base RNG seed for the group/pair subsampling (default: 0, reproducible)")
+    parser.add_argument("--repeats", type=int, default=1,
+                        help="Independent seeded estimates per rank → mean±std separation (default: 1)")
 
     args = parser.parse_args()
 
@@ -452,10 +473,11 @@ def main():
     results = {}
     for rank in args.ranks:
         try:
-            sep, qual = analyze_hierarchical_clustering_hyperbolic(
+            sep, sep_std, qual = analyze_hierarchical_clustering_hyperbolic(
                 emb, idx2tax, taxonomy, rank, output_dir,
+                seed=args.seed, repeats=args.repeats,
             )
-            results[rank] = {"separation": sep, "quality": qual}
+            results[rank] = {"separation": sep, "sep_std": sep_std, "quality": qual}
         except Exception as e:
             print(f"\nError analyzing {rank}: {e}")
             import traceback
@@ -469,7 +491,10 @@ def main():
     print(f"\n{'Rank':<12} {'Separation':>12} {'Quality':>15}")
     print("-" * 40)
     for rank, res in results.items():
-        print(f"{rank.capitalize():<12} {res['separation']:>11.2f}x {res['quality']:>15}")
+        std = res.get("sep_std", 0.0) or 0.0
+        suffix = f" ±{std:.2f}" if args.repeats > 1 else ""
+        # NB: keep "<Rank>   <sep>x" leading shape — _sweep_diagnostic_analyses.py parses it.
+        print(f"{rank.capitalize():<12} {res['separation']:>11.2f}x{suffix} {res['quality']:>15}")
 
     print(f"\nPlots saved to: {output_dir}")
 
