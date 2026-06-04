@@ -66,9 +66,37 @@ recipe.
    now EXCELLENT (echino 4k, mollusca 32k, metazoa 498k). PROJECT_STATE recipe + known-issue #7 updated to
    RESOLVED. Negative control kept (`mollusca_canonical_local`, eff-batch 2048 → POOR).
 
+6. **UMAP figures (user request) — upgraded viz `scripts/figure_umap_taxa.py`.** The old
+   `visualize_multi_groups.py` coloured by tree-depth (Metazoa's tree-children are Eumetazoa/Porifera, so
+   it can't show phyla). New tool: rank-based colouring (reuses the analyzer's `get_ancestor_at_rank`),
+   `--node-rank` (one point per coarse taxon — the key to seeing phylum REGIONS instead of pure species
+   micro-clusters), `--restrict-to-taxid`/`--exclude-taxids`, balanced sampling. Finding: the embedding makes
+   thousands of taxonomically-PURE micro-clusters (family 10× dominates), so phylum regions only resolve when
+   you plot one point per order. Figures in `paper/figures/`: `metazoa_umap_phylum_orders` (clean phylum
+   separation), `metazoa_umap_minor_phyla` (giants excluded → small phyla separate), `arthropoda_umap_class`
+   (zoom), `metazoa_umap_phylum` (species-level purity). Committed 32c2b49.
+7. **Eukaryota (all-Life) prep — built, verified, uploaded; ready to sbatch.** `taxembed build 2759 --clean`:
+   1,968,485 raw → **877,584 clean nodes** (55.4% noise stripped), **18.9M pairs**, max depth 39 (~1.76× metazoa).
+   Verified (Rule 10, `scripts/_verify_eukaryota_clean.py`): npz n_nodes == mapping rows; residual noise
+   **0.004%** (38 legit internal containers); full kingdom balance (Opisthokonta 598k / Viridiplantae 251k /
+   Fungi 99k / SAR 17k / Rhodophyta / Amoebozoa / Discoba / Haptista); eyeball clean (no `sp.`/environmental;
+   named strains kept, consistent with metazoa build). **Build LOCALLY, upload — don't taxdump on LRZ**
+   (compute nodes offline; local build lets us verify the cleaning before GPU; npz is only 7MB). Uploaded
+   npz+mapping (~20MB) + `scripts/train_lrz_eukaryota_canonical.sh` to LRZ /data (verified on disk).
+   Recipe = metazoa canonical (eff-batch 2048) — appropriate since eukaryota > metazoa (big-batch is for
+   LARGE clades; the mollusca shrink-batch fix was for small ones). **WATCH ep80–120 for a separation stall**
+   = within-clade hard-negative starvation re-emerging at this scale/depth → enable hard-neg sampler or
+   n_neg→500 (NOT an architecture ceiling). Dataset regenerable via the build cmd (not committed).
+
 **Verdict:** Task-1 "lock the result" COMPLETE — metazoa-scale EXCELLENT defensible. Task-4 generalization
 COMPLETE — recipe generalizes across 4k→498k with one scale-aware knob (effective batch); mollusca 32k now
 EXCELLENT (order 3.62 / family 4.76×). The "finished" bar (result locked + generalizes to ≥1 clade) is MET.
+UMAP figures delivered. Eukaryota (877k nodes) built+verified+uploaded, ready to launch.
+
+**Next:** user fires `sbatch train_lrz_eukaryota_canonical.sh` (repro 5666348 still running ~1h/10h — queue
+or 2nd GPU). On Eukaryota landing: pull + analyze (seeded separation + kNN-purity, ranks
+phylum/class/order/family — phylum here = kingdom-ish), read ep80–120 for the stall signal. If repro lands
+first, confirm it reproduces ~2.6/3.8/6.7/10× to close the reproducibility lock.
 
 **Next:** (a) test the eff-batch-256 mollusca fix (local, ~½h) — if it lifts, the recipe generalizes with
 one scale-aware lever. (b) LRZ reproducibility re-run of the exact Exp1 config (new tag
