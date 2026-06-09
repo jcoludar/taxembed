@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 from sklearn.metrics import roc_auc_score
+from scipy.stats import fisher_exact
 
 
 def excess_impurity(observed_purity: np.ndarray, chance_purity: float) -> np.ndarray:
@@ -114,3 +115,66 @@ def displacement_class(orig_parent: np.ndarray, new_parent: np.ndarray,
     op = np.asarray(orig_parent, dtype=np.int64)[moved]
     npar = np.asarray(new_parent, dtype=np.int64)[moved]
     return np.abs(depth[op] - depth[npar]) + 2
+
+
+def _qbin(x: np.ndarray, n_bins: int) -> np.ndarray:
+    x = np.asarray(x, dtype=np.float64)
+    qs = np.quantile(x, np.linspace(0, 1, n_bins + 1)[1:-1]) if n_bins > 1 else np.array([])
+    return np.digitize(x, qs)
+
+
+def match_background(flagged_idx: np.ndarray, depth: np.ndarray, clade_size: np.ndarray,
+                     study_effort: np.ndarray, n_bins: int = 5, seed: int = 0) -> np.ndarray:
+    """For each flagged node draw one control from the SAME depth x size x effort stratum (spec §9B).
+
+    Controls are preferentially non-flagged; if a stratum has no non-flagged member, falls back to any
+    member of that stratum. Returns an index array parallel to flagged_idx.
+    """
+    rng = np.random.default_rng(seed)
+    flagged_idx = np.asarray(flagged_idx, dtype=np.int64)
+    n = len(depth)
+    key = (_qbin(depth, n_bins).astype(np.int64) * (n_bins ** 2)
+           + _qbin(clade_size, n_bins).astype(np.int64) * n_bins
+           + _qbin(study_effort, n_bins).astype(np.int64))
+    flagged_set = set(flagged_idx.tolist())
+    controls = np.empty(len(flagged_idx), dtype=np.int64)
+    for i, v in enumerate(flagged_idx):
+        same = np.flatnonzero(key == key[v])
+        pool = np.array([s for s in same if s not in flagged_set], dtype=np.int64)
+        if pool.size == 0:
+            pool = same[same != v]
+        if pool.size == 0:
+            pool = same
+        controls[i] = rng.choice(pool)
+    return controls
+
+
+def enrichment_odds_ratio(score: np.ndarray, is_positive: np.ndarray,
+                          top_frac: float = 0.1) -> dict:
+    """Odds ratio + Fisher exact (2x2: flagged-vs-not x positive-vs-not) (spec §9B framing).
+
+    'flagged' = top `top_frac` of nodes by score. Returns OR, Fisher p, the 2x2 counts, and a
+    log-OR normal-approx 95% CI (Woolf). Higher score == more anomalous.
+    """
+    score = np.asarray(score, dtype=np.float64)
+    pos = np.asarray(is_positive, dtype=bool)
+    n = len(score)
+    n_flag = max(1, int(round(top_frac * n)))
+    flagged = np.zeros(n, bool)
+    flagged[np.argsort(score)[-n_flag:]] = True
+    a = int(np.sum(flagged & pos))
+    b = int(np.sum(flagged & ~pos))
+    c = int(np.sum(~flagged & pos))
+    d = int(np.sum(~flagged & ~pos))
+    odds_ratio, p_value = fisher_exact([[a, b], [c, d]], alternative="greater")
+    aa, bb, cc, dd = a + 0.5, b + 0.5, c + 0.5, d + 0.5
+    log_or = np.log((aa * dd) / (bb * cc))
+    se = np.sqrt(1 / aa + 1 / bb + 1 / cc + 1 / dd)
+    return {
+        "odds_ratio": float(odds_ratio),
+        "p_value": float(p_value),
+        "ci_low": float(np.exp(log_or - 1.96 * se)),
+        "ci_high": float(np.exp(log_or + 1.96 * se)),
+        "n_flagged": int(n_flag),
+        "counts": {"flagged_pos": a, "flagged_neg": b, "unflagged_pos": c, "unflagged_neg": d},
+    }

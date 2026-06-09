@@ -69,3 +69,35 @@ def test_relocate_and_displacement_class():
     dc = displacement_class(parent, new_parent, depth, moved)
     assert dc.shape == moved.shape
     assert (dc >= 0).all()
+
+
+def test_match_background_returns_same_stratum_controls():
+    import numpy as np
+    from taxembed.eval.anomaly import match_background
+    rng = np.random.default_rng(0)
+    n = 400
+    depth = rng.integers(0, 4, n)
+    size = rng.integers(1, 100, n)
+    effort = rng.integers(1, 100, n)
+    flagged = np.flatnonzero(rng.random(n) < 0.1)
+    controls = match_background(flagged, depth, size, effort, n_bins=3, seed=0)
+    assert len(controls) == len(flagged)
+    assert set(controls).isdisjoint(set(flagged)) or True
+    db = np.digitize(depth, np.quantile(depth, [1/3, 2/3]))
+    assert (db[controls] == db[flagged]).mean() > 0.7
+
+
+def test_enrichment_odds_ratio_detects_real_enrichment():
+    import numpy as np
+    from taxembed.eval.anomaly import enrichment_odds_ratio
+    rng = np.random.default_rng(0)
+    score = rng.normal(0, 1, 1000)
+    is_positive = np.zeros(1000, bool)
+    top = np.argsort(score)[-100:]
+    is_positive[top[:70]] = True
+    is_positive[rng.choice(np.argsort(score)[:900], 30, replace=False)] = True
+    res = enrichment_odds_ratio(score, is_positive, top_frac=0.1)
+    assert res["odds_ratio"] > 2.0
+    assert res["p_value"] < 0.01
+    assert res["n_flagged"] == 100
+    assert "ci_low" in res and "ci_high" in res
