@@ -247,6 +247,17 @@ represent any species/clade. The bar is high: we want EXCELLENT separation
    knn_purity) and `artifacts/tags/mollusca_canonical_local/` (the eff-batch-2048 negative control). Three
    scales now EXCELLENT with this principle: echino 4k (3.01/2.63×), mollusca 32k (3.62/4.76×), metazoa 498k
    (6.65/10.31×). See SESSION_LOG 2026-06-04.
+8. **🛑 App #2 leg B (NCBI release-diff, the "predictive QC" HEADLINE) has a date-leakage design fork (found 2026-06-09).**
+   The implemented + unit-tested leakage guard requires `training_date ≤ old_date < new_date` (the
+   embedding's training taxonomy must predate the OLD release we score on; reclassifications are read
+   OLD→NEW). But eukaryota/cellular were trained on a **recent (~2026-06) taxdump**, so there is no
+   leakage-free OLD<NEW window *after* training to observe yet (that needs future taxdumps). The plan's
+   Task-7 prose ("old = ~3 yr ago, new = training dump") **contradicts its own guard** and would be
+   REFUSED (training 2026 > old 2023). Options, NOT yet decided: (a) **retrain** the embedding on an OLD
+   (~2022) taxdump → enables a true predictive 2022→2025 diff (a new LRZ training run); (b) **reframe**
+   leg B as retrospective taxonomy-consistency (honest it is not leakage-free predictive — spec §9F);
+   (c) **demote** leg B to supporting and lead #2 on leg A (synthetic ROC, calibrated) + leg C
+   (incertae-sedis enrichment). Scorer + legs A/C are UNAFFECTED and ready to run at scale.
 
 ## Roadmap / next steps
 
