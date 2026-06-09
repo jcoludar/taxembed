@@ -24,6 +24,7 @@ from knn_purity_hyperbolic import _prep_sqnorms, _batch_distances, chance_purity
 from taxembed.eval.treedist import TreeDistance
 from taxembed.eval.anomaly import (matched_null_z, trivial_baselines, baseline_aucs,
                                    relocate_nodes, enrichment_odds_ratio)
+from audit_taxonomy_noise import classify_name_noise, is_container, parse_names_dmp
 
 
 def index_tree(idx2tax, taxonomy=None, parent_col=None):
@@ -146,6 +147,24 @@ def cmd_roc(args):
     print(json.dumps(res, indent=2))
 
 
+def cmd_enrichment(args):
+    data = np.load(args.pool_npz)
+    pool_idx = data["pool_idx"]; score_z = data["score_z"]
+    idx2tax = load_mapping(args.mapping)
+    taxids = np.array([idx2tax[int(i)] for i in pool_idx], dtype=np.int64)
+    names = parse_names_dmp(Path(args.names_dmp), set(taxids.tolist()))
+    is_uncertain = np.array([
+        bool(classify_name_noise(names.get(int(t), ""))) or
+        (is_container(names.get(int(t), "")) is not None)
+        for t in taxids], dtype=bool)
+    res = enrichment_odds_ratio(score_z, is_uncertain, top_frac=args.top_frac)
+    res["n_uncertain"] = int(is_uncertain.sum())
+    res["pool_size"] = int(len(pool_idx))
+    out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
+    (out / "enrichment.json").write_text(json.dumps(res, indent=2))
+    print(json.dumps(res, indent=2))
+
+
 def add_common(sp):
     sp.add_argument("--checkpoint", required=True)
     sp.add_argument("--mapping", required=True)
@@ -165,9 +184,17 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     roc = sub.add_parser("roc"); add_common(roc); roc.add_argument("--n-relocate", type=int, default=2000)
+    enr = sub.add_parser("enrichment")
+    enr.add_argument("--pool-npz", required=True)
+    enr.add_argument("--mapping", required=True)
+    enr.add_argument("--names-dmp", default=str(ROOT / "data" / "names.dmp"))
+    enr.add_argument("--top-frac", type=float, default=0.1)
+    enr.add_argument("-o", "--output-dir", required=True)
     args = ap.parse_args()
     if args.cmd == "roc":
         cmd_roc(args)
+    elif args.cmd == "enrichment":
+        cmd_enrichment(args)
 
 
 if __name__ == "__main__":
