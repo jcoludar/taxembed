@@ -93,6 +93,39 @@ final (pull is local-only now); arthropoda 325k canonical (LRZ) if a 5th ladder 
 - **Plans 2 & 3 SCOPED** (8 TDD tasks each, on disk): `docs/plans/2026-06-09-taxembed-app2-taxonomy-qc.md`
   and `docs/plans/2026-06-09-taxembed-app3-sampling-bias.md`.
 
+### (same day, later still) — Plan 2 (taxonomy QC, the LEAD app) BUILT + GPU-ported for LRZ
+- **Verify-before-trust:** job 5673097 (cellular) = **PENDING** (no pull; developed on eukaryota 877k,
+  decoupled per §9C). `tests/eval/` = 14 passed at start, as expected.
+- **Plan 2 Tasks 1–7 EXECUTED** (subagent-driven, TDD; full eval suite 14 → **31 passed**). New
+  `src/taxembed/eval/{anomaly,release_diff}.py` (size-conditioned kNN-impurity score = z vs
+  depth×clade-size-matched null + `score_excess`; trivial baselines; BH-FDR; relocate; merged/delnodes
+  canonicalization + reclassification def; matched-background + Fisher enrichment OR) + CLIs
+  `scripts/taxonomy_anomaly.py` (score+rank+FDR) and `scripts/_anomaly_validation.py` (leg A ROC-by-
+  displacement, leg C incertae-sedis enrichment, leg B NCBI release-diff + dated-archive fetch + a
+  training≤old<new **leakage guard**). Reuse verified up front (analyze/knn/audit helpers + TreeDistance).
+- **Two review-caught latent bugs FIXED** (same class, both untested flag combos): `taxonomy` unbound
+  when `--parent-from-mapping` without `--rank-from-mapping` → crash in `build_pool`, in BOTH CLIs
+  (`97635b1`, `867f15f`). Also kept the `anomaly.trivial_baselines` core **strict** (no silent
+  array-length padding; fixed the plan's test fixture instead).
+- **GPU-port + vectorization (user pivot: heavy compute/data → LRZ).** The full-pool numpy scorer was
+  single-core O(P²): 26 min+ on eukaryota 877k, ~15 GB, no ETA → killed. New shared
+  `scripts/_anomaly_knn.py`: device-aware (cuda|mps|cpu) batched `torch.topk` kNN (all float32 — MPS
+  has no float64; numpy kernel returns float32 so ordering matches) + **vectorized matched-null** (the
+  ~877k-iteration per-node Python loop → one draw per depth×size bin). Cross-checked against the numpy
+  kernel exactly on a tie-free fixture (`tests/eval/test_anomaly_knn.py`); suite now **34 passed**.
+  CLIs route through it with `--device`/`--knn-batch`. (`451df0f`.)
+- **S0274 local-end-to-end gate PASSED:** scorer + leg A + leg C all run clean end-to-end on
+  echino_softmax (3864-node pool) via **MPS** with the exact flag combo. (Echino is small+clean →
+  n_significant=0, leg-A AUC peak 0.62, leg-C OR 0 — signal expected only at full scale.)
+- **LRZ ready:** `scripts/analyze_lrz_anomaly.sh` (parameterized TAG+mapping; eukaryota now / cellular
+  when 5673097 lands; `--device cuda`; preflight) (`643ad86`). LRZ has eukaryota_canonical.pth (ep200)
+  + mappings; **taxdump NOT yet staged on /data** (needed for rank-family pool + legs B/C) →
+  `scripts/_extract_taxdump_dmps.py` stages names/nodes/merged/delnodes; current dump extracted locally
+  to `data/taxdump_current/`.
+- **PENDING decisions (leg B, the headline):** OLD archived taxdump release (~3 yr) + the training-dump
+  date for the no-leakage ordering. **PENDING infra:** scp latest `scripts/` + `data/new_taxdump.tar.gz`
+  to LRZ, then `sbatch analyze_lrz_anomaly.sh eukaryota_canonical …`.
+
 ---
 
 ## 2026-06-04 — Locked the metazoa breakthrough (kNN-purity + seeded separation); recipe promoted
