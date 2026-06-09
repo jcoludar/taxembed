@@ -92,4 +92,44 @@ def load_taxdb(data_dir: Path):
     )
 
 
-__all__ = ["TAXDUMP_URL", "ensure_taxdump", "load_taxdb"]
+ARCHIVE_BASE = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump_archive/"
+
+_ARCHIVE_MEMBERS = ("nodes.dmp", "names.dmp", "merged.dmp", "delnodes.dmp")
+
+
+def ensure_taxdump_archive(data_dir: Path, archive_name: str, *, force: bool = False):
+    """Fetch + extract a DATED archived taxdump (e.g. 'taxdmp_2022-01-01.zip' or '.tar.gz') for the
+    release-diff (spec §9C leg B). Returns (nodes, names, merged, delnodes) paths under data_dir.
+
+    archive_name is the exact file name under taxdump_archive/. Both .zip and .tar.gz are handled.
+    Offline-safe: if the four dmp files already exist under data_dir and not force, no network.
+    """
+    import zipfile
+
+    data_dir = Path(data_dir); data_dir.mkdir(parents=True, exist_ok=True)
+    paths = {m: data_dir / m for m in _ARCHIVE_MEMBERS}
+    if not force and paths["nodes.dmp"].exists() and paths["names.dmp"].exists():
+        return tuple(paths[m] if paths[m].exists() else None for m in _ARCHIVE_MEMBERS)
+
+    url = ARCHIVE_BASE + archive_name
+    archive_path = data_dir / archive_name
+    print(f"  Downloading archived taxdump {url}")
+    with urllib.request.urlopen(url) as resp, archive_path.open("wb") as out_f:
+        shutil.copyfileobj(resp, out_f)
+
+    if archive_name.endswith(".zip"):
+        with zipfile.ZipFile(archive_path) as zf:
+            for m in _ARCHIVE_MEMBERS:
+                if m in zf.namelist():
+                    zf.extract(m, path=data_dir)
+    else:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            for m in _ARCHIVE_MEMBERS:
+                try:
+                    tar.extract(tar.getmember(m), path=data_dir)
+                except KeyError:
+                    continue
+    return tuple(paths[m] if paths[m].exists() else None for m in _ARCHIVE_MEMBERS)
+
+
+__all__ = ["TAXDUMP_URL", "ensure_taxdump", "load_taxdb", "ensure_taxdump_archive"]

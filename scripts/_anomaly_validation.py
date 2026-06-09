@@ -8,6 +8,7 @@ Local analysis only: explicit --checkpoint (final/ep200) + --mapping; never rely
 import argparse
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +24,8 @@ from analyze_hierarchy_hyperbolic import (load_embeddings, load_mapping,
 from knn_purity_hyperbolic import _prep_sqnorms, _batch_distances, chance_purity, build_pool
 from taxembed.eval.treedist import TreeDistance
 from taxembed.eval.anomaly import (matched_null_z, trivial_baselines, baseline_aucs,
-                                   relocate_nodes, enrichment_odds_ratio)
+                                   relocate_nodes, enrichment_odds_ratio, match_background)
+from taxembed.eval.release_diff import parse_parents, parse_merged, parse_delnodes, reclassified_taxa
 from audit_taxonomy_noise import classify_name_noise, is_container, parse_names_dmp
 
 
@@ -165,6 +167,57 @@ def cmd_enrichment(args):
     print(json.dumps(res, indent=2))
 
 
+def _parse_date(s):
+    y, m, d = (int(x) for x in s.split("-"))
+    return date(y, m, d)
+
+
+def cmd_releasediff(args):
+    old_d, new_d = _parse_date(args.old_date), _parse_date(args.new_date)
+    dates_ok = old_d < new_d
+    msg = []
+    if not dates_ok:
+        msg.append(f"scored old-date {old_d} must be strictly before new-date {new_d}")
+    if args.training_date:
+        tr = _parse_date(args.training_date)
+        if tr > old_d:
+            dates_ok = False
+            msg.append(f"LEAKAGE: training-date {tr} is after scored old-date {old_d}")
+    if not dates_ok:
+        sys.stderr.write("releasediff REFUSED: " + "; ".join(msg) + "\n")
+        sys.exit(2)
+
+    data = np.load(args.pool_npz)
+    pool_idx = data["pool_idx"]; score_z = data["score_z"]
+    depth = data["depth"]; clade_size = data["clade_size"]; degree = data["degree"]
+    idx2tax = load_mapping(args.mapping)
+    scored_taxids = [int(idx2tax[int(i)]) for i in pool_idx]
+
+    old_parent = parse_parents(args.old_nodes)
+    new_parent = parse_parents(args.new_nodes)
+    new_merged = parse_merged(args.new_merged) if args.new_merged else {}
+    new_deln = parse_delnodes(args.new_delnodes) if args.new_delnodes else set()
+
+    present = np.array([t in old_parent for t in scored_taxids])
+    reclass = reclassified_taxa([t for t, p in zip(scored_taxids, present) if p],
+                                old_parent, new_parent, new_merged, new_deln)
+    is_reclass = np.array([t in reclass for t in scored_taxids]) & present
+
+    res = enrichment_odds_ratio(score_z[present], is_reclass[present], top_frac=args.top_frac)
+    flagged = np.flatnonzero((score_z >= np.quantile(score_z[present], 1 - args.top_frac)) & present)
+    controls = match_background(flagged, depth, clade_size, degree, n_bins=args.n_bins, seed=0)
+    res["flagged_reclass_rate"] = float(is_reclass[flagged].mean()) if len(flagged) else 0.0
+    res["matched_control_reclass_rate"] = float(is_reclass[controls].mean()) if len(controls) else 0.0
+
+    res.update({"n_reclassified": int(is_reclass[present].sum()),
+                "n_scored_present_in_old": int(present.sum()),
+                "training_date": args.training_date, "old_date": args.old_date,
+                "new_date": args.new_date, "dates_ok": True})
+    out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
+    (out / "releasediff.json").write_text(json.dumps(res, indent=2))
+    print(json.dumps(res, indent=2))
+
+
 def add_common(sp):
     sp.add_argument("--checkpoint", required=True)
     sp.add_argument("--mapping", required=True)
@@ -190,11 +243,28 @@ def main():
     enr.add_argument("--names-dmp", default=str(ROOT / "data" / "names.dmp"))
     enr.add_argument("--top-frac", type=float, default=0.1)
     enr.add_argument("-o", "--output-dir", required=True)
+    rd = sub.add_parser("releasediff")
+    rd.add_argument("--pool-npz", required=True)
+    rd.add_argument("--mapping", required=True)
+    rd.add_argument("--old-nodes", required=True)
+    rd.add_argument("--old-merged", default=None)
+    rd.add_argument("--old-delnodes", default=None)
+    rd.add_argument("--new-nodes", required=True)
+    rd.add_argument("--new-merged", default=None)
+    rd.add_argument("--new-delnodes", default=None)
+    rd.add_argument("--training-date", default=None)
+    rd.add_argument("--old-date", required=True)
+    rd.add_argument("--new-date", required=True)
+    rd.add_argument("--top-frac", type=float, default=0.1)
+    rd.add_argument("--n-bins", type=int, default=5)
+    rd.add_argument("-o", "--output-dir", required=True)
     args = ap.parse_args()
     if args.cmd == "roc":
         cmd_roc(args)
     elif args.cmd == "enrichment":
         cmd_enrichment(args)
+    elif args.cmd == "releasediff":
+        cmd_releasediff(args)
 
 
 if __name__ == "__main__":

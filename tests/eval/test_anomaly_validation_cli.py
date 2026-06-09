@@ -83,3 +83,68 @@ def test_enrichment_runs_on_precomputed_pool(tmp_path):
     res = json.loads((out / "enrichment.json").read_text())
     assert res["odds_ratio"] >= 1.0
     assert res["n_uncertain"] >= 2
+
+
+def test_releasediff_odds_ratio_local(tmp_path):
+    import numpy as np
+    pool_idx = np.arange(20); taxids = np.arange(200, 220)
+    score_z = np.linspace(-1, 5, 20)
+    np.savez(tmp_path / "anomaly_pool.npz", pool_idx=pool_idx, pool_lab=np.zeros(20, int),
+             observed=np.zeros(20), score_z=score_z, score_excess=np.zeros(20),
+             pvals=np.ones(20), qvals=np.ones(20),
+             clade_size=np.arange(1, 21), depth=np.ones(20, int) * 3, degree=np.ones(20),
+             dist_to_parent_centroid=np.zeros(20))
+    mp = tmp_path / "map.tsv"
+    mp.write_text("taxid\tidx\n" + "\n".join(f"{t}\t{i}" for i, t in enumerate(taxids)) + "\n")
+    old_nodes = tmp_path / "old_nodes.dmp"
+    old_nodes.write_text("\n".join(f"{t}\t|\t2\t|\tspecies\t|" for t in taxids) + "\n2\t|\t1\t|\tgenus\t|\n")
+    new_lines = []
+    for t in taxids:
+        par = 3 if t >= 216 else 2
+        new_lines.append(f"{t}\t|\t{par}\t|\tspecies\t|")
+    new_lines += ["2\t|\t1\t|\tgenus\t|", "3\t|\t1\t|\tgenus\t|"]
+    new_nodes = tmp_path / "new_nodes.dmp"; new_nodes.write_text("\n".join(new_lines) + "\n")
+    empty_merged = tmp_path / "merged.dmp"; empty_merged.write_text("")
+    empty_deln = tmp_path / "delnodes.dmp"; empty_deln.write_text("")
+
+    from pathlib import Path
+    import subprocess, json
+    ROOT = Path(__file__).resolve().parents[2]
+    PY = ROOT / ".venv" / "bin" / "python"
+    out = tmp_path / "out"
+    r = subprocess.run(
+        [str(PY), str(ROOT / "scripts" / "_anomaly_validation.py"), "releasediff",
+         "--pool-npz", str(tmp_path / "anomaly_pool.npz"), "--mapping", str(mp),
+         "--old-nodes", str(old_nodes), "--old-merged", str(empty_merged), "--old-delnodes", str(empty_deln),
+         "--new-nodes", str(new_nodes), "--new-merged", str(empty_merged), "--new-delnodes", str(empty_deln),
+         "--training-date", "2021-01-01", "--old-date", "2022-01-01", "--new-date", "2025-01-01",
+         "--top-frac", "0.25", "--n-bins", "2", "-o", str(out)],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    res = json.loads((out / "releasediff.json").read_text())
+    assert res["n_reclassified"] == 4
+    assert res["odds_ratio"] > 1.0
+    assert res["dates_ok"] is True
+
+
+def test_releasediff_refuses_bad_dates(tmp_path):
+    import numpy as np, subprocess
+    from pathlib import Path
+    np.savez(tmp_path / "p.npz", pool_idx=np.arange(2), pool_lab=np.zeros(2, int),
+             observed=np.zeros(2), score_z=np.zeros(2), score_excess=np.zeros(2),
+             pvals=np.ones(2), qvals=np.ones(2), clade_size=np.ones(2),
+             depth=np.ones(2), degree=np.ones(2), dist_to_parent_centroid=np.zeros(2))
+    mp = tmp_path / "m.tsv"; mp.write_text("taxid\tidx\n1\t0\n2\t1\n")
+    nodes = tmp_path / "n.dmp"; nodes.write_text("1\t|\t1\t|\tno rank\t|\n2\t|\t1\t|\tgenus\t|\n")
+    empty = tmp_path / "e.dmp"; empty.write_text("")
+    ROOT = Path(__file__).resolve().parents[2]; PY = ROOT / ".venv" / "bin" / "python"
+    r = subprocess.run(
+        [str(PY), str(ROOT / "scripts" / "_anomaly_validation.py"), "releasediff",
+         "--pool-npz", str(tmp_path / "p.npz"), "--mapping", str(mp),
+         "--old-nodes", str(nodes), "--old-merged", str(empty), "--old-delnodes", str(empty),
+         "--new-nodes", str(nodes), "--new-merged", str(empty), "--new-delnodes", str(empty),
+         "--training-date", "2024-01-01", "--old-date", "2022-01-01", "--new-date", "2025-01-01",
+         "-o", str(tmp_path / "o")],
+        capture_output=True, text=True)
+    assert r.returncode != 0
+    assert "leakage" in (r.stderr + r.stdout).lower()
