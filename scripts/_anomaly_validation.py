@@ -106,6 +106,8 @@ def build_labels(emb, idx2tax, taxonomy, args):
             if lab >= 0 and t in tax2idx:
                 pi.append(tax2idx[t]); pl.append(lab)
         return np.asarray(pi, np.int64), np.asarray(pl, np.int64)
+    if taxonomy is None:                           # parent came from mapping but rank needs the taxdump
+        taxonomy = load_taxonomy_with_depth(set(idx2tax.values()), args.data_dir)
     return build_pool(emb, idx2tax, taxonomy, args.rank)
 
 
