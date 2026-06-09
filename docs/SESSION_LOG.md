@@ -7,6 +7,94 @@ not here — this log is the timestamped trail.
 
 ---
 
+## 2026-06-09 — All-Life (877k) lands EXCELLENT + metazoa reproducibility lock CLOSED
+
+**Set out to:** check the outstanding LRZ runs, pull + analyze the two that the 2026-06-04 handoff was
+waiting on (eukaryota all-Life + metazoa repro), staying mindful of local disk (started at 96% / 44 GB free).
+
+**LRZ status:** queue empty — all `taxembed_*` jobs finished. The two target runs both COMPLETED:
+`metazoa_metazoa_repro` (5666348, 10h09m, ended 2026-06-05) and `eukaryota_canonical` (5666473, 20h30m,
+877k nodes, ended 2026-06-05). (Full account sweep also showed the plm_choice `oe_*`/`esmc_*` jobs done;
+one `oe_ESM2-3B` OOM at 5665521 then succeeded on rerun 5666300 — not ours.)
+
+**Space discipline:** did NOT mirror the tags (eukaryota 18 GB + repro 11 GB = 29 GB would have hit ~99%).
+Pulled only what analysis needs — final ckpt + ep80/100/120/150/180 milestones for eukaryota, final-only
+for repro (~4.4 GB). Then trimmed the locked Exp-1 tag (`metazoa_lower_lr_bigger_batch`) to final+best
+(milestones all still on LRZ = recovery path), reclaiming ~9.5 GB (10 GB → 768 MB; macOS holds the freed
+blocks as APFS purgeable). Helpers: `scripts/_eukaryota_trajectory_readout.py`, `scripts/_trim_exp1_checkpoints.py`.
+
+**Results (seeded analyzer, `analysis_final_seeded/` under each tag):**
+1. **Reproducibility lock CLOSED — repro (5666348).** Same canonical config, fresh run → phylum 2.59 /
+   class 3.84 / order 6.69 / **family 10.27 ±0.01×**; depth↔norm +0.984/+0.998. Matches Experiment 1
+   (2.60/3.85/6.68/10.30) inside the ±0.01 noise floor ⇒ the metazoa breakthrough is **deterministic**,
+   not a lucky seed.
+2. **ALL-LIFE EXCELLENT — eukaryota (5666473), 877k nodes.** Final ep200 → phylum 3.12 / class 5.09 /
+   order 7.13 / **family 8.23 ±0.01×**; depth↔norm +0.978/+0.999. EXCELLENT at every rank ("phylum"≈
+   kingdom at this scale). The canonical recipe (eff-batch 2048 + n_neg 300 + lr 0.001 + cosine
+   warm-restart, **default sampler**) holds at the largest, deepest tree we have — no ceiling.
+3. **Stall-watch resolved.** Milestone trajectory (family rank): ep80 2.34 → ep100 3.75 → ep120 3.54 →
+   ep150 3.68 → ep180 6.56 → ep200 8.23. The flagged ep80–120 window shows a **soft plateau (ep100–150),
+   not the metazoa-style curriculum-transition collapse**. The final dd≤all phase + warm-restart then
+   drives a hard late climb (separation more than doubled in the last 50 ep) ⇒ **use `final`, not `best`**.
+
+**Implication for the roadmap:** the E1c hard-negative sampler / E2 cones / E3 structural alternatives are
+**NOT required to reach EXCELLENT at full scale** — the default sampler + four canonical levers suffice
+through 877k. Those plans stay on the record (+ reusable diagnostics) but the core capability question is
+answered. **PC embeddings represent taxonomy well across 4k → 877k (all of Life), reproducibly.** Remaining
+work is presentational (figures, write-up) + optional polish, not a capability gap.
+
+**Next:** results/figures pass (the ep10→200 separation-trajectory story now has a 4-scale ladder: echino
+4k / mollusca 32k / metazoa 498k / eukaryota 877k). Optional: kNN-purity anti-Goodhart check on eukaryota
+final (pull is local-only now); arthropoda 325k canonical (LRZ) if a 5th ladder rung is wanted.
+
+### (same day, later) — eukaryota anti-Goodhart CLOSED + TRUE all-Life (cellular) built, smoked, launched
+
+- **Eukaryota kNN-purity DONE (asterisk closed).** `knn_purity/` (k=10, 3000 q/rank, 3 reps): phylum
+  0.9945 (4.1×) / class 0.9912 (5.8×) / order 0.9850 (43.9×) / **family 0.9124 (274.5× chance)**. NN are
+  91–99% same-clade ⇒ all-Life separation is genuine angular structure, not a radial artifact (family lift
+  even exceeds metazoa's 216×). Eukaryota result now has the SAME two-check rigor as metazoa.
+- **Test suite:** 64 passed (loss / training-pairs / negative-hardness math covered).
+- **TRUE all-Life dataset built — `cellular_organisms_131567_clean`.** `taxembed build 131567 --clean`:
+  2.625M raw → **1,102,163 clean nodes** (58% noise stripped), **21.4M pairs**, depth 40. Scope =
+  Bacteria + Archaea + Eukaryota; **Viruses excluded** deliberately (polyphyletic, artificial root, no
+  shared ancestry with cellular life — embedding them would assert false common origin). Verified (Rule 10,
+  `scripts/_verify_cellular_clean.py`): nodes==mapping; domains Bacteria 216k / Archaea 7k / Eukaryota 878k
+  (Euk matches standalone build = consistency check); residual name-noise 0.023% (internal env-sample /
+  informal-bacterium containers w/ real children — topology only, names don't affect training).
+- **Recipe UNCHANGED.** 21.4M pairs is only 1.13× eukaryota's 18.9M (raw-vs-clean: the earlier 56M/3×
+  scare was the RAW clade count) ⇒ epoch_fraction 0.3 + eff-batch 2048 stays put; est. ~23–27h fits the
+  48h walltime. Probe: `scripts/_probe_all_life_size.py`.
+- **RED-LINE honored (S0274):** exact flag combo ran end-to-end locally on echino (40 ep, all curriculum
+  auto-phases + warm-restarts + AMP + grad-accum + euclidean-param + softmax), depth↔norm +0.980, clean
+  exit, BEFORE any sbatch. Echoed command byte-identical to the LRZ script.
+- **LAUNCHED — `taxembed_cellular_canonical`, job 5673097** (PENDING, lrz-v100x2, 48h). Script
+  `scripts/train_lrz_cellular_canonical.sh`. On landing: pull final + ep80–200 milestones (local-only;
+  watch the ep100–150 plateau→climb shape), seeded separation + kNN-purity, ranks superkingdom/phylum/
+  class/order/family. Use `final`, not `best`.
+
+### (same day, later still) — paper scoped + Plan 1 executed + Application #1 RESULT
+- **Brainstormed the paper** (Bioinformatics tool venue): method + 5-scale validation ladder + 3 apps
+  (#1 fidelity, #2 taxonomy QC = LEAD, #3 sampling-bias) + #4 bridge as Outlook. Spec:
+  `docs/specs/2026-06-09-taxembed-paper-design.md` (§9 = 4-reviewer fan + recon fold).
+- **4-reviewer fan + recon** reshaped it: lead with artifact+scale (not "hyperbolic taxonomy embedding");
+  #2 release-diff QC is the real "so what"; #1 demoted to a validation subsection (Macaulay 2023 / De Sa
+  2018 precede the finding — defend on scale+service); #3 must benchmark vs Faith's PD; radial-only null +
+  taxon-bootstrap CIs mandatory; LCA/old-taxdump-canonicalize/UniProt-join are the real (non-thin) work;
+  ship an installable artifact + DOI'd embedding. #4 recon: ~100–200k ProtT5 proteins / ~200–300 taxa
+  offline; UniProt has per-entry embeddings for all → #3 coverage fetchable; #4 ~80% data (ant-venom
+  corpus best prototype) — prototype-able, its own effort.
+- **Plan 1 (eval foundation + #1) WRITTEN + EXECUTED** (subagent, TDD). Branch
+  `feat/taxembed-eval-foundation`; new `src/taxembed/eval/{treedist,nulls,pairs,bootstrap,fidelity}.py`
+  (binary-lifting LCA, radial-only/shuffled/random nulls, taxon-bootstrap CI, distortion + kNN-retrieval
+  + within-clade rank corr) + `scripts/cophenetic_fidelity.py`; **14/14 eval tests pass**, 6 commits.
+- **Application #1 RESULT (eukaryota 877k):** kNN-retrieval precision@10 = **0.636** [0.627–0.644] vs
+  **radial-only null 0.026** ⇒ **delta 0.609 (~24× null)**; distortion median 1.14. Fidelity is genuine
+  ANGULAR structure, not a radial artifact. (`artifacts/tags/eukaryota_canonical/cophenetic_fidelity/`.)
+- **Plans 2 & 3 SCOPED** (8 TDD tasks each, on disk): `docs/plans/2026-06-09-taxembed-app2-taxonomy-qc.md`
+  and `docs/plans/2026-06-09-taxembed-app3-sampling-bias.md`.
+
+---
+
 ## 2026-06-04 — Locked the metazoa breakthrough (kNN-purity + seeded separation); recipe promoted
 
 **Set out to:** execute the POST-BREAKTHROUGH "lock the result" step (local, ~0 GPU) so the 6–10×
@@ -93,10 +181,10 @@ COMPLETE — recipe generalizes across 4k→498k with one scale-aware knob (effe
 EXCELLENT (order 3.62 / family 4.76×). The "finished" bar (result locked + generalizes to ≥1 clade) is MET.
 UMAP figures delivered. Eukaryota (877k nodes) built+verified+uploaded, ready to launch.
 
-**Next:** user fires `sbatch train_lrz_eukaryota_canonical.sh` (repro 5666348 still running ~1h/10h — queue
-or 2nd GPU). On Eukaryota landing: pull + analyze (seeded separation + kNN-purity, ranks
-phylum/class/order/family — phylum here = kingdom-ish), read ep80–120 for the stall signal. If repro lands
-first, confirm it reproduces ~2.6/3.8/6.7/10× to close the reproducibility lock.
+**Next:** Eukaryota FIRED — `sbatch` job **5666473** (PENDING, queued behind repro 5666348 + plm_choice
+jobs). On landing: pull + analyze (seeded separation + kNN-purity, ranks phylum/class/order/family — phylum
+here = kingdom-ish), read ep80–120 for the stall signal. Repro **5666348** RUNNING (~1h38m/10h) — when it
+lands, confirm it reproduces ~2.6/3.8/6.7/10× to close the reproducibility lock.
 
 **Next:** (a) test the eff-batch-256 mollusca fix (local, ~½h) — if it lifts, the recipe generalizes with
 one scale-aware lever. (b) LRZ reproducibility re-run of the exact Exp1 config (new tag

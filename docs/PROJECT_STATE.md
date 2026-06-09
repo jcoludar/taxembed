@@ -3,7 +3,7 @@
 Living snapshot of "what we know right now." Update this when the recipe, metrics, or
 open issues change. Timestamped narrative lives in `SESSION_LOG.md`.
 
-_Last updated: 2026-06-04 (result LOCKED — kNN-purity + seeded separation)_
+_Last updated: 2026-06-09 (ALL-LIFE scale EXCELLENT + reproducibility lock CLOSED)_
 
 ## ✅ STATUS (2026-06-03): METAZOA SCALE SOLVED — EXCELLENT achieved at 498k
 
@@ -29,6 +29,36 @@ diagnostic tooling/learnings).
   radius-independent measure. A radial Goodhart artifact would leave family purity at chance (0.004);
   it sits at 0.92 (217× chance). ⇒ separation is real angular clustering. (depth↔norm flat at +0.984
   while separation climbs 1→10× already pointed here; kNN-purity nails it.)
+
+## ✅ STATUS (2026-06-09): ALL-LIFE SCALE EXCELLENT + REPRODUCIBILITY LOCK CLOSED
+
+The canonical recipe now clears EXCELLENT from a single phylum (echino 4k) all the way to **all of
+Life (Eukaryota, 877k nodes)** — and the metazoa breakthrough reproduces independently. Two LRZ runs
+pulled + analyzed 2026-06-09 (analysis under each tag's `analysis_final_seeded/`):
+
+- **Reproducibility lock CLOSED — `metazoa_lower_lr_bigger_batch_repro` (job 5666348).** Same canonical
+  config, fresh run. Seeded (5 seeds): phylum **2.59 ± 0.01** / class **3.84 ± 0.01** / order
+  **6.69 ± 0.01** / family **10.27 ± 0.01×**; depth↔norm +0.984 / +0.998. Matches Experiment 1
+  (2.60/3.85/6.68/10.30) to within the ±0.01 noise floor ⇒ the breakthrough is **deterministic, not a
+  lucky seed**. (`--seed` still not wired into training; reproduced by re-running the exact config.)
+- **All-Life — `eukaryota_canonical` (job 5666473), 877k nodes, 20h30m on V100.** Final ep200, seeded
+  (5 seeds): phylum **3.12 ± 0.02** / class **5.09 ± 0.01** / order **7.13 ± 0.02** / family
+  **8.23 ± 0.01×**; depth↔norm +0.978 / +0.999. **EXCELLENT at every rank** ("phylum" here ≈ kingdom).
+  No architecture ceiling, no hard-negative-starvation collapse at the largest, deepest tree we have.
+- **Stall-watch resolved (the ep80–120 worry did NOT materialize).** Milestone trajectory
+  (`trajectory_readout.json`, family-rank): ep80 **2.34** → ep100 **3.75** → ep120 **3.54** →
+  ep150 **3.68** → ep180 **6.56** → ep200 **8.23**. There is a **soft plateau in ep100–150** (the
+  flagged window) but it is a *plateau, not a collapse* — nothing like the metazoa curriculum-transition
+  failure that motivated the E1c/E2/E3 negative-sampling plan. The final dd≤all phase + cosine
+  warm-restart then drives a hard late climb (separation **more than doubled** in the last 50 epochs).
+  ⇒ reinforces **use `final` (ep200), NOT `best`** for these recipes, even more strongly than at metazoa.
+
+**Implication:** the E1c hard-negative sampler (and E2 cones / E3 structural alternatives) is **NOT
+needed to reach EXCELLENT at scale** — the default sampler + the four canonical levers suffice through
+877k. The E1c tooling/diagnostics remain valuable for the record, but the headline question ("does PC
+embedding represent taxonomy well at full scale?") is answered YES. Remaining work is presentational
+(figures/write-up) + optional polish, not a capability gap. Space note: Exp-1 tag trimmed to final+best
+locally (milestones recoverable from LRZ); ~9.5 GB reclaimed.
 
 ## Goal & bar
 
@@ -164,6 +194,8 @@ represent any species/clade. The bar is high: we want EXCELLENT separation
 | metazoa_v2_NOCURRIC best/final ep38/200 | yes | ranking, **no curric** | +0.726 | 1.02 / 1.02 / 1.02 / 1.00× | floor case — ranking + no-curric = essentially nothing learned |
 | **metazoa_lower_lr_bigger_batch ep80** (Exp1, dd≤18 loads) | yes | softmax, **effbatch 2048 + n_neg 300 + lr 0.001 + cosine-warm-restart** | **+0.984** | **1.94 / 2.46 / 2.08 / 1.61×** | 🟢 **SURVIVES the dd≤18 transition** (Job C died here at +0.796/1.10×) |
 | **metazoa_lower_lr_bigger_batch FINAL ep200** (Exp1, job 5664609) | yes | " (default sampler) | **+0.984** | **2.56 / 3.86 / 6.65 / 10.31×** | 🎉 **SOLVED — EXCELLENT every rank at 498k; 1.20× ceiling shattered** (phylum/class/order/family) |
+| **metazoa_lower_lr_bigger_batch_repro FINAL ep200** (job 5666348, 2026-06-09, 5-seed) | yes | " (default sampler) | **+0.984** | **2.59 / 3.84 / 6.69 / 10.27 ±0.01×** | ✅ **REPRODUCIBILITY LOCK CLOSED** — matches Exp1 within the ±0.01 noise floor; breakthrough is deterministic |
+| **eukaryota_canonical FINAL ep200** (877k ALL-LIFE, job 5666473, 2026-06-09, 5-seed) | yes | " (default sampler) | **+0.978** | **3.12 / 5.09 / 7.13 / 8.23 ±0.01×** | 🌍 **ALL-LIFE EXCELLENT** ("phylum"≈kingdom); recipe scales 4k→877k. Trajectory: family 2.34(ep80)→3.75(100)→3.54(120)→3.68(150)→6.56(180)→8.23(200) — soft ep100–150 plateau, NO collapse |
 | echino_v1 (4k) | no | — | +0.85 | 1.13/1.16/1.07× | weak |
 | echino_v2_tiered (4k) | no | tiered | +0.85 | 1.03/1.03/0.97× | worse |
 | echino_euclparam (4k) | **yes** | — | +0.96 | 1.21/1.21/1.11× | reproduces echino_v4 |
