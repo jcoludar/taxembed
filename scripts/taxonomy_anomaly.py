@@ -21,7 +21,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from analyze_hierarchy_hyperbolic import (load_embeddings, load_mapping,
                                           load_taxonomy_with_depth)
-from knn_purity_hyperbolic import _prep_sqnorms, _batch_distances, chance_purity, build_pool
+from knn_purity_hyperbolic import chance_purity, build_pool
+from _anomaly_knn import observed_purity, matched_null, pick_device
 from taxembed.eval.anomaly import (excess_impurity, matched_null_z, trivial_baselines,
                                    benjamini_hochberg)
 
@@ -54,22 +55,6 @@ def _index_tree(idx2tax, taxonomy=None, parent_col=None):
     return parent, depth, clade_size, degree
 
 
-def _observed_purity(emb, raw, clip, pool_idx, pool_lab, query_pos, k):
-    """Observed kNN purity (fraction of k nearest sharing label) for queries at pool positions."""
-    pool_emb, pool_raw, pool_clip = emb[pool_idx], raw[pool_idx], clip[pool_idx]
-    keff = min(k, len(pool_idx) - 1)
-    out = np.empty(len(query_pos), dtype=np.float64)
-    B = 256
-    for s in range(0, len(query_pos), B):
-        bq = query_pos[s:s + B]
-        d = _batch_distances(pool_emb[bq], pool_raw[bq], pool_clip[bq], pool_emb, pool_raw, pool_clip)
-        d[np.arange(len(bq)), bq] = np.inf
-        nn = np.argpartition(d, keff, axis=1)[:, :keff]
-        match = (pool_lab[nn] == pool_lab[bq][:, None])
-        out[s:s + len(bq)] = match.mean(axis=1)
-    return out
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", required=True)
@@ -83,6 +68,8 @@ def main():
     ap.add_argument("--n-null", type=int, default=200, help="matched-null draws per query")
     ap.add_argument("--n-bins", type=int, default=5, help="quantile bins for depth/size matching")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--device", default=None, help="cuda|mps|cpu|auto (default: auto-detect)")
+    ap.add_argument("--knn-batch", type=int, default=1024, help="query rows per kNN batch (GPU memory)")
     ap.add_argument("-o", "--output-dir", required=True)
     args = ap.parse_args()
 
@@ -114,24 +101,12 @@ def main():
         pool_idx, pool_lab = build_pool(emb, idx2tax, taxonomy, args.rank)
         rank_name = args.rank
 
-    raw, clip = _prep_sqnorms(emb.astype(np.float64))
     chance = chance_purity(pool_lab)
+    device = pick_device(args.device)
+    print(f"[device] kNN on {device} (pool={len(pool_idx)}, k={args.k}, batch={args.knn_batch})")
 
-    query_pos = np.arange(len(pool_idx))
-    observed = _observed_purity(emb, raw, clip, pool_idx, pool_lab, query_pos, args.k)
-
-    rng = np.random.default_rng(args.seed)
-    pdepth = depth[pool_idx]; psize = clade_size[pool_idx]
-    def _qbin(x):
-        qs = np.quantile(x, np.linspace(0, 1, args.n_bins + 1)[1:-1]) if args.n_bins > 1 else np.array([])
-        return np.digitize(x, qs)
-    bins = _qbin(pdepth) * (args.n_bins + 1) + _qbin(psize)
-    null_obs = np.empty((len(query_pos), args.n_null), dtype=np.float64)
-    for b in np.unique(bins):
-        members = np.flatnonzero(bins == b)
-        for qi in members:
-            draw = rng.choice(members, size=args.n_null, replace=True)
-            null_obs[qi] = observed[draw]
+    observed = observed_purity(emb, pool_idx, pool_lab, args.k, device=device, batch=args.knn_batch)
+    null_obs = matched_null(observed, pool_idx, depth, clade_size, args.n_null, args.n_bins, args.seed)
 
     score_z = matched_null_z(observed, null_obs)
     score_excess = excess_impurity(observed, chance)
@@ -164,6 +139,7 @@ def main():
     summary = {
         "checkpoint": str(args.checkpoint), "rank": rank_name, "k": args.k,
         "n_null": args.n_null, "n_bins": args.n_bins, "seed": args.seed,
+        "device": device, "knn_batch": args.knn_batch,
         "pool_size": int(len(pool_idx)), "chance_purity": chance,
         "n_significant_q05": int(np.sum(qvals <= 0.05)),
         "top10_taxids": [int(idx2tax[int(pool_idx[j])]) for j in order[:10]],

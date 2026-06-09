@@ -1,0 +1,106 @@
+"""Device-aware (CUDA / MPS / CPU) batched kNN observed-purity + vectorized matched-null for App #2.
+
+The per-node anomaly score needs EVERY pool node as a query against the full pool — an exact
+O(P^2) kNN. The numpy/single-core path (`knn_purity_hyperbolic._batch_distances` + argpartition)
+is fine for the SUBSAMPLED queries the original anti-Goodhart check used, but for FULL-pool scoring
+at 877k / 1.1M it is the bottleneck (single core, ~15 GB, no ETA). This module runs the identical
+Poincaré neighbour ordering on GPU via batched `torch.topk`, and vectorizes the matched-null
+sampling (the former per-node Python loop over ~877k nodes is replaced by one draw per bin).
+
+Distance semantics are byte-compatible with `knn_purity_hyperbolic`:
+    arg = 1 + 2*||u-v||^2 / ((1-clip(||u||^2))(1-clip(||v||^2))) ,  d = arccosh(arg)
+arccosh is monotone, so for kNN we rank by `arg` directly (skip arccosh). The numpy kernel already
+returns float32 distances, so an all-float32 torch path reproduces its neighbour ordering to within
+the same tolerance `_validate_distance` accepts — and float32 is portable to MPS (no float64 there).
+Neighbour ordering is cross-checked against the numpy kernel in tests/eval/test_anomaly_knn.py.
+"""
+from __future__ import annotations
+
+import numpy as np
+
+EPS = 1e-5
+
+
+def pick_device(prefer: str | None = None) -> str:
+    """Resolve the compute device: explicit > cuda > mps > cpu."""
+    import torch
+
+    if prefer and prefer != "auto":
+        return prefer
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def observed_purity(emb, pool_idx, pool_lab, k, device=None, batch=1024, eps=EPS):
+    """Fraction of each pool node's k nearest neighbours (Poincaré) sharing its label.
+
+    Scores EVERY pool node as a query against the full pool (self excluded). Returns a float64
+    numpy array aligned to `pool_idx`. Runs on `device` (auto-resolved if None) in float32 batches
+    of `batch` queries; memory is dominated by the (batch x P) distance matrix.
+    """
+    import torch
+
+    dev = pick_device(device)
+    emb = np.asarray(emb, dtype=np.float32)
+    pool_idx = np.asarray(pool_idx, dtype=np.int64)
+    pool_lab = np.asarray(pool_lab, dtype=np.int64)
+
+    pe = torch.as_tensor(emb[pool_idx], dtype=torch.float32, device=dev)        # (P, D)
+    lab = torch.as_tensor(pool_lab, dtype=torch.long, device=dev)               # (P,)
+    P = pe.shape[0]
+    if P < 2:
+        return np.zeros(P, dtype=np.float64)
+
+    raw = (pe * pe).sum(dim=1)                                                  # (P,) ||v||^2
+    one_minus_clip = 1.0 - raw.clamp(0.0, 1.0 - eps)                            # conformal factor
+    keff = min(int(k), P - 1)
+    peT = pe.T.contiguous()
+    out = torch.empty(P, dtype=torch.float32, device=dev)        # float32: MPS has no float64
+
+    for s in range(0, P, batch):
+        e = min(s + batch, P)
+        q = pe[s:e]                                                            # (b, D)
+        q_raw = raw[s:e]                                                       # (b,)
+        q_omc = one_minus_clip[s:e]                                            # (b,)
+        dot = q @ peT                                                         # (b, P) — heavy op
+        sq_diff = (q_raw[:, None] + raw[None, :] - 2.0 * dot).clamp_min(0.0)
+        denom = q_omc[:, None] * one_minus_clip[None, :]
+        arg = 1.0 + 2.0 * sq_diff / denom                                     # monotone in distance
+        rows = torch.arange(e - s, device=dev)
+        arg[rows, s + rows] = float("inf")                                    # exclude self
+        nn = arg.topk(keff, dim=1, largest=False).indices                     # (b, keff)
+        match = (lab[nn] == lab[s:e][:, None]).float().mean(dim=1)
+        out[s:e] = match
+
+    return out.detach().cpu().numpy().astype(np.float64)
+
+
+def _qbin(x, n_bins):
+    x = np.asarray(x, dtype=np.float64)
+    qs = np.quantile(x, np.linspace(0, 1, n_bins + 1)[1:-1]) if n_bins > 1 else np.array([])
+    return np.digitize(x, qs)
+
+
+def matched_null(observed, pool_idx, depth, clade_size, n_null, n_bins, seed):
+    """Per-query null observed-purity drawn from the SAME depth x clade-size stratum (vectorized).
+
+    Replaces the former per-node Python loop: for each (small) depth x size bin we draw an
+    (m, n_null) index matrix in one call and gather, so the only loop is over the <= (n_bins+1)^2
+    bins. Returns (Q, n_null) float64 aligned to `pool_idx`.
+    """
+    rng = np.random.default_rng(seed)
+    observed = np.asarray(observed, dtype=np.float64)
+    depth = np.asarray(depth)[np.asarray(pool_idx, dtype=np.int64)]
+    csize = np.asarray(clade_size)[np.asarray(pool_idx, dtype=np.int64)]
+    bins = _qbin(depth, n_bins) * (n_bins + 1) + _qbin(csize, n_bins)
+    Q = len(observed)
+    null = np.empty((Q, n_null), dtype=np.float64)
+    for b in np.unique(bins):
+        members = np.flatnonzero(bins == b)                                   # (m,)
+        m = len(members)
+        draw = rng.integers(0, m, size=(m, n_null))                          # (m, n_null) -> members
+        null[members] = observed[members[draw]]
+    return null

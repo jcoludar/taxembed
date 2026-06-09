@@ -21,7 +21,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from analyze_hierarchy_hyperbolic import (load_embeddings, load_mapping,
                                           load_taxonomy_with_depth, get_ancestor_at_rank)
-from knn_purity_hyperbolic import _prep_sqnorms, _batch_distances, chance_purity, build_pool
+from knn_purity_hyperbolic import chance_purity, build_pool
+from _anomaly_knn import observed_purity, matched_null, pick_device
 from taxembed.eval.treedist import TreeDistance
 from taxembed.eval.anomaly import (matched_null_z, trivial_baselines, baseline_aucs,
                                    relocate_nodes, enrichment_odds_ratio, match_background)
@@ -52,34 +53,6 @@ def index_tree(idx2tax, taxonomy=None, parent_col=None):
         if parent[i] != i:
             clade_size[parent[i]] += clade_size[i]
     return parent, depth, clade_size, degree
-
-
-def observed_purity(emb, raw, clip, pool_idx, pool_lab, k):
-    pe, pr, pc = emb[pool_idx], raw[pool_idx], clip[pool_idx]
-    keff = min(k, len(pool_idx) - 1)
-    out = np.empty(len(pool_idx), dtype=np.float64); B = 256
-    for s in range(0, len(pool_idx), B):
-        bq = np.arange(s, min(s + B, len(pool_idx)))
-        d = _batch_distances(pe[bq], pr[bq], pc[bq], pe, pr, pc)
-        d[np.arange(len(bq)), bq] = np.inf
-        nn = np.argpartition(d, keff, axis=1)[:, :keff]
-        out[s:s + len(bq)] = (pool_lab[nn] == pool_lab[bq][:, None]).mean(axis=1)
-    return out
-
-
-def matched_null(observed, pool_idx, depth, clade_size, n_null, n_bins, seed):
-    rng = np.random.default_rng(seed)
-    pd_, ps_ = depth[pool_idx], clade_size[pool_idx]
-    def qb(x):
-        qs = np.quantile(x, np.linspace(0, 1, n_bins + 1)[1:-1]) if n_bins > 1 else np.array([])
-        return np.digitize(x, qs)
-    bins = qb(pd_) * (n_bins + 1) + qb(ps_)
-    null = np.empty((len(pool_idx), n_null), dtype=np.float64)
-    for b in np.unique(bins):
-        members = np.flatnonzero(bins == b)
-        for qi in members:
-            null[qi] = observed[rng.choice(members, size=n_null, replace=True)]
-    return null
 
 
 def load_all(args):
@@ -113,7 +86,7 @@ def build_labels(emb, idx2tax, taxonomy, args):
 
 def cmd_roc(args):
     emb, idx2tax, taxonomy, parent, depth, clade_size, degree = load_all(args)
-    raw, clip = _prep_sqnorms(emb.astype(np.float64))
+    device = pick_device(args.device)
     td = TreeDistance(parent, depth)
     new_parent, moved = relocate_nodes(parent, depth, n=args.n_relocate, seed=args.seed)
     disp = td.path_length(parent[moved], new_parent[moved])
@@ -121,7 +94,7 @@ def cmd_roc(args):
     disp_class = np.digitize(disp, edges[1:-1])
 
     pool_idx, pool_lab = build_labels(emb, idx2tax, taxonomy, args)
-    obs = observed_purity(emb, raw, clip, pool_idx, pool_lab, args.k)
+    obs = observed_purity(emb, pool_idx, pool_lab, args.k, device=device, batch=args.knn_batch)
     null = matched_null(obs, pool_idx, depth, clade_size, args.n_null, args.n_bins, args.seed)
     score_z = matched_null_z(obs, null)
     base = trivial_baselines(emb, parent, depth, clade_size, degree)
@@ -231,6 +204,8 @@ def add_common(sp):
     sp.add_argument("--n-null", type=int, default=200)
     sp.add_argument("--n-bins", type=int, default=5)
     sp.add_argument("--seed", type=int, default=0)
+    sp.add_argument("--device", default=None, help="cuda|mps|cpu|auto (default: auto-detect)")
+    sp.add_argument("--knn-batch", type=int, default=1024, help="query rows per kNN batch (GPU memory)")
     sp.add_argument("-o", "--output-dir", required=True)
 
 
