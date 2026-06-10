@@ -64,9 +64,15 @@ for f in "$CKPT" "$MAPPING" "$NAMES_DMP"; do
     fi
 done
 
+# TaxoPy needs a WRITABLE taxdb_dir (it touches nodes.dmp); /data is mounted ro -> copy to scratch.
+WORK_TAXDUMP="${TMPDIR:-/tmp}/taxdump_work"
+mkdir -p "$WORK_TAXDUMP"
+cp /data/taxdump_current/nodes.dmp /data/taxdump_current/names.dmp /data/taxdump_current/merged.dmp "$WORK_TAXDUMP"/
+echo "  staged writable taxdump at $WORK_TAXDUMP"
+
 echo "=== Step 1: per-node score + BH-FDR (rank=family) ==="
 python scripts/taxonomy_anomaly.py \
-    --checkpoint "$CKPT" --mapping "$MAPPING" --data-dir /data \
+    --checkpoint "$CKPT" --mapping "$MAPPING" --data-dir "$WORK_TAXDUMP" \
     --rank family --k 10 --n-null 200 --n-bins 5 --seed 0 \
     --device cuda --knn-batch 2048 \
     -o "$OUT"
@@ -74,7 +80,7 @@ echo
 
 echo "=== Step 2: leg A — synthetic ROC stratified by displacement ==="
 python scripts/_anomaly_validation.py roc \
-    --checkpoint "$CKPT" --mapping "$MAPPING" --data-dir /data \
+    --checkpoint "$CKPT" --mapping "$MAPPING" --data-dir "$WORK_TAXDUMP" \
     --rank family --k 10 --n-relocate 3000 --n-null 200 --seed 0 \
     --device cuda --knn-batch 2048 \
     -o "$OUT"
