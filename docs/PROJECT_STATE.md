@@ -3,7 +3,7 @@
 Living snapshot of "what we know right now." Update this when the recipe, metrics, or
 open issues change. Timestamped narrative lives in `SESSION_LOG.md`.
 
-_Last updated: 2026-06-09 (ALL-LIFE scale EXCELLENT + reproducibility lock CLOSED)_
+_Last updated: 2026-06-11 (CELLULAR all-of-Life 1.1M / 3 domains EXCELLENT; anomaly-QC V100 OOM fixed)_
 
 ## ✅ STATUS (2026-06-03): METAZOA SCALE SOLVED — EXCELLENT achieved at 498k
 
@@ -59,6 +59,28 @@ needed to reach EXCELLENT at scale** — the default sampler + the four canonica
 embedding represent taxonomy well at full scale?") is answered YES. Remaining work is presentational
 (figures/write-up) + optional polish, not a capability gap. Space note: Exp-1 tag trimmed to final+best
 locally (milestones recoverable from LRZ); ~9.5 GB reclaimed.
+
+## ✅ STATUS (2026-06-11): CELLULAR ALL-OF-LIFE (1.1M, 3 DOMAINS) — SEPARATION VERIFIED
+
+`cellular_canonical` (job 5673097, ep200, 1d01h31m on V100) extends the canonical recipe from all
+eukaryotes (877k) to the **FULL cellular tree — 1,102,163 nodes across all three domains** (Eukaryota
+878k / Bacteria 217k / Archaea 7k). Both anti-Goodhart checks ran locally 2026-06-11
+(`artifacts/tags/cellular_canonical/{analysis_final_seeded,knn_purity}/`):
+- **Seeded separation (5 seeds):** phylum **3.67 ± 0.02** / class **5.97 ± 0.01** / order **7.17 ± 0.01**
+  / family **7.69 ± 0.01×** — EXCELLENT at every rank, on par with/above eukaryota. depth↔norm +0.954/+0.996.
+- **kNN-purity (full pool):** purity@10 domain 0.985 / phylum 0.987 / class 0.985 / order 0.979 /
+  family 0.907; lift-over-chance rising 1.5× → 5.7× → 7.9× → 56.9× → **317×**.
+- **Domain split:** separation RATIO is 1.16× (POOR) — a top-rank-diversity artifact (intra-Eukaryota is
+  ≈ as broad as cross-domain), but domain **purity@1 = 0.979** ⇒ the three domains form clean,
+  non-interpenetrating local neighbourhoods. **The embedding separates all of cellular life.** Recipe
+  scales 4k → 498k → 877k → 1.1M with no degradation; no architecture ceiling at the deepest tree we have.
+
+**Anomaly QC (App#2) — V100 OOM fixed (2026-06-11, commit `cdae1ff`).** Job 5674199 failed (CUDA OOM in
+`_anomaly_knn.observed_purity`: the (block×P) kNN working set blew past 16 GiB at the 864k pool). Fixed
+with a `_safe_batch` cap (working set ~4 GiB regardless of --knn-batch; batch-invariant ⇒ lossless),
++4 tests (38/38), sbatch hardened with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, fixed scripts
+staged on LRZ. The leg-A/C go/no-go JSONs (gating the leg-B retrain, KI-8) are **still unproduced** —
+pending a resubmit (user/VPN). The 06-09 echino S0274 gate (pool 3864) could not catch this scale-only OOM.
 
 ## Goal & bar
 
@@ -196,6 +218,7 @@ represent any species/clade. The bar is high: we want EXCELLENT separation
 | **metazoa_lower_lr_bigger_batch FINAL ep200** (Exp1, job 5664609) | yes | " (default sampler) | **+0.984** | **2.56 / 3.86 / 6.65 / 10.31×** | 🎉 **SOLVED — EXCELLENT every rank at 498k; 1.20× ceiling shattered** (phylum/class/order/family) |
 | **metazoa_lower_lr_bigger_batch_repro FINAL ep200** (job 5666348, 2026-06-09, 5-seed) | yes | " (default sampler) | **+0.984** | **2.59 / 3.84 / 6.69 / 10.27 ±0.01×** | ✅ **REPRODUCIBILITY LOCK CLOSED** — matches Exp1 within the ±0.01 noise floor; breakthrough is deterministic |
 | **eukaryota_canonical FINAL ep200** (877k ALL-LIFE, job 5666473, 2026-06-09, 5-seed) | yes | " (default sampler) | **+0.978** | **3.12 / 5.09 / 7.13 / 8.23 ±0.01×** | 🌍 **ALL-LIFE EXCELLENT** ("phylum"≈kingdom); recipe scales 4k→877k. Trajectory: family 2.34(ep80)→3.75(100)→3.54(120)→3.68(150)→6.56(180)→8.23(200) — soft ep100–150 plateau, NO collapse |
+| **cellular_canonical FINAL ep200** (1.1M ALL-CELLULAR-LIFE / 3 domains, job 5673097, 2026-06-11, 5-seed) | yes | " (default sampler) | **+0.954** | **3.67 / 5.97 / 7.17 / 7.69 ±0.02×** (domain 1.16× = top-rank artifact; domain purity@1 0.979) | 🌳 **ALL-CELLULAR-LIFE EXCELLENT** phylum→family; 3 domains form clean local neighbourhoods (kNN-purity@10 0.91–0.99, lift→317×). Recipe scales 877k→1.1M, no degradation |
 | echino_v1 (4k) | no | — | +0.85 | 1.13/1.16/1.07× | weak |
 | echino_v2_tiered (4k) | no | tiered | +0.85 | 1.03/1.03/0.97× | worse |
 | echino_euclparam (4k) | **yes** | — | +0.96 | 1.21/1.21/1.11× | reproduces echino_v4 |

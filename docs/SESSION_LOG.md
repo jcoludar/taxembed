@@ -7,6 +7,57 @@ not here — this log is the timestamped trail.
 
 ---
 
+## 2026-06-11 — Cellular (all-of-Life, 1.1M) separation VERIFIED + anomaly OOM fixed; disk reclaimed
+
+**Set out to:** check the prior handoff (user flagged a possibly-missing half-session) + whether the
+outstanding LRZ runs concluded. Found a doc gap (this log had no 06-10 entry — reconstructed below) and
+both LRZ jobs landed: cellular training DONE, the anomaly QC job FAILED again.
+
+**Cellular all-of-Life — SEPARATION VERIFIED (the headline).** `cellular_canonical` (job 5673097,
+1d01h31m on V100, ep200) trained the canonical recipe over the FULL cellular tree —
+**1,102,163 nodes spanning all three domains** (Eukaryota 878k / Bacteria 217k / Archaea 7k). Pulled the
+checkpoint locally + ran the same two anti-Goodhart analyses as eukaryota
+(`artifacts/tags/cellular_canonical/{analysis_final_seeded,knn_purity}/`):
+- **Seeded separation (5 seeds):** phylum **3.67 ± 0.02** / class **5.97 ± 0.01** / order **7.17 ± 0.01**
+  / family **7.69 ± 0.01×** — EXCELLENT every rank, on par with/above eukaryota (3.12/5.09/7.13/8.23).
+  depth↔norm +0.954 / +0.996.
+- **kNN-purity (3 repeats, full pool):** purity@10 domain 0.985 / phylum 0.987 / class 0.985 / order
+  0.979 / family 0.907; lift-over-chance rising 1.5× → 5.7× → 7.9× → 56.9× → **317×**.
+- **Domain question resolved:** the domain separation RATIO is only 1.16× (POOR) — a top-rank-diversity
+  artifact (intra-Eukaryota spans plant↔animal, ~as far as eukaryote↔bacterium, so inter/intra
+  compresses). But domain **purity@1 = 0.979** ⇒ the three domains form clean, non-interpenetrating local
+  neighbourhoods. **The embedding separates all of cellular life**; the recipe scales 4k → 498k → 877k →
+  1.1M / 3 domains with no degradation. Publishable all-of-Life result.
+
+**Anomaly QC job — FAILED again, root-caused + fixed.** Job 5674199 (resubmitted 06-10) ran 06-11 10:48
+and died in 1m17s — but PAST the taxdump-ro bug (that fix worked); new failure was **CUDA OOM** at
+`_anomaly_knn.py:69`. observed_purity scores every pool node vs the full pool in blocks of --knn-batch; at
+P=864k a block of 2048 needs ~6.6 GiB per (block×P) float32 intermediate, ~6 live at peak → ~30 GiB on a
+16 GiB V100. The 06-09 S0274 echino gate passed only because echino's pool (3864) is 224× smaller — a
+**scale-only OOM the local gate could not catch**. FIX (commit `cdae1ff`, TDD): new
+`_safe_batch(P, requested, budget_bytes)` caps the block so the working set fits ~4 GiB regardless of the
+flag (P=1.1M → block ~120, ~5 GiB peak); batch-invariant ⇒ lossless. +4 tests, **38/38 eval pass**. sbatch
+hardened with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`. Fixed scripts scp'd + verified on LRZ.
+**Resubmit is the user's (VPN/LRZ); the leg-A/C go/no-go JSONs are still unproduced.**
+
+**Disk reclaim (user flagged 98%-full disk as the real constraint — NOT RAM; machine has 96 GB / 14 cores).**
+A full-scale local smoke was killed under disk pressure (disk 98% full, 22 GiB free; local artifacts/ was
+18 GB). Deleted the pulled cellular checkpoint (841 MB) + LRZ-backed milestone diagnostics
+(metazoa_softmax_milestones 10 GB, eukaryota milestones ep10-200 ~3.3 GB) + throwaway smokes → artifacts/
+18 GB → 4.1 GB. NOTE: a Time Machine local snapshot (2026-06-10) still pins the freed blocks as purgeable
+(df unchanged at 22 GiB) — auto-reclaimed under pressure / ~24h, or `tmutil thinlocalsnapshots`. KEPT all
+final checkpoints + the local-only mollusca/echino results (no LRZ backup).
+
+**Reconstructed — 2026-06-10 (the missing half-session):** App#2 (taxonomy QC / anomaly) was BUILT
+2026-06-09 17:02-17:05 (9 commits, subagent-driven + TDD: `eval/{anomaly,release_diff}.py`,
+`scripts/{taxonomy_anomaly,_anomaly_validation,_anomaly_knn}.py`) and GPU-ported for LRZ; on 06-10 the only
+commits were the taxdump-ro fix (`e887891`) + the handoff (`42946a6`, 12:55). That session ended without a
+SESSION_LOG entry — captured only by `docs/NEXT_SESSION_HANDOFF_2026-06-10_app2_anomaly.md` + the commits.
+(This entry closes the gap.)
+
+**Next:** (1) user resubmits the anomaly job on LRZ (VPN) → pull/read leg-A/C JSONs → leg-B retrain
+go/no-go (KI-8). (2) optional: triage the uncommitted 06-03 e1c work. (3) optional: thin the TM snapshot.
+
 ## 2026-06-09 — All-Life (877k) lands EXCELLENT + metazoa reproducibility lock CLOSED
 
 **Set out to:** check the outstanding LRZ runs, pull + analyze the two that the 2026-06-04 handoff was
