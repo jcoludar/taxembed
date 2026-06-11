@@ -8,7 +8,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from _anomaly_knn import observed_purity, matched_null          # noqa: E402
+from _anomaly_knn import observed_purity, matched_null, _safe_batch  # noqa: E402
 from knn_purity_hyperbolic import _prep_sqnorms, _batch_distances  # noqa: E402  (numpy reference)
 
 
@@ -52,6 +52,38 @@ def test_torch_purity_batch_invariance():
     one = observed_purity(emb, pool_idx, lab, k=4, device="cpu", batch=1000)
     many = observed_purity(emb, pool_idx, lab, k=4, device="cpu", batch=5)
     assert np.allclose(one, many)
+
+
+def test_safe_batch_caps_to_memory_budget():
+    # A million-node pool with the old default flag (2048) is what OOM'd the V100 (job 5674199):
+    # the (batch x P) working set must be shrunk so n_buffers simultaneous float32 copies fit budget.
+    P = 1_000_000
+    budget = 4 * 1024 ** 3
+    b = _safe_batch(P, requested=2048, budget_bytes=budget, n_buffers=8)
+    assert 1 <= b < 2048
+    assert 8 * b * P * 4 <= budget          # working set stays within budget
+
+
+def test_safe_batch_passthrough_when_pool_small():
+    # Small pool (echino 4k regime): the cap must NOT bind -> requested batch preserved unchanged.
+    assert _safe_batch(4000, requested=1024, budget_bytes=4 * 1024 ** 3, n_buffers=8) == 1024
+
+
+def test_safe_batch_floors_at_one():
+    # Even a pathologically tiny budget never returns 0 (would zero-step the loop / divide by zero).
+    assert _safe_batch(10_000_000, requested=2048, budget_bytes=1024, n_buffers=8) == 1
+
+
+def test_observed_purity_caps_inner_batch_to_budget():
+    # A huge requested batch + a tiny memory budget forces the kernel to internally shrink the
+    # query-block; it must STILL return the correct numpy-matching purities (1.0 on clean clusters).
+    emb, lab = _clustered(seed=1)
+    pool_idx = np.arange(len(emb))
+    ref = _numpy_observed_purity(emb, pool_idx, lab, k=5)
+    got = observed_purity(emb, pool_idx, lab, k=5, device="cpu", batch=10_000,
+                          mem_budget_bytes=4096)      # forces tiny inner query-blocks
+    assert np.allclose(got, ref, atol=1e-9)
+    assert np.allclose(got, 1.0)
 
 
 def test_matched_null_shape_and_draws_from_bin():

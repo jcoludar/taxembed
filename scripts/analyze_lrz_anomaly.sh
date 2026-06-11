@@ -14,6 +14,10 @@
 
 set -euo pipefail
 export MKL_THREADING_LAYER=GNU   # MKL/libgomp threading-layer clash fix (see PROJECT_STATE.md)
+# Reduce CUDA allocator fragmentation — defence-in-depth alongside the _safe_batch cap in
+# _anomaly_knn.observed_purity (the kNN working set is now bounded to ~4 GiB regardless of
+# --knn-batch). Job 5674199 OOM'd a 16 GiB V100 here; the allocator hinted expandable_segments.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # =============================================================================
 # Application #2 — taxonomy QC / anomaly detection — GPU run on LRZ.

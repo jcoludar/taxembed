@@ -34,12 +34,33 @@ def pick_device(prefer: str | None = None) -> str:
     return "cpu"
 
 
-def observed_purity(emb, pool_idx, pool_lab, k, device=None, batch=1024, eps=EPS):
+def _safe_batch(P, requested, budget_bytes=4 * 1024 ** 3, n_buffers=8, bytes_per_elem=4):
+    """Cap the query-block size so the live (batch x P) float32 intermediates fit a memory budget.
+
+    The hot loop holds ~`n_buffers` simultaneous (batch x P) float32 tensors at peak (dot, the
+    broadcast sum, sq_diff, denom, arg, plus topk workspace). At P=864k a `batch` of 2048 needs
+    ~6.6 GiB *per* buffer and OOM'd a 16 GiB V100 (job 5674199). This shrinks the effective block so
+    `n_buffers * batch * P * bytes_per_elem <= budget_bytes`, leaving `requested` untouched whenever
+    the pool is small enough that the cap doesn't bind (e.g. the echino 4k regime). Never returns 0
+    (a zero step would stall the loop). Result ordering is batch-invariant, so capping is lossless.
+    """
+    requested = max(1, int(requested))
+    if P <= 0:
+        return requested
+    per_row = n_buffers * int(P) * bytes_per_elem
+    cap = max(1, int(budget_bytes) // per_row)
+    return max(1, min(requested, cap))
+
+
+def observed_purity(emb, pool_idx, pool_lab, k, device=None, batch=1024, eps=EPS,
+                    mem_budget_bytes=4 * 1024 ** 3):
     """Fraction of each pool node's k nearest neighbours (Poincaré) sharing its label.
 
     Scores EVERY pool node as a query against the full pool (self excluded). Returns a float64
-    numpy array aligned to `pool_idx`. Runs on `device` (auto-resolved if None) in float32 batches
-    of `batch` queries; memory is dominated by the (batch x P) distance matrix.
+    numpy array aligned to `pool_idx`. Runs on `device` (auto-resolved if None) in float32 blocks of
+    queries; memory is dominated by the (block x P) distance matrix, so the requested `batch` is
+    capped via `_safe_batch` to keep the working set under `mem_budget_bytes` (default 4 GiB). The
+    cap only shrinks the block — results are batch-invariant — so it never changes the scores.
     """
     import torch
 
@@ -60,6 +81,7 @@ def observed_purity(emb, pool_idx, pool_lab, k, device=None, batch=1024, eps=EPS
     peT = pe.T.contiguous()
     out = torch.empty(P, dtype=torch.float32, device=dev)        # float32: MPS has no float64
 
+    batch = _safe_batch(P, batch, budget_bytes=mem_budget_bytes)
     for s in range(0, P, batch):
         e = min(s + batch, P)
         q = pe[s:e]                                                            # (b, D)
