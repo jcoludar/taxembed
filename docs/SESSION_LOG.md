@@ -58,6 +58,36 @@ SESSION_LOG entry — captured only by `docs/NEXT_SESSION_HANDOFF_2026-06-10_app
 **Next:** (1) user resubmits the anomaly job on LRZ (VPN) → pull/read leg-A/C JSONs → leg-B retrain
 go/no-go (KI-8). (2) optional: triage the uncommitted 06-03 e1c work. (3) optional: thin the TM snapshot.
 
+### (same day, later) — session resumed: anomaly job PENDING (not yet run); verify-before-trust pass clean
+
+Resumed after `/clear` to action the lead task (read the leg-A/C go/no-go JSONs from the resubmitted
+anomaly job). **Gated on LRZ-queue completion — nothing actionable yet.**
+
+- **Job `5675791` is still PENDING** — `squeue` reason `(Priority)`, partition `lrz-v100x2`, est. start
+  **`2026-06-12T22:43:30`** (backfill estimate; slips — don't trust the timestamp), 4h walltime. It has
+  **not run**, so the go/no-go JSONs (`roc_by_displacement.json`, `enrichment.json`, `anomaly_summary.json`)
+  do not exist yet. The OOM fix (`cdae1ff`) is already in the staged LRZ code ⇒ **no resubmit needed**, just wait.
+- **Verify-before-trust pass (all local, read-only) — every handoff counter checks out:**
+  - Commits `cdae1ff`/`240eada`/`ccb270a` present; branch `feat/taxembed-eval-foundation`, not pushed. ✓
+  - **eval 38/38** — re-ran `tests/eval/` → `38 passed in 11.63s` (incl. the 4 new `_anomaly_knn` cap tests). ✓
+  - **kNN-purity verified exactly** from `cellular_canonical/knn_purity/knn_purity.json`: domain purity@1
+    0.9787 (≈0.979), purity@10 ladder 0.985/0.987/0.985/0.979/0.907, lift ladder
+    1.46→5.72→7.89→56.9→**317.4×**. ✓
+  - Local `data/taxdump_current` BROKEN — only `delnodes.dmp` remains (names/nodes taxopy-eaten). ✓
+  - Cellular checkpoint deleted in the disk reclaim — no `.pth` on disk (matches the reclaim log). ✓
+  - **Caveat (1 counter):** seeded separation 3.67/5.97/7.17/7.69× exists only as the 5 PNGs in
+    `analysis_final_seeded/` (analyzer prints ratios to console, no numeric JSON) and the checkpoint is gone
+    ⇒ not locally re-derivable without an LRZ re-pull. Identical across SESSION_LOG / PROJECT_STATE /
+    handoff; corroborated, just no on-disk numeric artifact.
+- **Did NOT:** submit anything to LRZ (read-only until user go); restore the local taxdump (offered — not
+  needed for leg-A/C, which compute on LRZ; I only pull+read the resulting JSONs). Tarball
+  (`data/new_taxdump.tar.gz`, 153 MB) + `_extract_taxdump_dmps.py` present if wanted later.
+- **No commits this session** (verification + status check only); SESSION_LOG + new handoff
+  (`NEXT_SESSION_HANDOFF_2026-06-11b_app2_anomaly_pending.md`) are the only doc deltas.
+
+**Next:** wait for `5675791` to run (~24h+), then pull/read leg-A/C JSONs → apply the leg-B go/no-go
+(KI-8, unchanged). Both the leg-B retrain and the cellular anomaly run remain LRZ submits → user "go" required.
+
 ## 2026-06-09 — All-Life (877k) lands EXCELLENT + metazoa reproducibility lock CLOSED
 
 **Set out to:** check the outstanding LRZ runs, pull + analyze the two that the 2026-06-04 handoff was
