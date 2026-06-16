@@ -3,7 +3,8 @@
 Living snapshot of "what we know right now." Update this when the recipe, metrics, or
 open issues change. Timestamped narrative lives in `SESSION_LOG.md`.
 
-_Last updated: 2026-06-11 (CELLULAR all-of-Life 1.1M / 3 domains EXCELLENT; anomaly-QC V100 OOM fixed)_
+_Last updated: 2026-06-16 (App #2 anomaly-QC → NO-GO / honest §9F negative; leg-A no-op fixed but only a
+floor test — KI-8 RESOLVED, KI-9 added; paper leads on App #1 representation. CELLULAR all-of-Life 1.1M EXCELLENT.)_
 
 ## ✅ STATUS (2026-06-03): METAZOA SCALE SOLVED — EXCELLENT achieved at 498k
 
@@ -79,8 +80,9 @@ eukaryotes (877k) to the **FULL cellular tree — 1,102,163 nodes across all thr
 `_anomaly_knn.observed_purity`: the (block×P) kNN working set blew past 16 GiB at the 864k pool). Fixed
 with a `_safe_batch` cap (working set ~4 GiB regardless of --knn-batch; batch-invariant ⇒ lossless),
 +4 tests (38/38), sbatch hardened with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, fixed scripts
-staged on LRZ. The leg-A/C go/no-go JSONs (gating the leg-B retrain, KI-8) are **still unproduced** —
-pending a resubmit (user/VPN). The 06-09 echino S0274 gate (pool 3864) could not catch this scale-only OOM.
+staged on LRZ. The 06-09 echino S0274 gate (pool 3864) could not catch this scale-only OOM. **✅ 2026-06-16
+— the go/no-go ran (job 5675791, COMPLETED clean 2026-06-12) → NO-GO; App #2 demoted to an honest §9F
+negative. See KI-8 (resolution) + KI-9 (leg-A limitations).**
 
 ## Goal & bar
 
@@ -281,6 +283,44 @@ represent any species/clade. The bar is high: we want EXCELLENT separation
    leg B as retrospective taxonomy-consistency (honest it is not leakage-free predictive — spec §9F);
    (c) **demote** leg B to supporting and lead #2 on leg A (synthetic ROC, calibrated) + leg C
    (incertae-sedis enrichment). Scorer + legs A/C are UNAFFECTED and ready to run at scale.
+
+   **✅ RESOLVED 2026-06-16 → NO-GO on the leg-B 30h retrain; App #2 anomaly-PREDICTION demoted to an
+   honest §9F negative (option c+b).** The eukaryota leg-A/C JSONs finally ran (job 5675791, COMPLETED
+   2026-06-12, clean — the OOM fix held). All three legs came back null/uninformative: per-node FDR
+   `n_significant_q05 = 0` (200-perm null, BH); leg C OR 1.13, Fisher p 0.14 (NS, CI [0.93,1.38]); leg A
+   `score_z` AUC ≈ 0.50 (chance). **Leg A as run was a NO-OP** — `score_z` was computed on the ORIGINAL
+   labels and the relocation only set the positive mask, so moved nodes were independent of the score →
+   AUC ≈ 0.5 by construction; the uniform relocator also never sampled the sister-genus regime. **Fixed**
+   (commit `b0bdbd5`, TDD, eval 41 passed): `synthetic_displacement_roc` relabels moved nodes and
+   RECOMPUTES purity under the perturbation; `choose_displacement_donors` spans small→large displacement;
+   S0274 echino smoke PASSED (AUC 0.84/0.81/0.90, small-disp bin populated). **But fan-review (3 lenses)
+   found the fixed leg A is only a FLOOR test, not trusted for the small-displacement go/no-go** — see
+   Known issues #9. Net: even a fully-repaired leg A tests only the easy direction (label wrong, embedding
+   right), and the two independent valid legs are clean nulls → no justification to spend 30h. **The paper
+   leads on App #1 (representation: separation 3–8×, purity→317×); App #2 becomes an honest limitation.**
+
+9. **🛑 App #2 leg A (synthetic-displacement ROC) is a FLOOR test, NOT a trusted small-displacement
+   instrument (fan-reviewed 2026-06-16, 3 lenses).** The no-op is fixed (commit `b0bdbd5`) but four
+   methodological issues remain, each of which would have to be repaired before any leg-A small-displacement
+   verdict could be believed (deferred — App #2 demoted, KI-8):
+   (a) **Selection confound** — a node is eligible for a small-displacement (sister-clade) move only if it
+   HAS a near-sister family, which is topology-gated and correlates with the static `clade_size`/`degree`
+   baselines, handing them an unfair edge at exactly the decisive bin (echino: score_z 0.84 ≈ clade_size
+   0.87 at bin 1 is not a fair comparison). Fix: matched negatives from the same eligibility stratum (reuse
+   `match_background`); report a paired score−baseline delta with a CI.
+   (b) **Contaminated null** — `matched_null` resamples from the PERTURBED-label purities; relabeling a
+   large fraction depresses the null mean → miscalibrated z. Fix: draw the null from UNperturbed purities /
+   keep the relabel fraction ≪1 / exclude moved nodes from null donors.
+   (c) **Underpowered, no CIs** — bin 1 had n=44 with no confidence interval; the output is bare point
+   AUCs. Scaling to 864k does not raise the bin-1 *fraction*. Fix: high `local_frac` + small per-seed
+   relabel fraction + multi-seed accumulation + bootstrap CIs + a codified GO rule (e.g. lower-95%-CI of
+   score_z−clade_size > 0 in bin 1).
+   (d) **Displacement in edges, not ranks** — `--up-offset` counts tree edges; NCBI rank-heterogeneity
+   means "bin 1" ≠ "sister-genus/family." Fix: bin by the actual rank of the moved↔donor LCA.
+   **Deeper point:** even fully repaired, leg A only tests the EASY direction (label wrong, embedding
+   right) — a node relabeled to a far family has low purity regardless of embedding quality — so it's a
+   sanity floor, not evidence the embedding flags real reclassifications. Reviewer transcripts captured in
+   SESSION_LOG 2026-06-16.
 
 ## Roadmap / next steps
 

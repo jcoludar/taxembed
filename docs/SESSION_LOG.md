@@ -7,6 +7,57 @@ not here — this log is the timestamped trail.
 
 ---
 
+## 2026-06-16 — App #2 anomaly go/no-go ran → NO-GO; leg-A no-op found + fixed; demoted to honest §9F negative
+
+**Set out to:** the LRZ anomaly job finished — pull/read the leg-A/C JSONs and make the leg-B 30h-retrain
+go/no-go (KI-8). Ended up finding leg A was a no-op, fixing it (TDD + fan-review), and — on the fixed test +
+the two clean null legs — deciding NO-GO.
+
+**Job `5675791` COMPLETED clean** (2026-06-12 17:45–17:52, 6m49s; the `cdae1ff` OOM cap held — kNN ran on
+the 864k pool at knn_batch=2048, no OOM). Project lives at LRZ
+`/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz` (NOT `~/taxembed_lrz`). Pulled the
+3 JSONs → `artifacts/tags/eukaryota_canonical/anomaly/`.
+
+**All three legs null/uninformative:**
+- Per-node FDR (`anomaly_summary.json`): `n_significant_q05 = 0` (200-perm matched null, BH) — zero
+  genome-wide-significant anomalies.
+- Leg C (`enrichment.json`): OR **1.13**, Fisher **p 0.14** (NS), 95% CI [0.93, 1.38] crosses 1 —
+  incertae-sedis NOT enriched among high-anomaly nodes.
+- Leg A (`roc_by_displacement.json`): `score_z` AUC **0.4935 / 0.4998** ≈ chance; never beats baselines.
+
+**Leg A was a NO-OP (root-caused by reading `cmd_roc`).** `score_z` was computed on the ORIGINAL labels and
+the synthetic relocation only set the positive mask, so randomly-moved nodes were independent of the score →
+AUC ≈ 0.5 BY CONSTRUCTION (the 0.49985 at n=2948 is the exact signature). The uniform relocator also only
+made cross-tree jumps → the sister-genus regime (displacement 0/1) the go/no-go cares about went unsampled.
+
+**Fixed under TDD** (commit `b0bdbd5`, eval **41 passed**, +3 tests incl. a no-op regression guard):
+`synthetic_displacement_roc` relabels moved nodes to a donor family and RECOMPUTES kNN-purity under the
+perturbed labels (a misplaced node sits among its original family → neighbours stop matching its new label →
+low purity → high z); `choose_displacement_donors` spans sister-clade (small) → cross-clade (large)
+displacement, measured on the TRUE tree. Wired into `cmd_roc` (purity_fn = the Poincaré GPU kNN, recomputed
+per relabel); +`--local-frac`/`--up-offset`. **Restored the local taxdump to a scratch dir**
+(`/tmp/taxdump_scratch`, from `data/new_taxdump.tar.gz`) and ran the **S0274 echino smoke — PASSED**: AUC
+**0.84 / 0.81 / 0.90** (vs old 0.50), small-displacement bin populated (44/473/2483).
+
+**Fan-review (3 adversarial lenses: code / statistics / scope) — the reason this is a NO-GO, not a GO.** All
+agreed the no-op is genuinely fixed, but the stats lens (corroborated by the others) found the fixed leg A is
+still NOT a trustworthy small-displacement instrument: (1) **selection confound** — small-disp move
+eligibility is topology-gated → the static clade_size/degree baselines get an unfair edge at the decisive bin
+(echino score_z 0.84 ≈ clade_size 0.87 is not a fair fight); (2) **contaminated null** (drawn from perturbed
+purities); (3) **underpowered, no CIs** (bin-1 n=44); (4) **displacement in edges, not ranks**. And the
+deeper point: even fully repaired, leg A only tests the EASY direction (label wrong, embedding right) — a
+floor test, not evidence of real-reclassification detection. Recorded as KI-9; cheap hygiene fixes (dup
+print, dead import) applied.
+
+**Decision (user): NO-GO on the 30h leg-B retrain; App #2 anomaly-PREDICTION → honest §9F negative.** Two
+independent valid legs are clean nulls and leg A (even repaired) is only a floor test, so there's no
+justification to spend 30h; the leg-A repairs (matched negatives, clean null, rank binning, multi-seed CIs)
+are deferred. KI-8 RESOLVED. **The paper leads on App #1 (representation: separation 3–8×, purity→317×).**
+
+**Next (new direction — user pivot):** move the taxonomic-signal work from the taxonomy embedding onto
+PROTEIN embeddings — (1) predict taxonomy from a pLM (ESM/ProtT5) embedding; (2) erase the taxonomic
+subspace from a protein embedding and measure whether function/family clustering improves. Scoping next.
+
 ## 2026-06-11 — Cellular (all-of-Life, 1.1M) separation VERIFIED + anomaly OOM fixed; disk reclaimed
 
 **Set out to:** check the prior handoff (user flagged a possibly-missing half-session) + whether the
