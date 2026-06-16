@@ -178,3 +178,140 @@ def enrichment_odds_ratio(score: np.ndarray, is_positive: np.ndarray,
         "n_flagged": int(n_flag),
         "counts": {"flagged_pos": a, "flagged_neg": b, "unflagged_pos": c, "unflagged_neg": d},
     }
+
+
+def matched_null(observed, pool_idx, depth, clade_size, n_null, n_bins, seed):
+    """Per-query null observed-purity drawn from the SAME depth x clade-size stratum (vectorized).
+
+    Canonical pure-core copy (mirrors scripts/_anomaly_knn.matched_null, kept in sync by
+    tests/eval/test_anomaly_knn + test_anomaly). For each depth x size bin draw an (m, n_null) index
+    matrix and gather, so the only loop is over the <= (n_bins+1)^2 bins. Returns (Q, n_null) float64
+    aligned to `pool_idx`.
+    """
+    rng = np.random.default_rng(seed)
+    observed = np.asarray(observed, dtype=np.float64)
+    d = np.asarray(depth)[np.asarray(pool_idx, dtype=np.int64)]
+    csize = np.asarray(clade_size)[np.asarray(pool_idx, dtype=np.int64)]
+    bins = _qbin(d, n_bins) * (n_bins + 1) + _qbin(csize, n_bins)
+    Q = len(observed)
+    null = np.empty((Q, n_null), dtype=np.float64)
+    for b in np.unique(bins):
+        members = np.flatnonzero(bins == b)
+        m = len(members)
+        draw = rng.integers(0, m, size=(m, n_null))
+        null[members] = observed[members[draw]]
+    return null
+
+
+def _ancestor_at_depth(td, nodes, target_depth):
+    """Lift each node up to `target_depth` via binary lifting (per-node target; clamped at the node)."""
+    a = np.asarray(nodes, dtype=np.int64).copy()
+    diff = np.maximum(td.depth[a] - np.asarray(target_depth, dtype=np.int64), 0)
+    for k in range(td.maxlog):
+        move = ((diff >> k) & 1).astype(bool)
+        a = np.where(move, td.up[k][a], a)
+    return a
+
+
+def choose_displacement_donors(pool_idx, pool_lab, td, n, seed, local_frac=0.5, up_offset=2):
+    """Pick n moved pool positions + a donor pool position each, spanning small->large displacement.
+
+    Fixes defect 2 of the old leg A: the uniform relocator (`relocate_nodes`) only ever produced
+    cross-tree jumps, so the sister-genus/family regime (the go/no-go's focus) went unsampled. Here a
+    `local` donor shares the moved node's ancestor `up_offset` levels up (a sister/cousin clade -> small
+    displacement); a `global` donor is a uniform random pool node of a different family (large
+    displacement). Donors always carry a DIFFERENT label (a same-label relabel is a no-op). Displacement
+    is returned as the TRUE cophenetic distance, so downstream binning is honest regardless of the
+    sampling mix. Returns (moved_pos, donor_pos, disp) — parallel int arrays indexing pool_idx.
+    """
+    rng = np.random.default_rng(seed)
+    pool_idx = np.asarray(pool_idx, dtype=np.int64)
+    pool_lab = np.asarray(pool_lab)
+    P = len(pool_idx)
+    n = min(int(n), P)
+    moved_pos = rng.choice(P, size=n, replace=False)
+
+    target = np.maximum(td.depth[pool_idx] - int(up_offset), 0)
+    anc = _ancestor_at_depth(td, pool_idx, target)                 # (P,) near-ancestor per pool node
+    groups = {}
+    for pos in range(P):
+        groups.setdefault(int(anc[pos]), []).append(pos)
+    groups = {a: np.asarray(v, dtype=np.int64) for a, v in groups.items()}
+
+    want_local = rng.random(n) < float(local_frac)
+    donor_pos = np.empty(n, dtype=np.int64)
+    for i in range(n):
+        mp = int(moved_pos[i])
+        lab_g = pool_lab[mp]
+        chosen = -1
+        if want_local[i]:
+            cand = groups.get(int(anc[mp]))
+            if cand is not None:
+                cand = cand[pool_lab[cand] != lab_g]
+                if len(cand):
+                    chosen = int(rng.choice(cand))
+        if chosen < 0:                                            # wanted global, or local had no sister
+            for _ in range(16):
+                c = int(rng.integers(0, P))
+                if c != mp and pool_lab[c] != lab_g:
+                    chosen = c
+                    break
+            if chosen < 0:                                        # degenerate (monochrome pool) fallback
+                alt = np.flatnonzero(pool_lab != lab_g)
+                chosen = int(rng.choice(alt)) if len(alt) else int((mp + 1) % P)
+        donor_pos[i] = chosen
+
+    disp = td.path_length(pool_idx[moved_pos], pool_idx[donor_pos])
+    return moved_pos, donor_pos, np.asarray(disp, dtype=np.int64)
+
+
+def synthetic_displacement_roc(pool_idx, pool_lab, depth, clade_size, purity_fn, baselines_pool,
+                               moved_pos, donor_pos, disp_class, n_null, n_bins, seed):
+    """Leg A core (spec §9B), FIXED: recompute the anomaly score UNDER the relabel perturbation.
+
+    The earlier driver scored the ORIGINAL labels and used the relocation only to set the positive
+    mask, so moved nodes (chosen at random) were independent of the score -> AUC ~ 0.5 BY CONSTRUCTION
+    (job 5675791: score_z 0.4998 at n=2948). Here each moved pool position is relabelled to its
+    donor's label, observed purity is RECOMPUTED under those perturbed labels via `purity_fn`
+    (injected: prod = Poincare GPU kNN, tests = brute force), turned into the matched-null z-score, and
+    we report ROC-AUC of the score (and the trivial baselines) for moved-vs-rest, stratified by
+    displacement class. A node relabelled into a far clade still sits in embedding space among its
+    ORIGINAL family, so its neighbours stop matching its new label -> low purity -> high z. Displacement
+    is measured on the true tree, so the move-sampling heuristic only affects which bins populate, never
+    correctness.
+
+    moved_pos / donor_pos / disp_class index into pool_idx (parallel arrays). baselines_pool maps
+    name -> (P,) array already gathered onto pool_idx. Returns {auc_by_displacement,
+    baseline_auc_by_displacement} matching the driver's roc_by_displacement.json shape.
+    """
+    pool_lab = np.asarray(pool_lab)
+    moved_pos = np.asarray(moved_pos, dtype=np.int64)
+    donor_pos = np.asarray(donor_pos, dtype=np.int64)
+    disp_class = np.asarray(disp_class, dtype=np.int64)
+
+    new_lab = pool_lab.copy()
+    new_lab[moved_pos] = pool_lab[donor_pos]
+    obs = np.asarray(purity_fn(new_lab), dtype=np.float64)
+    null = matched_null(obs, pool_idx, depth, clade_size, n_null, n_bins, seed)
+    score_z = matched_null_z(obs, null)
+
+    P = len(np.asarray(pool_idx))
+    is_moved = np.zeros(P, dtype=bool)
+    is_moved[moved_pos] = True
+    disp_arr = np.full(P, -1, dtype=np.int64)
+    disp_arr[moved_pos] = disp_class
+    scores_full = {"score_z": score_z,
+                   **{n: np.asarray(v, dtype=np.float64) for n, v in baselines_pool.items()}}
+
+    auc_by, base_by = {}, {}
+    for dc in sorted(set(disp_class.tolist())):
+        pos_mask = is_moved & (disp_arr == dc)
+        keep = pos_mask | ~is_moved
+        labels = pos_mask[keep].astype(np.int64)
+        if labels.sum() < 1 or (labels == 0).sum() < 1:
+            continue
+        sc = {n: s[keep] for n, s in scores_full.items()}
+        aucs = baseline_aucs(labels, sc)
+        auc_by[str(dc)] = {"score_z": aucs["score_z"], "n_pos": int(labels.sum())}
+        base_by[str(dc)] = {n: aucs[n] for n in baselines_pool}
+    return {"auc_by_displacement": auc_by, "baseline_auc_by_displacement": base_by}

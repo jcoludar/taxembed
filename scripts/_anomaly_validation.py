@@ -25,7 +25,8 @@ from knn_purity_hyperbolic import chance_purity, build_pool
 from _anomaly_knn import observed_purity, matched_null, pick_device
 from taxembed.eval.treedist import TreeDistance
 from taxembed.eval.anomaly import (matched_null_z, trivial_baselines, baseline_aucs,
-                                   relocate_nodes, enrichment_odds_ratio, match_background)
+                                   enrichment_odds_ratio, match_background,
+                                   choose_displacement_donors, synthetic_displacement_roc)
 from taxembed.eval.release_diff import parse_parents, parse_merged, parse_delnodes, reclassified_taxa
 from audit_taxonomy_noise import classify_name_noise, is_container, parse_names_dmp
 
@@ -88,38 +89,32 @@ def cmd_roc(args):
     emb, idx2tax, taxonomy, parent, depth, clade_size, degree = load_all(args)
     device = pick_device(args.device)
     td = TreeDistance(parent, depth)
-    new_parent, moved = relocate_nodes(parent, depth, n=args.n_relocate, seed=args.seed)
-    disp = td.path_length(parent[moved], new_parent[moved])
+    pool_idx, pool_lab = build_labels(emb, idx2tax, taxonomy, args)
+
+    # Leg A (FIXED): relabel each moved node to a donor's family and RECOMPUTE the kNN-purity score
+    # UNDER that perturbation. The old driver scored the ORIGINAL labels and used the relocation only
+    # to set the positive mask, so moved nodes (random) were independent of the score -> AUC ~ 0.5 by
+    # construction (job 5675791). Donors span sister-clade (small) -> cross-clade (large) displacement,
+    # measured on the true tree; `purity_fn` is the Poincaré GPU kNN recomputed on the perturbed labels.
+    moved_pos, donor_pos, disp = choose_displacement_donors(
+        pool_idx, pool_lab, td, n=args.n_relocate, seed=args.seed,
+        local_frac=args.local_frac, up_offset=args.up_offset)
     edges = [0, 2, 4, 8, 10_000]
     disp_class = np.digitize(disp, edges[1:-1])
 
-    pool_idx, pool_lab = build_labels(emb, idx2tax, taxonomy, args)
-    obs = observed_purity(emb, pool_idx, pool_lab, args.k, device=device, batch=args.knn_batch)
-    null = matched_null(obs, pool_idx, depth, clade_size, args.n_null, args.n_bins, args.seed)
-    score_z = matched_null_z(obs, null)
     base = trivial_baselines(emb, parent, depth, clade_size, degree)
     base_pool = {n: v[pool_idx] for n, v in base.items()}
+    purity_fn = lambda lab: observed_purity(emb, pool_idx, lab, args.k,
+                                            device=device, batch=args.knn_batch)
 
-    moved_set = set(moved.tolist())
-    pool_is_moved = np.array([1 if int(i) in moved_set else 0 for i in pool_idx])
-    moved_to_disp = {int(m): int(disp_class[j]) for j, m in enumerate(moved)}
-
-    auc_by, base_by = {}, {}
-    for dc in sorted(set(disp_class.tolist())):
-        pos_mask = np.array([pool_is_moved[k] == 1 and moved_to_disp.get(int(pool_idx[k]), -1) == dc
-                             for k in range(len(pool_idx))])
-        labels = np.where(pos_mask, 1, 0)
-        keep = (labels == 1) | (pool_is_moved == 0)
-        if labels[keep].sum() < 1 or (labels[keep] == 0).sum() < 1:
-            continue
-        scores = {"score_z": score_z[keep], **{n: base_pool[n][keep] for n in base_pool}}
-        all_aucs = baseline_aucs(labels[keep], scores)
-        auc_by[str(dc)] = {"score_z": all_aucs["score_z"], "n_pos": int(labels[keep].sum())}
-        base_by[str(dc)] = {n: all_aucs[n] for n in base_pool}
-
+    res = synthetic_displacement_roc(
+        pool_idx, pool_lab, depth, clade_size, purity_fn, base_pool,
+        moved_pos, donor_pos, disp_class, args.n_null, args.n_bins, args.seed)
+    res.update({"displacement_edges": edges, "n_relocate": int(len(moved_pos)), "k": args.k,
+                "local_frac": float(args.local_frac), "up_offset": int(args.up_offset),
+                "disp_class_counts": {str(int(c)): int((disp_class == c).sum())
+                                      for c in sorted(set(disp_class.tolist()))}})
     out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
-    res = {"auc_by_displacement": auc_by, "baseline_auc_by_displacement": base_by,
-           "displacement_edges": edges, "n_relocate": int(len(moved)), "k": args.k}
     (out / "roc_by_displacement.json").write_text(json.dumps(res, indent=2))
     print(json.dumps(res, indent=2))
 
@@ -214,6 +209,10 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     roc = sub.add_parser("roc"); add_common(roc); roc.add_argument("--n-relocate", type=int, default=2000)
+    roc.add_argument("--local-frac", type=float, default=0.5,
+                     help="fraction of synthetic moves drawn as sister-clade (small-displacement) relabels")
+    roc.add_argument("--up-offset", type=int, default=2,
+                     help="ancestor levels up that a local donor shares with the moved node")
     enr = sub.add_parser("enrichment")
     enr.add_argument("--pool-npz", required=True)
     enr.add_argument("--mapping", required=True)

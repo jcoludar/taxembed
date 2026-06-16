@@ -7,7 +7,26 @@ from taxembed.eval.anomaly import (
     benjamini_hochberg,
     relocate_nodes,
     displacement_class,
+    synthetic_displacement_roc,
 )
+
+
+def _bf_purity(emb, pool_idx, labels, k):
+    """Brute-force Euclidean kNN observed-purity for tiny well-separated test fixtures.
+
+    Stands in for the production Poincaré GPU kNN (observed_purity) so the leg-A core can be tested
+    torch-free: purity is a pure function OF the label vector, which is exactly what the no-op bug
+    (score computed on the ORIGINAL labels, never the perturbed ones) violated.
+    """
+    X = np.asarray(emb)[np.asarray(pool_idx)]
+    labels = np.asarray(labels)
+    d = np.linalg.norm(X[:, None, :] - X[None, :, :], axis=2)
+    np.fill_diagonal(d, np.inf)
+    out = np.empty(len(pool_idx), dtype=np.float64)
+    for i in range(len(pool_idx)):
+        nn = np.argsort(d[i])[:k]
+        out[i] = float(np.mean(labels[nn] == labels[i]))
+    return out
 
 
 def test_excess_impurity_size_conditioned_sign():
@@ -85,6 +104,87 @@ def test_match_background_returns_same_stratum_controls():
     assert set(controls).isdisjoint(set(flagged)) or True
     db = np.digitize(depth, np.quantile(depth, [1/3, 2/3]))
     assert (db[controls] == db[flagged]).mean() > 0.7
+
+
+def test_leg_a_recomputes_score_under_relabel_so_misplaced_nodes_are_detected():
+    # The leg-A bug: score_z was computed on the ORIGINAL labels and the relocation only set the
+    # positive mask, so moved nodes (chosen at random) were independent of the score -> AUC ~ 0.5 by
+    # construction. The fix recomputes purity UNDER the relabel: a node relabeled into a different
+    # family still sits (in embedding space) among its original family, so its neighbours no longer
+    # match its new label -> low purity -> high anomaly. A correct leg A must DETECT these.
+    rng = np.random.default_rng(0)
+    fam_centers = np.array([[0.0, 0.0], [10.0, 0.0], [0.0, 10.0], [10.0, 10.0]])
+    F, M = 4, 15
+    labels0 = np.repeat(np.arange(F), M)
+    emb = np.vstack([fam_centers[f] + rng.normal(0, 0.3, (M, 2)) for f in range(F)])
+    pool_idx = np.arange(F * M)
+    pool_lab = labels0.copy()
+    depth = np.full(F * M, 3)
+    clade_size = np.full(F * M, M)
+    moved_pos = rng.choice(F * M, 12, replace=False)
+    donor_pos = (moved_pos + M) % (F * M)            # land in a DIFFERENT family block
+    disp_class = np.full(12, 1)
+    purity_fn = lambda lab: _bf_purity(emb, pool_idx, lab, k=5)
+    res = synthetic_displacement_roc(
+        pool_idx, pool_lab, depth, clade_size, purity_fn,
+        baselines_pool={}, moved_pos=moved_pos, donor_pos=donor_pos,
+        disp_class=disp_class, n_null=50, n_bins=2, seed=0,
+    )
+    assert res["auc_by_displacement"]["1"]["n_pos"] == 12
+    assert res["auc_by_displacement"]["1"]["score_z"] > 0.9
+
+
+def test_leg_a_noop_score_independent_of_relabel_is_chance():
+    # Guard against regression to the no-op: if the score does NOT depend on the relabel (i.e. a
+    # purity_fn that ignores its label argument), AUC must collapse to ~chance. This is the exact
+    # failure signature of job 5675791 (score_z AUC 0.4998 at n=2948).
+    rng = np.random.default_rng(1)
+    fam_centers = np.array([[0.0, 0.0], [10.0, 0.0], [0.0, 10.0], [10.0, 10.0]])
+    F, M = 4, 25
+    labels0 = np.repeat(np.arange(F), M)
+    emb = np.vstack([fam_centers[f] + rng.normal(0, 0.3, (M, 2)) for f in range(F)])
+    pool_idx = np.arange(F * M)
+    pool_lab = labels0.copy()
+    depth = np.full(F * M, 3)
+    clade_size = np.full(F * M, M)
+    moved_pos = rng.choice(F * M, 30, replace=False)
+    donor_pos = (moved_pos + M) % (F * M)
+    disp_class = np.full(30, 1)
+    frozen = _bf_purity(emb, pool_idx, labels0, k=5)      # ORIGINAL-label purity, ignores relabel
+    res = synthetic_displacement_roc(
+        pool_idx, pool_lab, depth, clade_size, lambda lab: frozen,
+        baselines_pool={}, moved_pos=moved_pos, donor_pos=donor_pos,
+        disp_class=disp_class, n_null=50, n_bins=2, seed=0,
+    )
+    assert abs(res["auc_by_displacement"]["1"]["score_z"] - 0.5) < 0.15
+
+
+def test_choose_displacement_donors_local_are_near_global_are_far():
+    # Defect 2: the uniform relocator only ever produced cross-tree jumps, so the sister-genus/family
+    # (small-displacement) regime the go/no-go cares about went unsampled. The donor sampler must yield
+    # near (sister-clade) moves when local AND far (cross-clade) moves when global, with displacement
+    # measured on the TRUE tree (so the heuristic only affects bin population, never correctness).
+    from taxembed.eval.anomaly import choose_displacement_donors
+    from taxembed.eval.treedist import TreeDistance
+    # root -> {A,B} -> {families} -> leaves; sister families share a grandparent (disp 4),
+    # cross-clade leaf pairs meet only at the root (disp 6).
+    parent = np.array([0, 0, 0, 1, 1, 2, 2] + [3] * 5 + [4] * 5 + [5] * 5 + [6] * 5, dtype=np.int64)
+    depth = np.array([0, 1, 1, 2, 2, 2, 2] + [3] * 20, dtype=np.int64)
+    td = TreeDistance(parent, depth)
+    pool_idx = np.arange(7, 27)
+    pool_lab = np.array([3] * 5 + [4] * 5 + [5] * 5 + [6] * 5)
+    mp_l, dp_l, disp_l = choose_displacement_donors(pool_idx, pool_lab, td, n=20, seed=0,
+                                                    local_frac=1.0, up_offset=2)
+    mp_g, dp_g, disp_g = choose_displacement_donors(pool_idx, pool_lab, td, n=20, seed=0,
+                                                    local_frac=0.0, up_offset=2)
+    # donors always differ in family label (no displacement-0 no-op relabels)
+    assert (pool_lab[dp_l] != pool_lab[mp_l]).all()
+    assert (pool_lab[dp_g] != pool_lab[mp_g]).all()
+    # displacement equals the true cophenetic tree distance
+    assert (disp_l == td.path_length(pool_idx[mp_l], pool_idx[dp_l])).all()
+    # local moves stay sister-clade (share grandparent) => small; global reaches cross-clade => larger
+    assert disp_l.max() <= 4
+    assert disp_g.max() >= 6
 
 
 def test_enrichment_odds_ratio_detects_real_enrichment():
