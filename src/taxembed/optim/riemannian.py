@@ -10,7 +10,9 @@ So the Riemannian gradient is:
 
     grad_R = ((1 - ||x||^2)^2 / 4) * grad_E
 
-See: hype/manifolds/poincare.py:41-53 (Facebook's original implementation)
+See Nickel & Kiela (2017), "Poincaré Embeddings for Learning Hierarchical
+Representations" (NeurIPS 2017). This is a clean-room reimplementation of that
+conformal-factor gradient rescaling.
 """
 
 import torch

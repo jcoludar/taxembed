@@ -1,0 +1,32 @@
+TaxPointCare — Hierarchical Taxonomy Embeddings with Poincaré Geometry
+Copyright 2025–2026 The TaxPointCare authors (@jcoludar and contributors)
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this software except in compliance with the License. A copy of the License is in
+the LICENSE file at the repository root, or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+----------------------------------------------------------------------
+Attribution / origin
+----------------------------------------------------------------------
+This project originally began as a fork of Facebook AI Research's reference
+implementation of Poincaré embeddings
+(https://github.com/facebookresearch/poincare-embeddings), which implements the
+method of:
+
+    Nickel, M. & Kiela, D. (2017). "Poincaré Embeddings for Learning
+    Hierarchical Representations." Advances in Neural Information Processing
+    Systems 30 (NeurIPS 2017). arXiv:1705.08039.
+
+That reference code was open-sourced by Facebook Research in 2018 under the
+Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0) license. Since the
+fork, the codebase has been entirely reimplemented for biological taxonomy: the
+training driver, transitive-closure/dataset builders, evaluation suite, CLI,
+optimizer, and figures are original work, and no source code from the original
+implementation remains in this repository. The Riemannian gradient rescaling in
+src/taxembed/optim/riemannian.py is a clean-room reimplementation of the
+Poincaré-ball conformal-factor formula described by Nickel & Kiela (2017),
+copying no original source text.
+
+We gratefully acknowledge Nickel & Kiela for the original method.

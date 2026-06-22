@@ -7,7 +7,7 @@ name = "taxembed"
 version = "0.2.0"
 description = "Hierarchical Poincaré embeddings for NCBI biological taxonomy"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "Joha Coludar", email = "jcoludar@gmail.com" }
 ]

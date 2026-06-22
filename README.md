@@ -1,7 +1,7 @@
 # Hierarchical Taxonomy Embeddings with Poincaré Geometry
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Status: Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)](https://github.com/jcoludar/taxembed)
 
 **Learn hierarchical embeddings of NCBI's biological taxonomy in hyperbolic space.**
@@ -11,7 +11,7 @@
 📁 **Models:** `artifacts/tags/<tag>/` (run `taxembed train <clade> -as <tag>`)
 🧹 **NEW:** `--clean` flag removes NCBI taxonomy noise (sp., cf., environmental — 50-70% of nodes)
 
-This project extends Facebook Research's Poincaré embeddings with hierarchical features specifically designed for deep taxonomic hierarchies (38 levels, 2.7M organisms).
+This project began from the reference implementation of Poincaré embeddings (Nickel & Kiela, 2017; open-sourced by Facebook Research in 2018) and has since been **entirely reimplemented** for deep biological taxonomies (38 ranks, ~2.7M organisms). Where the original embeds lexical word hierarchies (WordNet nouns), we embed the **NCBI taxonomy** — millions of taxon IDs across the tree of life. No source code from the original implementation remains; see [NOTICE](NOTICE).
 
 ---
 
@@ -123,9 +123,12 @@ taxembed visualize <tag> --metric poincare
 
 ---
 
-## 📊 What's Different from Facebook's Implementation?
+## 📊 What's Different from the Original Poincaré-Embedding Method?
 
-| Feature | Facebook | This Project (v10a) |
+The original method (Nickel & Kiela, 2017) embeds lexical hierarchies (WordNet); this project is a from-scratch
+reimplementation targeting the NCBI taxonomy. Key differences:
+
+| Feature | Original (Nickel & Kiela 2017) | This Project (v10a) |
 |---------|----------|-------------------|
 | **Training Data** | Parent-child only | All ancestor-descendant pairs (transitive closure) |
 | **Optimizer** | SGD | Euclidean Adam (preserves angular gradients) |
@@ -326,7 +329,7 @@ Use `--max-depth` to truncate deep subtrees or point `--taxdump-dir` at an alter
 ## 📖 Documentation
 
 - **[QUICKSTART.md](docs/QUICKSTART.md)** - Get started in 5 minutes
-- **[JOURNEY.md](JOURNEY.md)** - Full development history from Facebook's code to now
+- **[JOURNEY.md](JOURNEY.md)** - Full development history (from the original reference code to the current reimplementation)
 - **[SESSION_SUMMARY_NOV8.md](SESSION_SUMMARY_NOV8.md)** - Latest session summary with findings
 - **[docs/archive/](docs/archive/)** - Intermediate development documents
 
@@ -436,7 +439,7 @@ VIRTUAL_ENV= uv run taxembed visualize mollusca_v5 --children 2 --metric poincar
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please open an issue or pull request.
 
 ### **Priority Areas**
 - Hyperparameter tuning for better hierarchy quality
@@ -449,9 +452,10 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## 📚 References
 
-### **Original Papers**
-- Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations" [[PDF](https://arxiv.org/abs/1705.08039)]
-- Facebook Research implementation: [[GitHub](https://github.com/facebookresearch/poincare-embeddings)]
+### **Original Method**
+- Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations." NeurIPS 2017. [[PDF](https://arxiv.org/abs/1705.08039)]
+- Nickel & Kiela (2018). "Learning Continuous Hierarchies in the Lorentz Model of Hyperbolic Geometry." ICML 2018. [[PDF](https://arxiv.org/abs/1806.03417)]
+- Reference implementation (open-sourced by Facebook Research, 2018): [[GitHub](https://github.com/facebookresearch/poincare-embeddings)] — this project was originally forked from it and has since been fully reimplemented (see [NOTICE](NOTICE)).
 
 ### **Data**
 - NCBI Taxonomy: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
@@ -466,13 +470,16 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## 📜 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+**Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE). This project was originally forked from
+`facebookresearch/poincare-embeddings` (CC BY-NC 4.0); it has since been fully reimplemented and contains none of
+the original source, so the current code is released under Apache-2.0. The original method is credited to
+Nickel & Kiela (2017).
 
 ---
 
 ## 👥 Authors
 
-- Based on Facebook Research's Poincaré embeddings
+- Method originally introduced by Nickel & Kiela (2017); our codebase began as a fork of their reference implementation and has since been fully reimplemented for taxonomy
 - Extended for hierarchical taxonomy by @jcoludar
 - Development history in [JOURNEY.md](JOURNEY.md)
 
