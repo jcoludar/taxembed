@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import argparse
+import math
 import os
 import sys
 from collections import defaultdict, deque
@@ -31,6 +32,7 @@ from train_hierarchical import (
     HierarchicalDataLoader,
     TrainingPairs,
     ranking_loss_with_margin,
+    softmax_loss,
     radial_regularizer
 )
 
@@ -442,6 +444,56 @@ def parse_curriculum_phases(spec):
     return sorted(phases, key=lambda x: x[0])
 
 
+def _compute_scheduled_lr(
+    epoch: int,
+    n_epochs: int,
+    base_lr: float,
+    schedule: str,
+    lr_min_mult: float,
+    phase_boundaries: list[int] | None,
+) -> float:
+    """Per-epoch LR under {const, cosine, cosine_warmrestart}.
+
+    cosine_warmrestart restarts the cosine inside each curriculum phase
+    segment. Targets the 2026-06-02 diagnostic verdict: the dd<=9 -> dd<=18
+    transition at epoch 80 is the breaker; arriving there with a high LR
+    is what destroys the dd<=1 / dd<=9 manifold the model just built.
+    """
+    if schedule == "const":
+        return base_lr
+
+    if schedule == "cosine":
+        denom = max(1, n_epochs - 1)
+        t = (epoch - 1) / denom
+        cos_factor = 0.5 * (1.0 + math.cos(math.pi * t))
+        return base_lr * (lr_min_mult + (1.0 - lr_min_mult) * cos_factor)
+
+    if schedule == "cosine_warmrestart":
+        if not phase_boundaries:
+            raise ValueError(
+                "lr_schedule='cosine_warmrestart' requires non-empty phase_boundaries "
+                "(enable --curriculum and --warm-restart-on-phase)"
+            )
+        # Find [e_start, e_end) phase segment containing this epoch.
+        e_start = phase_boundaries[0]
+        for b in phase_boundaries:
+            if b <= epoch:
+                e_start = b
+            else:
+                break
+        e_end = n_epochs + 1
+        for b in phase_boundaries:
+            if b > e_start:
+                e_end = b
+                break
+        seg_len = max(1, e_end - e_start)
+        t = (epoch - e_start) / seg_len
+        cos_factor = 0.5 * (1.0 + math.cos(math.pi * t))
+        return base_lr * (lr_min_mult + (1.0 - lr_min_mult) * cos_factor)
+
+    raise ValueError(f"Unknown lr_schedule: {schedule!r}")
+
+
 def auto_curriculum_phases(max_depth: int, n_epochs: int) -> list[tuple[int, int | None]]:
     """Generate curriculum phases scaled to tree depth and epoch budget.
 
@@ -513,7 +565,10 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
                              depth_scale_margin=False, margin_min=0.05,
                              margin_max=1.0, radial_schedule='linear',
                              grad_accum_steps=1, use_amp=False,
-                             class_weighted_loss=False):
+                             class_weighted_loss=False, loss_type='ranking',
+                             save_every=0,
+                             lr_schedule='const', warm_restart_on_phase=False,
+                             lr_min_multiplier=0.01):
     """Train with enhanced terminal visualization."""
 
     model.to(device)
@@ -539,6 +594,10 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
         print(f"  Depth-scaled margin: [{margin_min}, {margin_max}]")
     if radial_schedule != 'linear':
         print(f"  Radial schedule: {radial_schedule}")
+    if lr_schedule != 'const':
+        floor_lr = optimizer.param_groups[0]['lr'] * lr_min_multiplier
+        wr_note = " (warm-restart on each curriculum phase boundary)" if warm_restart_on_phase else ""
+        print(f"  LR schedule: {lr_schedule} → floor {floor_lr:.2e}{wr_note}")
 
     # Import target_radius helper
     from train_hierarchical import target_radius as _target_radius
@@ -616,11 +675,36 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
     # Store base LR for burn-in
     base_lr = optimizer.param_groups[0]['lr']
 
+    # LR-schedule prereqs: warm-restart needs curriculum-phase boundaries.
+    phase_boundaries = sorted({pe for pe, _ in parsed_phases}) if parsed_phases else None
+    if lr_schedule == 'cosine_warmrestart':
+        if not warm_restart_on_phase:
+            raise ValueError(
+                "lr_schedule='cosine_warmrestart' currently requires --warm-restart-on-phase "
+                "(curriculum-phase boundaries are the only supported restart trigger)"
+            )
+        if not phase_boundaries:
+            raise ValueError(
+                "lr_schedule='cosine_warmrestart' requires --curriculum with phases"
+            )
+
     for epoch in range(1, n_epochs + 1):
-        # --- Burn-in LR adjustment ---
-        if burnin > 0 and epoch <= burnin:
+        # --- Burn-in LR adjustment (takes precedence over schedule during burn-in) ---
+        in_burnin_now = burnin > 0 and epoch <= burnin
+        if in_burnin_now:
             for pg in optimizer.param_groups:
                 pg['lr'] = base_lr * burnin_multiplier
+        elif lr_schedule != 'const':
+            scheduled = _compute_scheduled_lr(
+                epoch=epoch,
+                n_epochs=n_epochs,
+                base_lr=base_lr,
+                schedule=lr_schedule,
+                lr_min_mult=lr_min_multiplier,
+                phase_boundaries=phase_boundaries if warm_restart_on_phase else None,
+            )
+            for pg in optimizer.param_groups:
+                pg['lr'] = scheduled
         elif burnin > 0 and epoch == burnin + 1:
             for pg in optimizer.param_groups:
                 pg['lr'] = base_lr
@@ -674,15 +758,21 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
 
             # Forward pass (with optional AMP autocast)
             with torch.amp.autocast(amp_device, enabled=amp_enabled):
-                # Ranking loss
-                loss = ranking_loss_with_margin(
-                    model, ancestors, descendants, negatives,
-                    depths, margin=margin, depth_weight=True,
-                    depth_scale_margin=depth_scale_margin,
-                    margin_min=margin_min, margin_max=margin_max,
-                    max_depth_diff=max_depth,
-                    class_weights=class_weight_tensor,
-                )
+                # Training objective: margin-ranking (default) or softmax/NLL
+                if loss_type == 'softmax':
+                    loss = softmax_loss(
+                        model, ancestors, descendants, negatives, depths,
+                        depth_weight=True, class_weights=class_weight_tensor,
+                    )
+                else:
+                    loss = ranking_loss_with_margin(
+                        model, ancestors, descendants, negatives,
+                        depths, margin=margin, depth_weight=True,
+                        depth_scale_margin=depth_scale_margin,
+                        margin_min=margin_min, margin_max=margin_max,
+                        max_depth_diff=max_depth,
+                        class_weights=class_weight_tensor,
+                    )
 
                 # Radial regularizer
                 reg_loss = radial_regularizer(model, reg_indices_tensor,
@@ -836,6 +926,14 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
 
             checkpoint_queue.append(checkpoint_path)
 
+            # Milestone save: every N epochs, persist a non-deletable copy.
+            # Used to diagnose curriculum-phase behavior — the rolling queue above
+            # keeps only the last 5 epochs, so without this we have no view into
+            # what happens at phase boundaries (e.g., ep 40, 80, 120 transitions).
+            if save_every > 0 and epoch % save_every == 0:
+                milestone_path = checkpoint_base.replace('.pth', f'_milestone_epoch{epoch}.pth')
+                torch.save(ckpt_data, milestone_path)
+
         # Best model selection: use quality score when curriculum is active,
         # raw loss otherwise.  This prevents saving "best" during an easy
         # curriculum phase that hasn't learned cross-branch structure.
@@ -950,6 +1048,22 @@ def main():
                        help='Upweight minority class pair losses by inverse sqrt frequency')
     parser.add_argument('--euclidean-param', action='store_true',
                        help='Learn in R^d with tanh map to Poincare ball (fixes gradient vanishing)')
+    parser.add_argument('--loss', choices=['ranking', 'softmax'], default='ranking',
+                       help='Training objective: ranking (margin hinge, default) or softmax (Nickel-Kiela NLL)')
+    parser.add_argument('--save-every', type=int, default=0,
+                       help='Save a non-deletable milestone checkpoint every N epochs '
+                            '(default 0 = disabled; rolling queue of last 5 unchanged). '
+                            'Diagnostic for tracking model state across curriculum phase transitions.')
+    parser.add_argument('--lr-schedule', choices=['const', 'cosine', 'cosine_warmrestart'],
+                       default='const',
+                       help='LR schedule: const (default), cosine (full-run decay), or '
+                            'cosine_warmrestart (restart cosine at each curriculum phase). '
+                            'Targets the dd<=18 transition that broke the 2026-06-02 diagnostic.')
+    parser.add_argument('--warm-restart-on-phase', action='store_true',
+                       help='Required with --lr-schedule cosine_warmrestart: restart cosine '
+                            'at each curriculum phase boundary.')
+    parser.add_argument('--lr-min-multiplier', type=float, default=0.01,
+                       help='Cosine LR floor as fraction of base LR (default 0.01 = 1%%).')
 
     args = parser.parse_args()
 
@@ -959,6 +1073,16 @@ def main():
         print("   Riemannian corrections assume parameters live on the manifold.")
         print("   Use --optimizer adam (default) with --euclidean-param.")
         sys.exit(1)
+
+    # Validate: cosine_warmrestart needs curriculum + phase-restart trigger.
+    if args.lr_schedule == 'cosine_warmrestart':
+        if not args.curriculum:
+            print("❌ Error: --lr-schedule cosine_warmrestart requires --curriculum")
+            sys.exit(1)
+        if not args.warm_restart_on_phase:
+            print("❌ Error: --lr-schedule cosine_warmrestart requires --warm-restart-on-phase")
+            print("   (curriculum-phase boundaries are the only supported restart trigger).")
+            sys.exit(1)
     
     # Device selection: CUDA > MPS > CPU
     if args.gpu >= 0 and torch.cuda.is_available():
@@ -1119,6 +1243,11 @@ def main():
         grad_accum_steps=args.grad_accum_steps,
         use_amp=args.amp,
         class_weighted_loss=getattr(args, 'class_weighted_loss', False),
+        loss_type=getattr(args, 'loss', 'ranking'),
+        save_every=getattr(args, 'save_every', 0),
+        lr_schedule=getattr(args, 'lr_schedule', 'const'),
+        warm_restart_on_phase=getattr(args, 'warm_restart_on_phase', False),
+        lr_min_multiplier=getattr(args, 'lr_min_multiplier', 0.01),
     )
     
     # Save final model (Poincare-space for downstream compat)

@@ -702,6 +702,49 @@ def ranking_loss_with_margin(model, ancestors, descendants, negatives,
     return loss.mean()
 
 
+def softmax_loss_from_dists(pos_dist, neg_dist):
+    """Nickel-Kiela softmax/NLL loss from precomputed Poincaré distances.
+
+    pos_dist: (batch,) distance anchor->positive; neg_dist: (batch, n_neg).
+    Returns per-example loss (batch,): -log( e^{-pos} / (e^{-pos} + sum_j e^{-neg_j}) ),
+    i.e. cross_entropy over logits [-pos, -neg_1, ..., -neg_n] with the positive at index 0.
+    Pure function of the distances so it can be unit-tested without a model.
+    """
+    logits = torch.cat([-pos_dist.unsqueeze(1), -neg_dist], dim=1)  # (batch, 1+n_neg)
+    target = torch.zeros(logits.shape[0], dtype=torch.long, device=logits.device)
+    return nn.functional.cross_entropy(logits, target, reduction='none')  # (batch,)
+
+
+def softmax_loss(model, ancestors, descendants, negatives, depths,
+                 depth_weight=True, class_weights=None):
+    """Softmax/NLL Poincaré objective (Nickel & Kiela 2017); alternative to the
+    margin-ranking loss. Classifies the positive (descendant) as nearest to the anchor
+    among {descendant} + negatives via softmax over Poincaré distances. Unlike the hinge
+    ranking loss this pushes against ALL negatives every step (no margin dead-zone).
+    Keeps the same depth/class weighting as ranking_loss_with_margin for comparability.
+    """
+    anc_emb = model(ancestors)  # (batch, dim)
+    desc_emb = model(descendants)  # (batch, dim)
+    neg_emb = model(negatives)  # (batch, n_neg, dim)
+
+    pos_dist = model.poincare_distance(anc_emb, desc_emb)  # (batch,)
+    anc_emb_expanded = anc_emb.unsqueeze(1).expand_as(neg_emb)
+    neg_dist = model.poincare_distance(anc_emb_expanded, neg_emb)  # (batch, n_neg)
+
+    per_example = softmax_loss_from_dists(pos_dist, neg_dist)  # (batch,)
+
+    if depth_weight:
+        weights = torch.sqrt(depths + 1)
+        weights = weights / weights.mean()
+        per_example = per_example * weights
+
+    if class_weights is not None:
+        cw = class_weights[descendants]  # (batch,)
+        per_example = per_example * cw
+
+    return per_example.mean()
+
+
 def radial_regularizer(model, idx_to_depth_tensor, target_radii_tensor, lambda_reg=0.01):
     """
     Vectorized radial regularizer to keep nodes at expected radius based on depth.

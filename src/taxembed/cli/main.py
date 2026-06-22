@@ -409,6 +409,14 @@ def handle_train(args: argparse.Namespace) -> None:
         train_cmd.append("--class-weighted-loss")
     if args.euclidean_param:
         train_cmd.append("--euclidean-param")
+    train_cmd.extend(["--loss", args.loss])
+    if args.save_every > 0:
+        train_cmd.extend(["--save-every", str(args.save_every)])
+    if args.lr_schedule != "const":
+        train_cmd.extend(["--lr-schedule", args.lr_schedule])
+        train_cmd.extend(["--lr-min-multiplier", str(args.lr_min_multiplier)])
+    if args.warm_restart_on_phase:
+        train_cmd.append("--warm-restart-on-phase")
 
     print(f"\n🧬 Training tag '{args.as_tag}' (slug '{slug}')")
     if args.identifier and not args.file:
@@ -465,6 +473,10 @@ def handle_train(args: argparse.Namespace) -> None:
                     "class_balanced": args.class_balanced,
                     "class_weighted_loss": args.class_weighted_loss,
                     "euclidean_param": args.euclidean_param,
+                    "loss": args.loss,
+                    "lr_schedule": args.lr_schedule,
+                    "warm_restart_on_phase": args.warm_restart_on_phase,
+                    "lr_min_multiplier": args.lr_min_multiplier,
                     "clean": getattr(args, "clean", False),
                 },
                 "paths": {
@@ -731,6 +743,20 @@ def build_parser() -> argparse.ArgumentParser:
                               help="Upweight minority class pair losses by inverse sqrt frequency")
     train_parser.add_argument("--euclidean-param", action="store_true",
                               help="Learn in R^d with tanh map to Poincare ball (fixes gradient vanishing)")
+    train_parser.add_argument("--loss", choices=["ranking", "softmax"], default="ranking",
+                              help="Training objective: ranking (margin hinge, default) or softmax (Nickel-Kiela NLL)")
+    train_parser.add_argument("--save-every", type=int, default=0,
+                              help="Save non-deletable milestone checkpoint every N epochs (0 = disabled). "
+                                   "Diagnostic for tracking curriculum-phase behavior.")
+    train_parser.add_argument("--lr-schedule", choices=["const", "cosine", "cosine_warmrestart"],
+                              default="const",
+                              help="LR schedule: const (default), cosine (full-run decay), or "
+                                   "cosine_warmrestart (restart cosine at each curriculum phase).")
+    train_parser.add_argument("--warm-restart-on-phase", action="store_true",
+                              help="Required with --lr-schedule cosine_warmrestart: restart cosine "
+                                   "at each curriculum phase boundary.")
+    train_parser.add_argument("--lr-min-multiplier", type=float, default=0.01,
+                              help="Cosine LR floor as fraction of base LR (default 0.01).")
     train_parser.add_argument("--clean", action="store_true",
                               help="Filter taxonomy noise (sp., cf., environmental, etc.) via bottom-up leaf pruning")
     train_parser.set_defaults(func=handle_train)
