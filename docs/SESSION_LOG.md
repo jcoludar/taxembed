@@ -7,6 +7,48 @@ not here — this log is the timestamped trail.
 
 ---
 
+## 2026-07-07 — [IN PROGRESS] orientation + reconcile → path-to-draft planning
+
+**Set out to:** pick the taxembed paper back up after a ~2-week gap, reconcile all session records,
+and design the concrete path to a first manuscript **draft**. (User initially thought the last big push
+was `unknown_unknowns`; corrected → the target is **this** taxembed Poincaré paper.)
+
+**Reconciliation (read PROJECT_STATE + paper-design spec §1–9F + all handoffs + SESSION_LOG + the 3 app
+plans + scripts/ + paper/):**
+- **Locked & draft-ready:** Contribution #1 (methods fix — curriculum-collapse + 4-lever recipe) and
+  #2 (validation ladder echino 4k → mollusca 32k → metazoa 498k → eukaryota 877k → **cellular 1.1M / 3
+  domains**, EXCELLENT at every rank on 3 orthogonal metrics; reproducibility lock closed).
+- **App #1 (geometry-as-a-service / cophenetic fidelity):** BUILT (`src/taxembed/eval/*` + 14 tests +
+  `scripts/cophenetic_fidelity.py`), MEASURED on eukaryota 877k (kNN precision@10 0.636 vs radial-null
+  0.026 ≈ 24×; distortion median 1.14). NOT regenerated on cellular 1.1M — that checkpoint was deleted in
+  the 06-11 disk reclaim → needs an LRZ re-pull for headline-scale numbers.
+- **App #2 (taxonomy QC / anomaly):** BUILT but result = clean null → **demoted to honest §9F negative**
+  (06-16, KI-8 RESOLVED, leg-B 30h retrain NO-GO'd by user). Reportable as an honest limitation, not a
+  positive contribution.
+- **App #3 (sampling-bias / coverage):** PLAN fully written (`docs/plans/2026-06-09-taxembed-app3-*`),
+  **NOT built** — no `coverage.py` / `coverage_bias.py` / `fetch_uniprot_proteomes.py` on disk.
+- **Paper text:** none yet. `paper/` holds only 6 figures (separation trajectory + UMAPs). Venue target
+  = Bioinformatics (tool/methods) per spec.
+- **Doc gap noted:** two commits on 2026-06-22 (`4243bde` Apache-2.0 relicense + remove forked FB code;
+  `75b9c18` wip band-sampler/diagnostics) post-date the last SESSION_LOG entry (06-16) — an unlogged
+  licensing/cleanup session. Working tree clean on `feat/taxembed-eval-foundation`.
+- **⚠ CORRECTION (found mid-session):** the 06-16 "pivot" spawned `projects/tax_disentangle/` which is
+  **NOT a separate paper — it is Result 2 of the actual manuscript.** The real, content-complete draft lives
+  on the `feat/taxonomy-bridge` worktree (`.worktrees/taxonomy-bridge/manuscript/DRAFT.md`, commit `ae7235ec`):
+  **"A hyperbolic embedding of the tree of all cellular life — and its use to disentangle protein function
+  from phylogeny"** (Koludarov & Rost, TUM). Result 1 = THIS Poincaré embedding (locked); Result 2 = the
+  linear bridge that READs taxonomy out of ProtT5 embeddings and CLEANs (LEACE-erases) it, coherence-verified.
+  Draft is v2 content-complete, all-life numbers audited 2026-07-07, 9 figures drafted.
+- **Pfam/TrEMBL pivot CONFIRMED (user's recollection):** the intended Swiss-Prot-vs-TrEMBL batch twin is VOID
+  because the all-life Pfam panel is **99.5% TrEMBL** (SP twin n=293/0.5%, not scorable; TrEMBL twin redundant
+  with headline) → reported as an honest §3.3 caveat, leaning on batch-effect AUC 0.749 instead. Paired with two
+  more honest negatives (EC independent cross-check VOID: NMI(Pfam,EC3)=0.875 near-bijective; READ leg
+  leave-clade-out=0.0). The draft frames these three as bounding-the-claim strengths.
+
+**Next:** real path-to-draft = the manuscript's own TODO checklist — the one open COMPUTE item is §2.3 cellular
+cophenetic fidelity (only eukaryota 0.636 computed; cellular checkpoint LRZ-only → re-pull, VPN now on), plus
+prose tighten + 5 ref-PDF gaps + novelty Scholar sweep + finalize 9 figures + venue pick.
+
 ## 2026-06-16 — App #2 anomaly go/no-go ran → NO-GO; leg-A no-op found + fixed; demoted to honest §9F negative
 
 **Set out to:** the LRZ anomaly job finished — pull/read the leg-A/C JSONs and make the leg-B 30h-retrain
