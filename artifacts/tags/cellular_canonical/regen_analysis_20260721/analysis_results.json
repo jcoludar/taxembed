@@ -1,0 +1,51 @@
+{
+  "checkpoint": "/app/artifacts/tags/cellular_canonical/cellular_canonical.pth",
+  "mapping": "/data/taxonomy_edges_cellular_organisms_131567_clean.mapping.tsv",
+  "data_dir": "/tmp/taxdump_work",
+  "n_embedded": 1102163,
+  "n_taxonomy_nodes": 1102149,
+  "seed": 0,
+  "repeats": 5,
+  "ranks": [
+    "domain",
+    "superkingdom",
+    "phylum",
+    "class",
+    "order",
+    "family"
+  ],
+  "depth_norm_pearson": 0.9516320512220211,
+  "depth_norm_spearman": 0.9946182811558761,
+  "separation": {
+    "domain": {
+      "separation": 1.1571274157206637,
+      "sep_std": 0.016666581030295242,
+      "quality": "POOR"
+    },
+    "superkingdom": {
+      "separation": null,
+      "sep_std": 0.0,
+      "quality": "N/A (single group)"
+    },
+    "phylum": {
+      "separation": 3.6799629865353993,
+      "sep_std": 0.004760394798126946,
+      "quality": "EXCELLENT"
+    },
+    "class": {
+      "separation": 5.983856333088157,
+      "sep_std": 0.02851119051236685,
+      "quality": "EXCELLENT"
+    },
+    "order": {
+      "separation": 7.1214842698784455,
+      "sep_std": 0.0110066536005114,
+      "quality": "EXCELLENT"
+    },
+    "family": {
+      "separation": 7.649319821416152,
+      "sep_std": 0.011429557846086296,
+      "quality": "EXCELLENT"
+    }
+  }
+}

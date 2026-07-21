@@ -6,6 +6,22 @@ open issues change. Timestamped narrative lives in `SESSION_LOG.md`.
 _Last updated: 2026-06-16 (App #2 anomaly-QC → NO-GO / honest §9F negative; leg-A no-op fixed but only a
 floor test — KI-8 RESOLVED, KI-9 added; paper leads on App #1 representation. CELLULAR all-of-Life 1.1M EXCELLENT.)_
 
+## ✅ STATUS (2026-07-21): HEADLINE SEPARATION + DEPTH-NORM NOW BACKED BY RAW ARTIFACTS
+
+The 877k/1.1M separation + depth-norm were the only headline numbers lacking an on-disk raw file
+(methods-audit 2026-07-15). Regenerated on LRZ (jobs 5709981 eukaryota+cellular; 5710358 metazoa) via
+`scripts/analyze_lrz_hierarchy.sh` + `analyze_lrz_metazoa.sh`, against the exact 2026-06-09 `new_taxdump`
+the Methods declares, pinned taxopy 0.14.0. `analyze_hierarchy_hyperbolic.py` now emits
+`analysis_results.json`; raw files under `artifacts/tags/<tag>/regen_analysis_20260721/`.
+- **eukaryota 877k** reproduces prior bit-for-bit: +0.978; 3.12/5.09/7.13/8.23×.
+- **metazoa 498k** reproduces seeded values: +0.984; 2.58/3.85/6.68/10.30×.
+- **cellular 1.1M** drifts slightly: depth-norm +0.954→**+0.952**; family 7.69→**7.65×** (phylum/class/order
+  3.68/5.98/7.12). Drift is **prokaryote-specific** (eukaryote-only scales reproduce exactly), a benign
+  taxopy/taxdump rank-assignment difference — no verdict change (every rank still EXCELLENT). These are now
+  the canonical, traceable values; the manuscript (commit 18df2fd0) uses them.
+- kNN purity (family 0.907 / lift 317× / chance 0.00286) and cophenetic (0.545, CI 0.535–0.555; distortion
+  1.14, max 37) already had raw JSON and re-verified unchanged.
+
 ## ✅ STATUS (2026-06-03): METAZOA SCALE SOLVED — EXCELLENT achieved at 498k
 
 **Experiment 1 (`metazoa_lower_lr_bigger_batch`, job 5664609) cleared the EXCELLENT bar at full

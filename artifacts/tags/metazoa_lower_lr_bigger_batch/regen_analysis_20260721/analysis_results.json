@@ -1,0 +1,39 @@
+{
+  "checkpoint": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch.pth",
+  "mapping": "/data/taxonomy_edges_metazoa_33208_clean.mapping.tsv",
+  "data_dir": "/tmp/taxdump_work",
+  "n_embedded": 498246,
+  "n_taxonomy_nodes": 498246,
+  "seed": 0,
+  "repeats": 5,
+  "ranks": [
+    "phylum",
+    "class",
+    "order",
+    "family"
+  ],
+  "depth_norm_pearson": 0.9840415373980967,
+  "depth_norm_spearman": 0.9980549295084538,
+  "separation": {
+    "phylum": {
+      "separation": 2.584968885634938,
+      "sep_std": 0.00620070939635665,
+      "quality": "EXCELLENT"
+    },
+    "class": {
+      "separation": 3.846982131921211,
+      "sep_std": 0.011731373004548898,
+      "quality": "EXCELLENT"
+    },
+    "order": {
+      "separation": 6.676378378402274,
+      "sep_std": 0.015605842362144429,
+      "quality": "EXCELLENT"
+    },
+    "family": {
+      "separation": 10.30219359561174,
+      "sep_std": 0.012542955166763022,
+      "quality": "EXCELLENT"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "checkpoint": "/app/artifacts/tags/eukaryota_canonical/eukaryota_canonical.pth",
+  "mapping": "/data/taxonomy_edges_eukaryota_2759_clean.mapping.tsv",
+  "data_dir": "/tmp/taxdump_work",
+  "n_embedded": 877584,
+  "n_taxonomy_nodes": 877584,
+  "seed": 0,
+  "repeats": 5,
+  "ranks": [
+    "phylum",
+    "class",
+    "order",
+    "family"
+  ],
+  "depth_norm_pearson": 0.9777620565245455,
+  "depth_norm_spearman": 0.9990420591160938,
+  "separation": {
+    "phylum": {
+      "separation": 3.118172186068989,
+      "sep_std": 0.020020802691942802,
+      "quality": "EXCELLENT"
+    },
+    "class": {
+      "separation": 5.088766262180791,
+      "sep_std": 0.011468566020478735,
+      "quality": "EXCELLENT"
+    },
+    "order": {
+      "separation": 7.133069250705963,
+      "sep_std": 0.021100342791524628,
+      "quality": "EXCELLENT"
+    },
+    "family": {
+      "separation": 8.228605352399839,
+      "sep_std": 0.005408625307813154,
+      "quality": "EXCELLENT"
+    }
+  }
+}

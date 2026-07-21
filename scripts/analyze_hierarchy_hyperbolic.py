@@ -496,6 +496,36 @@ def main():
         # NB: keep "<Rank>   <sep>x" leading shape — _sweep_diagnostic_analyses.py parses it.
         print(f"{rank.capitalize():<12} {res['separation']:>11.2f}x{suffix} {res['quality']:>15}")
 
+    # Persist a machine-readable RAW artifact of the headline numbers (separation + depth-norm).
+    # Historically this script only printed to stdout and saved PNGs, so the manuscript's headline
+    # values (e.g. depth-norm +0.954, family separation 7.69x) had no on-disk numeric backing file.
+    def _finite(x):
+        return None if (x is None or x != x) else float(x)  # NaN -> null (json.dumps NaN is invalid)
+
+    summary = {
+        "checkpoint": str(checkpoint),
+        "mapping": str(mapping),
+        "data_dir": str(args.data_dir),
+        "n_embedded": int(emb.shape[0]),
+        "n_taxonomy_nodes": int(len(taxonomy)),
+        "seed": int(args.seed),
+        "repeats": int(args.repeats),
+        "ranks": list(args.ranks),
+        "depth_norm_pearson": _finite(pearson_r),
+        "depth_norm_spearman": _finite(spearman_r),
+        "separation": {
+            rank: {
+                "separation": _finite(res.get("separation")),
+                "sep_std": _finite(res.get("sep_std", 0.0)) or 0.0,
+                "quality": res.get("quality"),
+            }
+            for rank, res in results.items()
+        },
+    }
+    json_out = output_dir / "analysis_results.json"
+    json_out.write_text(json.dumps(summary, indent=2))
+    print(f"Saved raw metrics: {json_out}")
+
     print(f"\nPlots saved to: {output_dir}")
 
 
