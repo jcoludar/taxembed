@@ -1,0 +1,567 @@
+{
+  "class_rank_acc": 0.6323152056948929,
+  "n_scored": 12081,
+  "depth_null": {
+    "class_rank_acc": 0.00024832381425378696
+  },
+  "matched_candidate_set": {
+    "matched_chance_acc": 0.4154748743994208,
+    "n_classes": 36
+  },
+  "leave_clade_out": {
+    "weighted_class_acc": 0.0,
+    "fold_weights": [
+      0.054442471891115056,
+      0.047679431904641134,
+      0.002874291994251416,
+      0.014455997971088003,
+      0.003719671992560656,
+      0.028911995942176007,
+      0.002620677994758644,
+      0.05604869388790261,
+      0.003212443993575112,
+      0.0887648998224702,
+      0.05461154789077691,
+      0.6426578747146843
+    ],
+    "per_fold_family_overlap": [
+      1.0,
+      0.9591836734693877,
+      0.32653061224489793,
+      0.20408163265306123,
+      0.1836734693877551,
+      0.8979591836734694,
+      0.24489795918367346,
+      0.9591836734693877,
+      0.14285714285714285,
+      0.9387755102040817,
+      0.24489795918367346,
+      1.0
+    ],
+    "min_fold_n": 30,
+    "folds": [
+      {
+        "held_clade": "Actinopteri",
+        "n_held": 644,
+        "class_acc": 0.0,
+        "family_overlap": 1.0,
+        "family_balanced_n": 509,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Amphibia",
+        "n_held": 564,
+        "class_acc": 0.0,
+        "family_overlap": 0.9591836734693877,
+        "family_balanced_n": 399,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Anthozoa",
+        "n_held": 34,
+        "class_acc": 0.0,
+        "family_overlap": 0.32653061224489793,
+        "family_balanced_n": 11,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Arachnida",
+        "n_held": 171,
+        "class_acc": 0.0,
+        "family_overlap": 0.20408163265306123,
+        "family_balanced_n": 34,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Ascidiacea",
+        "n_held": 44,
+        "class_acc": 0.0,
+        "family_overlap": 0.1836734693877551,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Asteroidea",
+        "n_held": 18,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 4,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Aves",
+        "n_held": 342,
+        "class_acc": 0.0,
+        "family_overlap": 0.8979591836734694,
+        "family_balanced_n": 257,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Bivalvia",
+        "n_held": 28,
+        "class_acc": 0.0,
+        "family_overlap": 0.16326530612244897,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Branchiopoda",
+        "n_held": 15,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 4,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Cephalopoda",
+        "n_held": 14,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Cestoda",
+        "n_held": 13,
+        "class_acc": 0.0,
+        "family_overlap": 0.061224489795918366,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Chilopoda",
+        "n_held": 4,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Chondrichthyes",
+        "n_held": 31,
+        "class_acc": 0.0,
+        "family_overlap": 0.24489795918367346,
+        "family_balanced_n": 12,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Chromadorea",
+        "n_held": 663,
+        "class_acc": 0.0,
+        "family_overlap": 0.9591836734693877,
+        "family_balanced_n": 458,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Cladistia",
+        "n_held": 6,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Clitellata",
+        "n_held": 12,
+        "class_acc": 0.0,
+        "family_overlap": 0.10204081632653061,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Collembola",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Copepoda",
+        "n_held": 3,
+        "class_acc": 0.0,
+        "family_overlap": 0.061224489795918366,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Demospongiae",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Echinoidea",
+        "n_held": 38,
+        "class_acc": 0.0,
+        "family_overlap": 0.14285714285714285,
+        "family_balanced_n": 5,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Enteropneusta",
+        "n_held": 3,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Eutardigrada",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Gastropoda",
+        "n_held": 28,
+        "class_acc": 0.0,
+        "family_overlap": 0.22448979591836735,
+        "family_balanced_n": 9,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Holothuroidea",
+        "n_held": 1,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Hydrozoa",
+        "n_held": 7,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Hyperoartia",
+        "n_held": 10,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Insecta",
+        "n_held": 1050,
+        "class_acc": 0.0,
+        "family_overlap": 0.9387755102040817,
+        "family_balanced_n": 779,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Lepidosauria",
+        "n_held": 646,
+        "class_acc": 0.0,
+        "family_overlap": 0.24489795918367346,
+        "family_balanced_n": 121,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Leptocardii",
+        "n_held": 24,
+        "class_acc": 0.0,
+        "family_overlap": 0.14285714285714285,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Malacostraca",
+        "n_held": 16,
+        "class_acc": 0.0,
+        "family_overlap": 0.16326530612244897,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Mammalia",
+        "n_held": 7602,
+        "class_acc": 0.0,
+        "family_overlap": 1.0,
+        "family_balanced_n": 5876,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Merostomata",
+        "n_held": 6,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Myxini",
+        "n_held": 7,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Scyphozoa",
+        "n_held": 1,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Trematoda",
+        "n_held": 26,
+        "class_acc": 0.0,
+        "family_overlap": 0.2857142857142857,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Uniplacotomia",
+        "n_held": 4,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      }
+    ],
+    "dropped_folds_below_min_n": [
+      {
+        "held_clade": "Asteroidea",
+        "n_held": 18,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 4,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Bivalvia",
+        "n_held": 28,
+        "class_acc": 0.0,
+        "family_overlap": 0.16326530612244897,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Branchiopoda",
+        "n_held": 15,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 4,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Cephalopoda",
+        "n_held": 14,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Cestoda",
+        "n_held": 13,
+        "class_acc": 0.0,
+        "family_overlap": 0.061224489795918366,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Chilopoda",
+        "n_held": 4,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Cladistia",
+        "n_held": 6,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Clitellata",
+        "n_held": 12,
+        "class_acc": 0.0,
+        "family_overlap": 0.10204081632653061,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Collembola",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Copepoda",
+        "n_held": 3,
+        "class_acc": 0.0,
+        "family_overlap": 0.061224489795918366,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Demospongiae",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Enteropneusta",
+        "n_held": 3,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Eutardigrada",
+        "n_held": 2,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Gastropoda",
+        "n_held": 28,
+        "class_acc": 0.0,
+        "family_overlap": 0.22448979591836735,
+        "family_balanced_n": 9,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Holothuroidea",
+        "n_held": 1,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Hydrozoa",
+        "n_held": 7,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Hyperoartia",
+        "n_held": 10,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Leptocardii",
+        "n_held": 24,
+        "class_acc": 0.0,
+        "family_overlap": 0.14285714285714285,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Malacostraca",
+        "n_held": 16,
+        "class_acc": 0.0,
+        "family_overlap": 0.16326530612244897,
+        "family_balanced_n": 2,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Merostomata",
+        "n_held": 6,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Myxini",
+        "n_held": 7,
+        "class_acc": 0.0,
+        "family_overlap": 0.04081632653061224,
+        "family_balanced_n": 1,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Scyphozoa",
+        "n_held": 1,
+        "class_acc": 0.0,
+        "family_overlap": 0.02040816326530612,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      },
+      {
+        "held_clade": "Trematoda",
+        "n_held": 26,
+        "class_acc": 0.0,
+        "family_overlap": 0.2857142857142857,
+        "family_balanced_n": 6,
+        "family_balanced_class_acc": 0.0
+      },
+      {
+        "held_clade": "Uniplacotomia",
+        "n_held": 4,
+        "class_acc": 0.0,
+        "family_overlap": 0.08163265306122448,
+        "family_balanced_n": 0,
+        "family_balanced_class_acc": NaN
+      }
+    ],
+    "family_balanced": {
+      "informative": false,
+      "verdict": "uninformative",
+      "weighted_class_acc": 0.0,
+      "per_fold_n": [
+        509,
+        399,
+        11,
+        34,
+        6,
+        257,
+        12,
+        458,
+        5,
+        779,
+        121,
+        5876
+      ],
+      "ci_half_width": 0.0,
+      "zero_variance": true,
+      "claimed_effect": 0.05,
+      "power_floor_n": 30,
+      "note": "underpowered post-balance (n < floor or CI half-width >= claimed effect) -> reported UNINFORMATIVE, not a pass"
+    }
+  },
+  "leave_species_and_clade": {
+    "rawknn_loso_class_acc": 0.8265872030461054,
+    "rawknn_loso_n": 12081,
+    "rawknn_species_and_clade_class_acc": 0.0,
+    "rawknn_joint_n": 12081,
+    "leak_drop": 0.8265872030461054
+  },
+  "meta": {
+    "n_proteins": 12081,
+    "n_species": 1221,
+    "n_clades": 36,
+    "pca_dim": 64,
+    "min_fold_n": 30,
+    "seed": 0
+  },
+  "runtime_sec": 1365.0
+}

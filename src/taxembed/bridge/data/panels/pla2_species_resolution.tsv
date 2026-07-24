@@ -1,0 +1,86 @@
+species	taxid	idx	via
+Ailuropoda melanoleuca	9646	3114	direct
+Ailurus fulgens styani	424585	107111	alias
+Alligator mississippiensis	8496	2084	direct
+Alligator sinensis	38654	7809	direct
+Anas platyrhynchos platyrhynchos	8840	2398	direct
+Anser cygnoides	8845	2403	direct
+Aptenodytes forsteri	9233	2760	direct
+Apteryx australis mantelli	2696672	398652	alias
+Aquila chrysaetos canadensis	216574	58422	direct
+Balearica regulorum gibbericeps	100784	26846	direct
+Bison bison bison	43346	9189	direct
+Boa constrictor constrictor	499168	124051	direct
+Bos taurus	9913	3355	direct
+Canis lupus familiaris	9615	3088	direct
+Capra hircus	9925	3363	direct
+Chelonia mydas	8469	2061	direct
+Chinchilla lanigera	34839	6512	direct
+Chlamydotis macqueenii	187382	50053	direct
+Chrysemys picta bellii	8478	2070	direct
+Condylura cristata	143302	38489	direct
+Corvus cornix cornix	932674	202083	direct
+Crocodylus porosus	8502	2089	direct
+Crotalus adamanteus	8729	2294	direct
+Crotalus atrox	8730	2295	direct
+Crotalus helleri	8741	2306	direct
+Crotalus horridus	35024	6654	direct
+Crotalus scutulatus	8737	2302	direct
+Cuculus canorus	55661	13310	direct
+Dasypus novemcinctus	9361	2868	direct
+Deinakgistrodon acutus	36307	7031	alias
+Elephantulus edwardii	28737	4511	direct
+Enhydra lutris kenyoni	391180	100837	direct
+Equus caballus	9796	3254	direct
+Erinaceus europaeus	9365	2872	direct
+Felis catus	9685	3151	direct
+Gallus gallus	9031	2577	direct
+Gavialis gangeticus	94835	25198	direct
+Gopherus agassizii	38772	7851	direct
+Haliaeetus leucocephalus	52644	12333	direct
+Heterocephalus glaber	10181	3574	direct
+Homo sapiens	9606	3081	direct
+Lacerta bilineata	95620	25639	direct
+Lacerta viridis	65476	17332	direct
+Loxodonta africana	9785	3244	direct
+Marmota marmota marmota	9994	3420	direct
+Microcebus murinus	30608	5278	direct
+Monodelphis domestica	13616	3838	direct
+Mus musculus	10090	3498	direct
+Mustela putorius furo	9669	3137	direct
+Myotis lucifugus	59463	15000	direct
+Nannopterum auritus	56069	13533	alias
+Neomonachus schauinslandi	29088	4667	direct
+Notechis scutatus	8663	2230	direct
+Ochotona princeps	9978	3405	direct
+Odocoileus virginianus texanus	9880	3328	direct
+Ophiophagus hannah	8665	2232	direct
+Ophisaurus gracilis	182351	48621	alias
+Opisthocomus hoazin	30419	5153	direct
+Orcinus orca	9733	3195	direct
+Ornithorhynchus anatinus	9258	2782	direct
+Oryctolagus cuniculus	9986	3412	direct
+Ovis aries	9940	3375	direct
+Panthera tigris altaica	74533	19746	direct
+Pantholops hodgsonii	59538	15050	direct
+Paroedura picta	143630	38695	direct
+Patagioenas fasciata monilis	372326	96747	direct
+Pelodiscus sinensis	13735	3881	direct
+Phascolarctos cinereus	38626	7798	direct
+Pogona vitticeps	103695	27559	direct
+Protobothrops flavoviridis	88087	23363	direct
+Protobothrops mucrosquamatus	103944	27629	direct
+Pseudonaja textilis	8673	2240	direct
+Psittacula krameri	9228	2755	direct
+Pteropus vampyrus	132908	36207	direct
+Pygoscelis adeliae	9238	2765	direct
+Python bivittatus	176946	46864	direct
+Sarcophilus harrisii	9305	2822	direct
+Setophaga coronata coronata	1037456	211343	direct
+Sorex araneus	42254	8740	direct
+Strix occidentalis caurina	311401	81910	direct
+Trichechus manatus latirostris	127582	34987	direct
+Urile pelagicus	2723871	402907	alias
+Ursus maritimus	29073	4652	direct
+Vipera berus berus	31156	5530	direct
+Xenopus laevis	8355	1965	direct

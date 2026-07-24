@@ -1,0 +1,12 @@
+# Taxonomy Bridge extra dependency.
+#
+# `concept-erasure` is pulled in automatically with the package:
+#   pip install -e .
+# To install just this extra on its own:
+#   pip install "concept-erasure>=0.2.4"
+#
+# Reference versions this module was validated against (2026-06-17):
+#   numpy 1.26.4 · scipy 1.17.0 · h5py 3.15.1 · scikit-learn 1.8.0 · torch 2.11.0 ·
+#   concept_erasure 0.2.4 · pandas 2.3.3
+
+concept-erasure>=0.2.4

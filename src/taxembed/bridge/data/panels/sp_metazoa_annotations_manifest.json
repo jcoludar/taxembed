@@ -1,0 +1,7 @@
+{
+  "query": "reviewed:true AND taxonomy_id:33208",
+  "fields": "accession,organism_id,organism_name,sequence,length,xref_pfam,ec,protein_name,keyword",
+  "release": "2026_02",
+  "rows": 110691,
+  "sha256": "2d11a98bd7b06a039decf5a843bf07cc7c8374c5319d287cdf052204f62e1f45"
+}

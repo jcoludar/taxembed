@@ -1,0 +1,85 @@
+identifier	family	taxid	idx	organism	via
+P01533	Sea anemone sodium channel inhibitory toxin family	6108	61	Anemonia sulcata (Mediterranean snakelocks sea anemone)	direct
+P0C1F1	Sea anemone sodium channel inhibitory toxin family	6110	63	Anthopleura elegantissima (Green aggregating anemone) (Actinia elegantissima)	direct
+P0C5G5	Sea anemone sodium channel inhibitory toxin family	3122430	470839	Radianthus crispa (Leathery sea anemone) (Heteractis crispa)	direct
+P10453	Sea anemone sodium channel inhibitory toxin family	6111	64	Anthopleura fuscoviridis (Rainbow bottom anemone)	direct
+P0C1F5	Sea anemone sodium channel inhibitory toxin family	31164	5537	Bunodosoma granuliferum (Red warty sea anemone)	direct
+P30831	Sea anemone sodium channel inhibitory toxin family	3122430	470839	Radianthus crispa (Leathery sea anemone) (Heteractis crispa)	direct
+P0C5G3	Sea anemone sodium channel inhibitory toxin family	6112	65	Anthopleura xanthogrammica (Giant green sea anemone) (Actinia xanthogrammica)	direct
+P81383	Flavin monoamine oxidase family	8665	2232	Ophiophagus hannah (King cobra) (Naja hannah)	direct
+A0A2U8QPE6	Flavin monoamine oxidase family	430902	108187	Micrurus mipartitus (Red-tailed coral snake)	direct
+B5U6Y8	Flavin monoamine oxidase family	99586	26491	Echis ocellatus (Ocellated saw-scaled viper)	direct
+P0CC17	Flavin monoamine oxidase family	8725	2290	Bothrops atrox (Barba amarilla) (Fer-de-lance)	direct
+X2JCV5	Flavin monoamine oxidase family	8697	2263	Cerastes cerastes (Horned desert viper)	direct
+Q4JHE3	Flavin monoamine oxidase family	8667	2234	Oxyuranus scutellatus scutellatus (Australian taipan) (Coastal taipan)	direct
+A8QL51	Flavin monoamine oxidase family	8616	2189	Bungarus multicinctus (Many-banded krait)	direct
+J3S3U6	Snaclec family	8729	2294	Crotalus adamanteus (Eastern diamondback rattlesnake)	direct
+Q9I840	Snaclec family	8717	2282	Calloselasma rhodostoma (Malayan pit viper) (Agkistrodon rhodostoma)	direct
+Q4PRD0	Snaclec family	343250	90262	Daboia siamensis (Eastern Russel's viper) (Daboia russelii siamensis)	direct
+B0VXV2	Snaclec family	8762	2325	Sistrurus catenatus edwardsii (Desert massasauga) (Crotalophorus edwardsii)	direct
+Q4PRD2	Snaclec family	343250	90262	Daboia siamensis (Eastern Russel's viper) (Daboia russelii siamensis)	direct
+J3SBP0	Snaclec family	8729	2294	Crotalus adamanteus (Eastern diamondback rattlesnake)	direct
+Q9YGG9	Snaclec family	242054	65207	Gloydius blomhoffii (Mamushi) (Agkistrodon halys blomhoffi)	direct
+Q962V9	CRISP family	29170	4744	Ancylostoma caninum (Dog hookworm)	direct
+Q8AVA3	CRISP family	8671	2238	Pseudechis porphyriacus (Red-bellied black snake)	direct
+Q8JI38	CRISP family	8631	2203	Laticauda semifasciata (Black-banded sea krait) (Pseudolaticauda semifasciata)	direct
+B0VXV6	CRISP family	8762	2325	Sistrurus catenatus edwardsii (Desert massasauga) (Crotalophorus edwardsii)	direct
+Q7T1K6	CRISP family	8656	2223	Naja atra (Chinese cobra)	direct
+Q2XXP1	CRISP family	8559	2140	Varanus varius (Lace monitor lizard) (Lacerta varia)	direct
+C8YJG4	CRISP family	485572	121032	Tabanus yao (Horsefly)	direct
+C0K3N2	PDGF/VEGF growth factor family	8716	2281	Agkistrodon piscivorus piscivorus (Eastern cottonmouth)	direct
+P0DW98	PDGF/VEGF growth factor family	242841	65374	Protobothrops jerdonii (Jerdon's pitviper) (Trimeresurus jerdonii)	direct
+Q330K6	PDGF/VEGF growth factor family	103944	27629	Protobothrops mucrosquamatus (Taiwan habu) (Trimeresurus mucrosquamatus)	direct
+C0K3N3	PDGF/VEGF growth factor family	8730	2295	Crotalus atrox (Western diamondback rattlesnake)	direct
+Q90X24	PDGF/VEGF growth factor family	8723	2288	Bothrops insularis (Golden lancehead) (Lachesis insularis)	direct
+X5ICI2	PDGF/VEGF growth factor family	1170829	229403	Gloydius tsushimaensis (Tsushima Island pitviper) (Agkistrodon tsushimaensis)	direct
+C0K3N1	PDGF/VEGF growth factor family	8692	2258	Bitis arietans (African puff adder)	direct
+Q27049	Calycin superfamily	30077	4852	Meccus pallidipennis (Triatomine bug) (Triatoma pallidipennis)	direct
+Q04669	Calycin superfamily	6938	793	Ornithodoros moubata (Soft tick) (Argasid tick)	direct
+G3CJS0	Calycin superfamily	72496	19185	Dipetalogaster maximus (Blood-sucking bug)	direct
+Q27042	Calycin superfamily	30077	4852	Meccus pallidipennis (Triatomine bug) (Triatoma pallidipennis)	direct
+Q94733	Calycin superfamily	13249	3753	Rhodnius prolixus (Triatomid bug)	direct
+Q6PQK2	Calycin superfamily	13249	3753	Rhodnius prolixus (Triatomid bug)	direct
+A7BJ46	Calycin superfamily	30076	4851	Triatoma infestans (Assassin bug)	direct
+P68725	Long (4 C-C) scorpion toxin superfamily	2899558	438340	Leiurus hebraeus (Hebrew deathstalker scorpion) (Leiurus quinquestriatus hebraeus)	direct
+A0A7S8RFI7	Long (4 C-C) scorpion toxin superfamily	6887	750	Tityus serrulatus (Brazilian yellow scorpion)	direct
+Q1I163	Long (4 C-C) scorpion toxin superfamily	57059	13923	Tityus discrepans (Venezuelan scorpion)	direct
+Q86BW9	Long (4 C-C) scorpion toxin superfamily	34649	6342	Olivierus martensii (Manchurian scorpion) (Mesobuthus martensii)	direct
+P0C5K8	Long (4 C-C) scorpion toxin superfamily	50343	11328	Tityus bahiensis (Brazilian scorpion)	direct
+H1ZZI3	Long (4 C-C) scorpion toxin superfamily	1221240	235534	Tityus obscurus (Amazonian scorpion) (Tityus cambridgei)	direct
+Q17254	Long (4 C-C) scorpion toxin superfamily	6871	736	Buthus occitanus tunetanus (Common European scorpion) (Buthus tunetanus)	direct
+P0C1R1	MCD family	91438	24172	Protonectarina sylveirae (Brazilian wasp)	direct
+P17235	MCD family	7452	1221	Vespula lewisii (Korean yellow-jacket wasp) (Vespula flaviceps lewisii)	direct
+P0CJ39	MCD family	1035771	211193	Eumenes fraterculus (Solitary wasp)	direct
+P0C5G7	MCD family	202807	54070	Vespa magnifica (Hornet)	direct
+P0DX46	MCD family	2724002	402964	Agelaia vicina (Wasp)	direct
+P07496	MCD family	28643	4418	Bombus pensylvanicus (American bumblebee) (Apis pensylvanica)	direct
+P0CD69	MCD family	30192	4960	Bombus lapidarius (Red-tailed bumblebee) (Apis lapidaria)	direct
+A0A3S9V8L7	Insulin family	376876	97670	Conus kinoshitai (Kinoshita's cone)	direct
+A0A0B5AC95	Insulin family	6491	398	Conus geographus (Geography cone) (Nubecula geographus)	direct
+A0A0B5ABD5	Insulin family	6495	402	Conus tulipa (Fish-hunting cone snail) (Tulip cone)	direct
+A0A0F7YYV0	Insulin family	319920	84234	Conus victoriae (Queen Victoria cone)	direct
+A0A0B5A8P8	Insulin family	35631	6759	Conus imperialis (Imperial cone)	direct
+A0A0B5ADT3	Insulin family	6491	398	Conus geographus (Geography cone) (Nubecula geographus)	direct
+A0A0B5A7M7	Insulin family	35631	6759	Conus imperialis (Imperial cone)	direct
+P0C6E2	Disintegrin family	1170828	229402	Daboia palaestinae (Palestine viper) (Vipera palaestinae)	direct
+P0C6B4	Disintegrin family	40353	8328	Echis carinatus (Saw-scaled viper)	direct
+P83254	Disintegrin family	3148341	474003	Macrovipera lebetinus (Levantine viper) (Vipera lebetina)	direct
+P83658	Disintegrin family	40353	8328	Echis carinatus (Saw-scaled viper)	direct
+P83044	Disintegrin family	8697	2263	Cerastes cerastes (Horned desert viper)	direct
+P0C6A3	Disintegrin family	93050	24785	Echis multisquamatus (Central Asian sand viper)	direct
+P0C6B0	Disintegrin family	209528	56073	Macrovipera lebetina obtusa (Levant blunt-nosed viper) (Vipera lebetina obtusa)	direct
+G0W2H8	Sea anemone type 3 (BDS) potassium channel toxin family	31164	5537	Bunodosoma granuliferum (Red warty sea anemone)	direct
+G0W2I0	Sea anemone type 3 (BDS) potassium channel toxin family	31164	5537	Bunodosoma granuliferum (Red warty sea anemone)	direct
+C0HLS4	Sea anemone type 3 (BDS) potassium channel toxin family	38281	7735	Heteractis magnifica (Magnificent sea anemone) (Radianthus magnifica)	direct
+P0DMX9	Sea anemone type 3 (BDS) potassium channel toxin family	51769	11901	Anemonia viridis (Snakelocks anemone)	direct
+P0DMY8	Sea anemone type 3 (BDS) potassium channel toxin family	51769	11901	Anemonia viridis (Snakelocks anemone)	direct
+A0A1X9QHL1	Sea anemone type 3 (BDS) potassium channel toxin family	45621	9936	Urticina crassicornis (Mottled anemone) (Tealia crassicornis)	direct
+P69930	Sea anemone type 3 (BDS) potassium channel toxin family	280228	73883	Antheopsis maculata (Sea anemone)	direct
+A0A8B6XWY5	Actinoporin family	6087	40	Hydra vulgaris (Hydra) (Hydra attenuata)	direct
+P0DQV7	Actinoporin family	6087	40	Hydra vulgaris (Hydra) (Hydra attenuata)	direct
+A0A345GPN1	Actinoporin family	160219	42464	Anthopleura nigrescens (Sea anemone) (Tealiopsis nigrescens)	direct
+Q9Y1U9	Actinoporin family	6106	59	Actinia equina (Beadlet anemone)	direct
+A0A2Z5Z9X0	Actinoporin family	1799150	315114	Cribrinopsis japonica (Deep-sea anemone)	direct
+D2YZQ3	Actinoporin family	227975	61496	Actineria villosa (Okinawan sea anemone)	direct
+P0DQV6	Actinoporin family	6087	40	Hydra vulgaris (Hydra) (Hydra attenuata)	direct

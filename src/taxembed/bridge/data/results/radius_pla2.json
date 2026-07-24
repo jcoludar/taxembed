@@ -1,0 +1,83 @@
+{
+  "exploratory": true,
+  "meta": {
+    "n_proteins": 452,
+    "n_species": 85,
+    "alpha": 0.01,
+    "pca_dim": 64,
+    "seed": 0,
+    "n_bins": 5,
+    "coarse_rank": "class",
+    "fallback_rank": "order",
+    "coarse_rank_note": "Class rank used for all species that have an NCBI 'class' node. 8 species (4 Crocodiles + 4 Turtles) lack a class node (Sauropsida clade); these fall back to 'order' rank. Identical handling to read_eval.py.",
+    "depth_range": [
+      19,
+      32
+    ],
+    "radius_range": [
+      0.7915657089664614,
+      0.9253690531362857
+    ]
+  },
+  "spearman": {
+    "rho": 0.6678463254231745,
+    "p_value": 1.085492279136157e-59,
+    "n": 452,
+    "significant_p05": true,
+    "interpretation": "rho=0.6678 (p=1.0855e-59): positive and significant \u2014 deeper taxa produce larger placed norm"
+  },
+  "reliability_curve": {
+    "bins": [
+      {
+        "bin": 0,
+        "radius_min": 0.7915657089664614,
+        "radius_max": 0.8407122989537317,
+        "radius_mean": 0.8313934022497695,
+        "n_proteins": 91,
+        "n_scored": 91,
+        "coarse_rank_acc": 0.8571428571428571
+      },
+      {
+        "bin": 1,
+        "radius_min": 0.8408658812736304,
+        "radius_max": 0.848751284141447,
+        "radius_mean": 0.8449550251861276,
+        "n_proteins": 90,
+        "n_scored": 90,
+        "coarse_rank_acc": 0.8888888888888888
+      },
+      {
+        "bin": 2,
+        "radius_min": 0.8489715098499211,
+        "radius_max": 0.8575873268402573,
+        "radius_mean": 0.8525350719111018,
+        "n_proteins": 90,
+        "n_scored": 90,
+        "coarse_rank_acc": 0.8111111111111111
+      },
+      {
+        "bin": 3,
+        "radius_min": 0.8576333012471583,
+        "radius_max": 0.8751512294154613,
+        "radius_mean": 0.866834619596295,
+        "n_proteins": 90,
+        "n_scored": 90,
+        "coarse_rank_acc": 0.8666666666666667
+      },
+      {
+        "bin": 4,
+        "radius_min": 0.8753044531786635,
+        "radius_max": 0.9253690531362857,
+        "radius_mean": 0.8881924592240255,
+        "n_proteins": 91,
+        "n_scored": 91,
+        "coarse_rank_acc": 0.8571428571428571
+      }
+    ],
+    "monotone_ish": false,
+    "direction": "flat"
+  },
+  "verdict": "cut",
+  "verdict_rationale": "cut: condition not met \u2014 rho not positive/significant OR reliability not monotone-ish increasing. The radius-as-confidence claim is dropped; this is a clean null result.",
+  "runtime_sec": 51.4
+}

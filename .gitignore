@@ -59,3 +59,17 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+# taxembed.bridge ships small packaged panels + example results. Override the global `data/` and
+# `*.png` ignores above so these (and only these) can be committed with the package. Large/gitignored
+# artifacts stay out via the nested data/panels/taxdump/.gitignore (*.dmp) and are never copied here.
+!src/taxembed/bridge/data/
+!src/taxembed/bridge/data/**
+!src/taxembed/bridge/data/results/figures/*.png
+# ...but still keep large/regenerable artifacts out even inside the packaged data dir (a user may
+# download the big H5s / checkpoints / taxdump here; none of the shipped files match these):
+src/taxembed/bridge/data/**/*.h5
+src/taxembed/bridge/data/**/*.pth
+src/taxembed/bridge/data/**/*.safetensors
+src/taxembed/bridge/data/**/*.dmp
+src/taxembed/bridge/data/**/sp_metazoa_annotations.tsv

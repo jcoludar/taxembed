@@ -1,0 +1,231 @@
+{
+  "meta": {
+    "testbed": "pla2_mammals",
+    "clade_filter": "Mammals",
+    "crossed_groups_computed": [
+      "C",
+      "D1",
+      "D2",
+      "D3",
+      "E",
+      "F"
+    ],
+    "n_crossed_groups_in_subset": 5,
+    "note_d3_absent": "D3 is a crossed group (3 clades) but has 0 proteins in Mammals subset",
+    "n_proteins": 146,
+    "n_species": 38,
+    "n_gene_groups": 5,
+    "n_clusters": 94,
+    "pca_dim": 48,
+    "pca_dim_formula": "min(64, 146//3) = 48",
+    "smallest_train_fold_n": 110,
+    "n_splits_used": 5,
+    "taxonomy_stratum_label": "Species",
+    "taxonomy_stratum_rationale": "Clade is constant='Mammals' in this subset; Species (38 distinct mammalian species spanning multiple orders) is the finest available taxonomy discriminator in the annotation table without additional NCBI rank lookups.",
+    "knn_k": 5,
+    "seed": 0,
+    "mmseqs_used": true,
+    "small_n_warnings": [
+      "step3: within-Species purity scored only 0 queries (many species have <6 members); interpret with caution"
+    ]
+  },
+  "leace": {
+    "erased_rank_k": 11,
+    "pca_dim": 48,
+    "clean_claim_gated_ok": true,
+    "gate_note": "k < PCA_DIM/2 \u2014 function-preservation is meaningful"
+  },
+  "step2_erasure_worked": {
+    "taxonomy_probe_label": "Species (38 mammalian species; Clade=constant='Mammals')",
+    "species_probe": {
+      "original": {
+        "linear_acc": 0.0,
+        "nonlinear_acc": 0.00684931506849315,
+        "chance": 0.03424657534246575,
+        "n_scored": 146
+      },
+      "tax_erased": {
+        "linear_acc": 0.0,
+        "nonlinear_acc": 0.0,
+        "chance": 0.03424657534246575,
+        "n_scored": 146
+      }
+    },
+    "position_probe": {
+      "original": {
+        "linear_r2": -0.07590173600873107,
+        "nonlinear_r2": -2.7711187646637945,
+        "n_scored": 146
+      },
+      "tax_erased": {
+        "linear_r2": -0.23418404608018473,
+        "nonlinear_r2": -2.5764147709447496,
+        "n_scored": 146
+      }
+    },
+    "note": "Species probe has 38 classes with n=146 total; chance=0.034 (high due to many species + small n)."
+  },
+  "step3_function_preserved": {
+    "within_species": {
+      "original": NaN,
+      "tax_erased": NaN,
+      "n_queries": 0,
+      "note": "within-Species stratum (our proxy for taxonomy here; Clade is constant)"
+    },
+    "all_crossed_group_global": {
+      "original": 0.9904109589041096,
+      "tax_erased": 0.9931506849315068,
+      "n_queries": 146,
+      "note": "global purity over all n_m rows (all are crossed-group by construction)"
+    },
+    "group_chance_purity": 0.2513604803903171,
+    "crossed_groups_present_in_subset": [
+      "C",
+      "D1",
+      "D2",
+      "E",
+      "F"
+    ]
+  },
+  "step4_specificity": {
+    "leace_erased_energy": 0.007997474480254828,
+    "control_erased_energy": 0.019183930289572958,
+    "energy_ratio_control_over_leace": 2.398748547049029,
+    "energy_match_ok_half_to_2x": false,
+    "control_erased_rank": 1,
+    "taxonomy_under_control": {
+      "species_probe": {
+        "linear_acc": 0.0,
+        "nonlinear_acc": 0.00684931506849315,
+        "chance": 0.03424657534246575,
+        "n_scored": 146
+      },
+      "position_probe": {
+        "linear_r2": -0.06918522215555756,
+        "nonlinear_r2": -2.5747704363993136,
+        "n_scored": 146
+      }
+    }
+  },
+  "step5_reverse_symmetry": {
+    "function_erased_rank": 4,
+    "taxonomy_under_function_erasure": {
+      "species_probe": {
+        "linear_acc": 0.0,
+        "nonlinear_acc": 0.04794520547945205,
+        "chance": 0.03424657534246575,
+        "n_scored": 146
+      },
+      "position_probe": {
+        "linear_r2": 0.04362892902533044,
+        "nonlinear_r2": -1.8906608444939592,
+        "n_scored": 146
+      }
+    },
+    "function_under_function_erasure": {
+      "within_species": NaN,
+      "global_crossed_subset": 0.6232876712328768
+    },
+    "note": "Within one family restricted to one clade, Gene Group \u2248 paralog lineage \u2248 species-group, so strong entanglement is expected."
+  },
+  "step6_depth_null_clean": {
+    "primary_depth_magnitude": {
+      "erased_rank": 1,
+      "taxonomy_after_depth_erasure": {
+        "species_probe": {
+          "linear_acc": 0.0,
+          "nonlinear_acc": 0.0,
+          "chance": 0.03424657534246575,
+          "n_scored": 146
+        },
+        "position_probe": {
+          "linear_r2": -0.15621461002229298,
+          "nonlinear_r2": -2.7498810528901916,
+          "n_scored": 146
+        }
+      },
+      "species_acc_collapse": 0.0
+    },
+    "real_leace_species_acc_collapse": 0.0,
+    "depth_attributable_fraction": NaN,
+    "literal_random_direction_null": {
+      "erased_rank": 48,
+      "species_acc_collapse": 0.0,
+      "degenerate_full_rank": true
+    }
+  },
+  "step7_identity_strata": {
+    "binning": "cluster size (mmseqs 0.9): singleton vs multi-member",
+    "strata": {
+      "singleton_low_identity": {
+        "n_rows": 74,
+        "function_purity_within_clade": {
+          "original": NaN,
+          "tax_erased": NaN
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.0,
+          "tax_erased": 0.0
+        }
+      },
+      "multi_member_high_identity": {
+        "n_rows": 72,
+        "function_purity_within_clade": {
+          "original": NaN,
+          "tax_erased": NaN
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.027777777777777776,
+          "tax_erased": 0.013888888888888888
+        }
+      }
+    }
+  },
+  "disentanglement_matrix": {
+    "leace_erased_rank_k": 11,
+    "taxonomy_probe_label": "Species_acc (within-Mammals; Clade is constant)",
+    "taxonomy_recoverability_species_acc": {
+      "original": 0.0,
+      "tax_erased": 0.0,
+      "function_erased": 0.0,
+      "matched_control": 0.0
+    },
+    "function_recoverability_within_species_purity": {
+      "original": null,
+      "tax_erased": null,
+      "function_erased": null,
+      "matched_control": null
+    },
+    "function_recoverability_global_purity": {
+      "original": 0.9904,
+      "tax_erased": 0.9932,
+      "function_erased": 0.6233,
+      "matched_control": 0.9904
+    },
+    "function_note": "within_species_purity is NaN where most species have <k+1=6 proteins (38 species / 146 proteins => ~4/species mean); use global_purity as the viable signal, noting it does NOT control for taxonomy (within-species gene group is trivially correlated). Coherence + step3 global figures are the primary read-outs for this subset."
+  },
+  "coherence": {
+    "k": 11,
+    "pca_dim": 48,
+    "overlap": 0.7008613092795689,
+    "random_baseline_mean": 0.23427310589697997,
+    "random_baseline_std": 0.0214371647193256,
+    "expected_random_k_over_pca_dim": 0.22916666666666666,
+    "n_random_seeds": 20,
+    "overlap_exceeds_baseline_3sigma": true,
+    "interpretation": "READ and CLEAN target the SAME subspace (overlap >> random baseline)"
+  },
+  "entanglement_verdict": {
+    "reads_as": "UNDETERMINED_SMALL_N",
+    "reads_as_entangled": false,
+    "global_function_drop_on_taxonomy_erasure": -0.0028,
+    "taxonomy_acc_at_chance": true,
+    "within_species_purity_nan": true,
+    "expected_for_pla2_mammals": true,
+    "interpretation": "UNDETERMINED due to small-n instability: Species taxonomy probe is at chance (acc=0.0000 <= 2*chance=0.0685; 38 classes, ~29 test points), and within-Species kNN purity is NaN (most species have <6 proteins). The formal entanglement verdict cannot be rendered. Best available proxy: global kNN purity orig=0.9904 -> tax-erased=0.9932 (drop=-0.0028); this is likely ENTANGLED at the global level but does not isolate the within-species signal. Coherence overlap=high (see coherence block) confirms READ and CLEAN share the same subspace. The multi-family testbed (T15) is needed for a clean disentanglement verdict.",
+    "small_n_caveat": [
+      "step3: within-Species purity scored only 0 queries (many species have <6 members); interpret with caution"
+    ]
+  },
+  "runtime_sec": 172.2
+}

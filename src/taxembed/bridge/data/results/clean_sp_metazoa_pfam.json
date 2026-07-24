@@ -1,0 +1,348 @@
+{
+  "label_nesting": {
+    "tax_given_func": {
+      "H_tax_bits": 2.1389,
+      "H_tax_given_function_bits": 1.604,
+      "uncertainty_reduction": 0.2501,
+      "n_function_labels_mapping_to_one_tax": 3,
+      "n_function_labels": 169
+    },
+    "func_given_tax": {
+      "H_tax_bits": 6.7757,
+      "H_tax_given_function_bits": 6.2408,
+      "uncertainty_reduction": 0.0789,
+      "n_function_labels_mapping_to_one_tax": 5,
+      "n_function_labels": 43
+    }
+  },
+  "meta": {
+    "testbed": "sp_metazoa",
+    "data": "SwissProt-Metazoa ProtT5 per-protein embeddings (UniProt precomputed, mean-pooled)",
+    "n_proteins": 24653,
+    "n_function_labels": 169,
+    "n_distinct_taxids": 2135,
+    "stratum_col": "tax_class",
+    "n_stratum_classes": 43,
+    "n_tax_order_classes": 199,
+    "n_clusters": 14300,
+    "pca_dim": 64,
+    "pca_dim_formula": "min(64, 24653//3) = 64",
+    "smallest_train_fold_n": 19471,
+    "n_splits_used": 5,
+    "function_label": "func (single Pfam family / EC class from the frozen SP panel)",
+    "taxonomy_probe_label": "tax_class (NCBI rank from TaxonResolver.lineage)",
+    "taxonomy_probe_rationale": "SP species are mostly singletons; the NCBI rank `tax_class` is the probe target with enough per-class support for a held-out probe. It is DISTINCT from the Pfam/EC function label and cross-cuts it (the same function recurs across distant taxa), which is exactly the disentanglement structure under test. tax_order reported as a finer-grain sensitivity.",
+    "knn_k": 5,
+    "seed": 0,
+    "mmseqs_used": true,
+    "function_taxonomy_nesting": {
+      "tax_class": {
+        "H_tax_bits": 2.1389,
+        "H_tax_given_function_bits": 1.604,
+        "uncertainty_reduction": 0.2501,
+        "n_function_labels_mapping_to_one_tax": 3,
+        "n_function_labels": 169
+      },
+      "tax_order": {
+        "H_tax_bits": 3.966,
+        "H_tax_given_function_bits": 3.0518,
+        "uncertainty_reduction": 0.2305,
+        "n_function_labels_mapping_to_one_tax": 0,
+        "n_function_labels": 169
+      },
+      "note": "label_nesting is reported BIDIRECTIONALLY in out['label_nesting']. The Pfam/EC function axis is \u22a5 phylogeny by construction, so the FORWARD direction (erase taxonomy, keep function) is the disentanglement claim; the reverse direction is a sampling property of the panel, made visible by the func_given_tax figure."
+    },
+    "small_n_warnings": []
+  },
+  "leace": {
+    "erased_rank_k": 15,
+    "pca_dim": 64,
+    "clean_claim_gated_ok": true,
+    "gate_note": "k < PCA_DIM/2 \u2014 function-preservation is meaningful"
+  },
+  "step2_erasure_worked": {
+    "taxonomy_probe_label": "tax_class (NCBI rank)",
+    "tax_family_probe": {
+      "original": {
+        "linear_acc": 0.7371111020971078,
+        "nonlinear_acc": 0.7590962560337484,
+        "chance": 0.6447896807690747,
+        "n_scored": 24653
+      },
+      "tax_erased": {
+        "linear_acc": 0.6449519328276477,
+        "nonlinear_acc": 0.7380034884192593,
+        "chance": 0.6447896807690747,
+        "n_scored": 24653
+      }
+    },
+    "position_probe": {
+      "original": {
+        "linear_r2": 0.2898524978229232,
+        "nonlinear_r2": 0.38700031038648386,
+        "n_scored": 24653
+      },
+      "tax_erased": {
+        "linear_r2": -0.013949339880990452,
+        "nonlinear_r2": 0.23446754707180018,
+        "n_scored": 24653
+      }
+    }
+  },
+  "step3_function_preserved": {
+    "global": {
+      "original": 0.9598507281061128,
+      "tax_erased": 0.9645316999959438,
+      "n_queries": 24653,
+      "note": "global func kNN purity over all n proteins (primary function signal)"
+    },
+    "within_tax_family": {
+      "original": 0.898026796589525,
+      "tax_erased": 0.9000893219650831,
+      "n_queries": 24630,
+      "stratum_col": "tax_class",
+      "note": "within tax_class stratum (controls for taxonomy)"
+    },
+    "group_chance_purity": 0.015574270908605557
+  },
+  "stratum_grain": {
+    "order": {
+      "rank_col": "tax_order",
+      "original": 0.8041440997866405,
+      "tax_erased": 0.8072131954702116,
+      "n_queries": 24372,
+      "n_with_rank": 24577,
+      "n_null_rank": 76,
+      "n_strata": 199,
+      "frac_strata_with_min_members": 0.5729,
+      "protein_coverage_of_min_strata": 0.9917,
+      "feasible": true
+    },
+    "class": {
+      "rank_col": "tax_class",
+      "original": 0.898026796589525,
+      "tax_erased": 0.9000893219650831,
+      "n_queries": 24630,
+      "n_with_rank": 24653,
+      "n_null_rank": 0,
+      "n_strata": 43,
+      "frac_strata_with_min_members": 0.7674,
+      "protein_coverage_of_min_strata": 0.9991,
+      "feasible": true
+    }
+  },
+  "headline_stratum": "tax_order",
+  "step4_specificity": {
+    "leace_erased_energy": 0.19162114181629017,
+    "control_erased_energy": 0.2131982940000941,
+    "energy_ratio_control_over_leace": 1.112603191794412,
+    "energy_match_ok_half_to_2x": true,
+    "control_erased_rank": 7,
+    "taxonomy_under_control": {
+      "tax_family_probe": {
+        "linear_acc": 0.7303370786516854,
+        "nonlinear_acc": 0.7622601711759218,
+        "chance": 0.6447896807690747,
+        "n_scored": 24653
+      },
+      "position_probe": {
+        "linear_r2": 0.27759347842674675,
+        "nonlinear_r2": 0.3808149388255254,
+        "n_scored": 24653
+      }
+    },
+    "taxonomy_under_control_stays_recoverable": true,
+    "pass": true
+  },
+  "step5_reverse_symmetry": {
+    "function_erased_rank": 64,
+    "taxonomy_under_function_erasure": {
+      "tax_family_probe": {
+        "linear_acc": 0.6447896807690747,
+        "nonlinear_acc": 0.6447896807690747,
+        "chance": 0.6447896807690747,
+        "n_scored": 24653
+      },
+      "position_probe": {
+        "linear_r2": -0.0002142680657466478,
+        "nonlinear_r2": -0.0016264648079167277,
+        "n_scored": 24653
+      }
+    },
+    "function_under_function_erasure": {
+      "global": 0.5191092361984343,
+      "within_tax_family": 0.584531059683313
+    },
+    "note": "The Pfam/EC function axis is \u22a5 phylogeny by construction, so erasing function should NOT collapse taxonomy and erasing taxonomy should NOT collapse function \u2014 the clean (disentangled) expectation. The reverse-direction figure is reported via out['label_nesting']['func_given_tax'] (a sampling property, not entanglement)."
+  },
+  "step6_depth_null_clean": {
+    "primary_depth_magnitude": {
+      "erased_rank": 1,
+      "taxonomy_after_depth_erasure": {
+        "tax_family_probe": {
+          "linear_acc": 0.7229951730012575,
+          "nonlinear_acc": 0.7619356670587758,
+          "chance": 0.6447896807690747,
+          "n_scored": 24653
+        },
+        "position_probe": {
+          "linear_r2": 0.22416846386214295,
+          "nonlinear_r2": 0.3815984619663081,
+          "n_scored": 24653
+        }
+      },
+      "tax_family_acc_collapse": 0.014115929095850355
+    },
+    "real_leace_tax_family_acc_collapse": 0.0921591692694601,
+    "depth_attributable_fraction": 0.1531690140845065,
+    "literal_random_direction_null": {
+      "erased_rank": 18,
+      "tax_family_acc_collapse": 0.03330223502210683,
+      "degenerate_full_rank": false
+    }
+  },
+  "step7_identity_strata": {
+    "binning": "cluster size (mmseqs 0.9): singleton vs multi-member",
+    "strata": {
+      "singleton_low_identity": {
+        "n_rows": 10349,
+        "function_purity_within_clade": {
+          "original": 0.7721754284054604,
+          "tax_erased": 0.7751185981217931
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.6612233065996714,
+          "tax_erased": 0.5139627017103102
+        }
+      },
+      "multi_member_high_identity": {
+        "n_rows": 14304,
+        "function_purity_within_clade": {
+          "original": 0.9341836019621583,
+          "tax_erased": 0.9363980378416258
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.7961409395973155,
+          "tax_erased": 0.7397930648769575
+        }
+      }
+    }
+  },
+  "disentanglement_matrix": {
+    "leace_erased_rank_k": 15,
+    "taxonomy_probe_label": "tax_class_acc (NCBI rank)",
+    "stratum_col": "tax_class",
+    "function_metric_primary": "global func kNN purity",
+    "taxonomy_recoverability_tax_family_acc": {
+      "original": 0.7371,
+      "tax_erased": 0.645,
+      "function_erased": 0.6448,
+      "matched_control": 0.7303
+    },
+    "function_recoverability_global_purity": {
+      "original": 0.9599,
+      "tax_erased": 0.9645,
+      "function_erased": 0.5191,
+      "matched_control": 0.9602
+    },
+    "function_recoverability_within_tax_family_purity": {
+      "original": 0.898,
+      "tax_erased": 0.9001,
+      "function_erased": 0.5845,
+      "matched_control": 0.8987
+    }
+  },
+  "coherence": {
+    "k": 15,
+    "pca_dim": 64,
+    "overlap": 0.9870663931707505,
+    "random_baseline_mean": 0.24015433910220652,
+    "random_baseline_std": 0.01811708330366797,
+    "expected_random_k_over_pca_dim": 0.234375,
+    "n_random_seeds": 20,
+    "overlap_exceeds_baseline_3sigma": true,
+    "interpretation": "READ and CLEAN target the SAME subspace (overlap >> random baseline)"
+  },
+  "length_control": {
+    "purity_after_length_erase": 0.8991149005278115,
+    "tax_after_length_erase": {
+      "linear_acc": 0.7371516651117511,
+      "nonlinear_acc": 0.7604348355169757,
+      "chance": 0.6447896807690747,
+      "n_scored": 24653
+    },
+    "geometry_change": 0.03178783450513454,
+    "headline_survives": true,
+    "concept_dim": 1,
+    "detail": {
+      "purity_orig_within": 0.898026796589525,
+      "purity_relative_drop": -0.0012,
+      "purity_preserved": true,
+      "tax_acc_after_erase": 0.7372,
+      "tax_chance": 0.6448,
+      "tax_still_recoverable": true
+    },
+    "note": "Length is a 1-D scalar \u2014 the weakest sequence confound; a 1-D LEACE erasure on a ~PCA_DIM space is near a no-op (geometry_change makes the no-op visible). The headline must survive (spec \u00a76.2): function purity preserved AND taxonomy still recoverable."
+  },
+  "composition_control": {
+    "purity_after_comp_erase": 0.899074299634592,
+    "tax_after_comp_erase": {
+      "linear_acc": 0.710015008315418,
+      "nonlinear_acc": 0.7537419381008397,
+      "chance": 0.6447896807690747,
+      "n_scored": 24653
+    },
+    "comp_dim": 20,
+    "geometry_change": 0.18987757856422646,
+    "headline_survives": true,
+    "detail": {
+      "purity_orig_within": 0.898026796589525,
+      "purity_relative_drop": -0.0012,
+      "purity_preserved": true,
+      "tax_acc_after_erase": 0.71,
+      "tax_chance": 0.6448,
+      "tax_still_recoverable": true
+    },
+    "note": "Amino-acid composition (20-D AA fraction) is the STRONGER taxonomy proxy (clade-structured compositional drift, encoded by ProtT5). The headline must survive composition-erasure too (spec \u00a76.1 S1): function purity preserved AND taxonomy still recoverable. geometry_change reports the mean per-rep cosine shift so a no-op is visible."
+  },
+  "grain_consistent": true,
+  "disentanglement_verdict": {
+    "clean_disentangled": true,
+    "reads_cleaner_than_pla2": true,
+    "grain_consistent": true,
+    "grain_calls": {
+      "order": true,
+      "class": true
+    },
+    "headline_stratum": "tax_order",
+    "specificity_pass": true,
+    "length_control_headline_survives": true,
+    "composition_control_headline_survives": true,
+    "confound_control_gates_pass": true,
+    "primary_function_metric": "within_tax_class",
+    "taxonomy_erasable": true,
+    "function_preserved_under_taxonomy_erasure": true,
+    "taxonomy_survives_function_erasure": false,
+    "tax_family_acc_original": 0.7371,
+    "tax_family_acc_tax_erased": 0.645,
+    "tax_family_chance": 0.6448,
+    "function_within_stratum_original": 0.898,
+    "function_within_stratum_tax_erased": 0.9001,
+    "function_relative_drop_on_taxonomy_erasure_PRIMARY": -0.0023,
+    "function_relative_drop_on_taxonomy_erasure_global_SECONDARY": -0.0048,
+    "global_purity_drop_is_taxonomy_confound_not_entanglement": true,
+    "leace_clean_gate_ok": true,
+    "leace_gate_caveat": null,
+    "label_nesting_bidirectional": {
+      "tax_given_func_uncertainty_reduction": 0.2501,
+      "func_given_tax_uncertainty_reduction": 0.0789
+    },
+    "taxonomy_relative_drop_on_function_erasure": 0.1252,
+    "function_relative_drop_on_function_erasure": 0.3491,
+    "reverse_direction_note": "The Pfam/EC function axis is \u22a5 phylogeny by construction; any reverse-direction taxonomy drop under function-erasure is a SAMPLING property visible via out['label_nesting']['func_given_tax'] (uncertainty_reduction=0.0789), NOT embedding entanglement. The disentanglement CLAIM rests on the FORWARD direction (erase taxonomy, keep function).",
+    "expected_clean_contrast_to_pla2": true,
+    "interpretation": "CLEAN DISENTANGLEMENT (the expected result): taxonomy (tax_class acc 0.737->0.645, collapsing to ~chance=0.645) is ERASABLE while the Pfam/EC function clustering is PRESERVED (within_tax_class purity 0.898->0.900, rel-drop=-0.002 < 0.10). The function axis lives in a subspace separable from the taxonomy axis. NOTE the SECONDARY global purity may drop (0.960->0.965, rel-drop=-0.005); the within-stratum metric removes that taxonomy confound.",
+    "small_n_caveat": []
+  },
+  "runtime_sec": 2674.1
+}

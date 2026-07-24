@@ -1,0 +1,355 @@
+{
+  "meta": {
+    "n_proteins": 452,
+    "n_species": 85,
+    "n_clades": 6,
+    "n_clusters": 296,
+    "alpha": 0.01,
+    "alpha_grid": [
+      0.01,
+      0.1,
+      1.0,
+      10.0
+    ],
+    "pca_dim": 64,
+    "n_boot": 2000,
+    "seed": 0,
+    "ranks": [
+      "species",
+      "genus",
+      "family",
+      "order",
+      "class",
+      "phylum"
+    ],
+    "primary_rank": "class",
+    "mmseqs_used": true,
+    "class_rank_note": "8 species (4 Crocodiles + 4 Turtles, 32 proteins) lack an NCBI 'class' rank (clade Sauropsida); class-rank scored over the 77 species that have one."
+  },
+  "per_rank": {
+    "f": {
+      "species": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "genus": {
+        "mean": 0.010186023127199599,
+        "lo": 0.0009049773755656109,
+        "hi": 0.02261437908496732,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "family": {
+        "mean": 0.12564484535072773,
+        "lo": 0.06973293862999745,
+        "hi": 0.18875673101408394,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "order": {
+        "mean": 0.3143360664103698,
+        "lo": 0.2376231812563082,
+        "hi": 0.3903284370428333,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "class": {
+        "mean": 0.87369153402988,
+        "lo": 0.8220676284868015,
+        "hi": 0.9188246387071575,
+        "n_species": 77,
+        "n_scored": 420
+      },
+      "phylum": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n_species": 85,
+        "n_scored": 452
+      }
+    },
+    "raw_knn": {
+      "species": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "genus": {
+        "mean": 0.1285714285714286,
+        "lo": 0.06778711484593837,
+        "hi": 0.19747899159663865,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "family": {
+        "mean": 0.3653921568627451,
+        "lo": 0.2680171568627451,
+        "hi": 0.45638970588235284,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "order": {
+        "mean": 0.6105223843923534,
+        "lo": 0.5209480257015087,
+        "hi": 0.6973381062951496,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "class": {
+        "mean": 0.9446774403541319,
+        "lo": 0.9080284518113466,
+        "hi": 0.9729437229437228,
+        "n_species": 77,
+        "n_scored": 420
+      },
+      "phylum": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n_species": 85,
+        "n_scored": 452
+      }
+    },
+    "depth_null": {
+      "species": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "genus": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "family": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "order": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "class": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 77,
+        "n_scored": 420
+      },
+      "phylum": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      }
+    },
+    "logistic": {
+      "species": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "mean_softmax_entropy": 4.303027735378307,
+        "degenerate_single_class": false
+      },
+      "genus": {
+        "mean": 0.058823529411764705,
+        "lo": 0.011764705882352941,
+        "hi": 0.11764705882352941,
+        "n_species": 85,
+        "mean_softmax_entropy": 4.094159653805335,
+        "degenerate_single_class": false
+      },
+      "family": {
+        "mean": 0.12618538324420678,
+        "lo": 0.0640051247771836,
+        "hi": 0.18971947415329765,
+        "n_species": 85,
+        "mean_softmax_entropy": 3.671864080596071,
+        "degenerate_single_class": false
+      },
+      "order": {
+        "mean": 0.2498039215686274,
+        "lo": 0.16882107843137256,
+        "hi": 0.3348039215686274,
+        "n_species": 85,
+        "mean_softmax_entropy": 2.805074851244659,
+        "degenerate_single_class": false
+      },
+      "class": {
+        "mean": 0.7095500610879967,
+        "lo": 0.6359777661580464,
+        "hi": 0.7800361925421734,
+        "n_species": 77,
+        "mean_softmax_entropy": 0.7954269032559704,
+        "degenerate_single_class": false
+      },
+      "phylum": {
+        "mean": NaN,
+        "lo": NaN,
+        "hi": NaN,
+        "n_species": 85,
+        "mean_softmax_entropy": NaN,
+        "degenerate_single_class": true
+      }
+    },
+    "flat": {
+      "species": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "genus": {
+        "mean": 0.0942684766214178,
+        "lo": 0.042136123680241326,
+        "hi": 0.1549095022624434,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "family": {
+        "mean": 0.2214705882352941,
+        "lo": 0.1480343137254902,
+        "hi": 0.2934338235294118,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "order": {
+        "mean": 0.4479237308958672,
+        "lo": 0.3637670462922011,
+        "hi": 0.5344708830900781,
+        "n_species": 85,
+        "n_scored": 452
+      },
+      "class": {
+        "mean": 0.7946611659017674,
+        "lo": 0.7380738778765094,
+        "hi": 0.8493863514305243,
+        "n_species": 77,
+        "n_scored": 420
+      },
+      "phylum": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n_species": 85,
+        "n_scored": 452
+      }
+    }
+  },
+  "lofo_clade": {
+    "folds": [
+      {
+        "held_clade": "Birds",
+        "n_test": 61,
+        "n_class_scored": 61,
+        "f_class_acc": 0.0,
+        "rawknn_class_acc": 0.0
+      },
+      {
+        "held_clade": "Crocodiles",
+        "n_test": 15,
+        "n_class_scored": 0,
+        "f_class_acc": NaN,
+        "rawknn_class_acc": NaN
+      },
+      {
+        "held_clade": "Frog",
+        "n_test": 1,
+        "n_class_scored": 1,
+        "f_class_acc": 0.0,
+        "rawknn_class_acc": 0.0
+      },
+      {
+        "held_clade": "Mammals",
+        "n_test": 253,
+        "n_class_scored": 253,
+        "f_class_acc": 0.0,
+        "rawknn_class_acc": 0.0
+      },
+      {
+        "held_clade": "Squamates",
+        "n_test": 105,
+        "n_class_scored": 105,
+        "f_class_acc": 0.0,
+        "rawknn_class_acc": 0.0
+      },
+      {
+        "held_clade": "Turtles",
+        "n_test": 17,
+        "n_class_scored": 0,
+        "f_class_acc": NaN,
+        "rawknn_class_acc": NaN
+      }
+    ],
+    "sign_test": {
+      "n_pos": 0,
+      "n_total": 0,
+      "p": 1.0
+    },
+    "deltas": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "note": "all f-vs-rawknn class deltas are exactly 0 \u2014 both collapse to the SAME class accuracy under leave-one-clade-out, so the sign test is undefined (no nonzero deltas)."
+  },
+  "leak_species_and_clade": {
+    "rawknn_loso_class_acc": 0.9452380952380952,
+    "rawknn_loso_n": 420,
+    "rawknn_species_and_clade_class_acc": 0.0,
+    "rawknn_joint_n": 420,
+    "leak_drop": 0.9452380952380952
+  },
+  "exploratory_holm_adjusted_p": {
+    "lofo_class_sign_test": 1.0
+  },
+  "primary_endpoint": {
+    "definition": "LOSO class-rank accuracy of f vs raw-pLM-kNN (taxon-bootstrap CIs separated) AND f > depth-null.",
+    "f_class": {
+      "mean": 0.87369153402988,
+      "lo": 0.8220676284868015,
+      "hi": 0.9188246387071575,
+      "n_species": 77,
+      "n_scored": 420
+    },
+    "raw_knn_class": {
+      "mean": 0.9446774403541319,
+      "lo": 0.9080284518113466,
+      "hi": 0.9729437229437228,
+      "n_species": 77,
+      "n_scored": 420
+    },
+    "depth_null_class": {
+      "mean": 0.0,
+      "lo": 0.0,
+      "hi": 0.0,
+      "n_species": 77,
+      "n_scored": 420
+    },
+    "f_beats_rawknn_ci_separated": false,
+    "rawknn_beats_f_ci_separated": false,
+    "f_beats_depth_null_ci_separated": true,
+    "PASS": false,
+    "interpretation": "Inconclusive: f does not separate from raw-kNN at class rank in either direction."
+  },
+  "runtime_sec": 171.8
+}

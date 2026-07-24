@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "testbed": "pla2",
+    "n_proteins": 452,
+    "n_species": 85,
+    "n_clades": 6,
+    "n_gene_groups": 19,
+    "n_clusters": 296,
+    "pca_dim": 64,
+    "smallest_train_fold_n": 358,
+    "pca_dim_floor_applied": false,
+    "n_splits": 5,
+    "knn_k": 5,
+    "seed": 0,
+    "mmseqs_used": true
+  },
+  "leace": {
+    "erased_rank_k": 18,
+    "pca_dim": 64,
+    "clean_claim_gated_ok": true,
+    "gate_note": "k < PCA_DIM/2 \u2014 function-preservation is meaningful"
+  },
+  "step2_erasure_worked": {
+    "clade_probe": {
+      "original": {
+        "linear_acc": 0.7367256637168141,
+        "nonlinear_acc": 0.922566371681416,
+        "chance": 0.5597345132743363,
+        "n_scored": 452
+      },
+      "tax_erased": {
+        "linear_acc": 0.5597345132743363,
+        "nonlinear_acc": 0.7743362831858407,
+        "chance": 0.5597345132743363,
+        "n_scored": 452
+      }
+    },
+    "position_probe": {
+      "original": {
+        "linear_r2": 0.3278421096032039,
+        "nonlinear_r2": -0.37069978194746445,
+        "n_scored": 452
+      },
+      "tax_erased": {
+        "linear_r2": -0.21453187173417954,
+        "nonlinear_r2": -0.3584241741584253,
+        "n_scored": 452
+      }
+    }
+  },
+  "step3_function_preserved": {
+    "within_clade": {
+      "original": 0.873170731707317,
+      "tax_erased": 0.8527716186252772,
+      "n_queries": 451
+    },
+    "crossed_group_subset": {
+      "original": 0.9362318840579711,
+      "tax_erased": 0.9362318840579711,
+      "n_queries": 276,
+      "n_crossed_groups": 6,
+      "crossed_groups": [
+        "C",
+        "D1",
+        "D2",
+        "D3",
+        "E",
+        "F"
+      ]
+    },
+    "group_chance_purity": 0.1095426423369097
+  },
+  "step4_specificity": {
+    "leace_erased_energy": 0.01845487427389267,
+    "control_erased_energy": 0.023366409357846663,
+    "energy_ratio_control_over_leace": 1.266137553204691,
+    "energy_match_ok_half_to_2x": true,
+    "control_erased_rank": 3,
+    "taxonomy_under_control": {
+      "clade_probe": {
+        "linear_acc": 0.7323008849557522,
+        "nonlinear_acc": 0.9269911504424779,
+        "chance": 0.5597345132743363,
+        "n_scored": 452
+      },
+      "position_probe": {
+        "linear_r2": 0.32966704438481464,
+        "nonlinear_r2": -0.2912555867715798,
+        "n_scored": 452
+      }
+    }
+  },
+  "step5_reverse_symmetry": {
+    "function_erased_rank": 17,
+    "taxonomy_under_function_erasure": {
+      "clade_probe": {
+        "linear_acc": 0.6194690265486725,
+        "nonlinear_acc": 0.6858407079646017,
+        "chance": 0.5597345132743363,
+        "n_scored": 452
+      },
+      "position_probe": {
+        "linear_r2": 0.15593163585787573,
+        "nonlinear_r2": -0.18786160348485215,
+        "n_scored": 452
+      }
+    },
+    "function_under_function_erasure": {
+      "within_clade": 0.6842572062084258,
+      "crossed_group_subset": 0.7905797101449274
+    },
+    "note": "Within ONE family, Gene Group \u2248 paralog lineage \u2248 taxonomy, so function-erasure degrading taxonomy (and vice versa) is the EXPECTED entanglement, not a failure."
+  },
+  "step6_depth_null_clean": {
+    "primary_depth_magnitude": {
+      "erased_rank": 1,
+      "taxonomy_after_depth_erasure": {
+        "clade_probe": {
+          "linear_acc": 0.6769911504424779,
+          "nonlinear_acc": 0.8893805309734514,
+          "chance": 0.5597345132743363,
+          "n_scored": 452
+        },
+        "position_probe": {
+          "linear_r2": 0.048501429363771886,
+          "nonlinear_r2": -0.3825311871108177,
+          "n_scored": 452
+        }
+      },
+      "clade_collapse": 0.05973451327433621
+    },
+    "real_leace_clade_collapse": 0.17699115044247782,
+    "depth_attributable_fraction": 0.3374999999999997,
+    "literal_random_direction_null": {
+      "erased_rank": 64,
+      "clade_collapse": 0.17699115044247782,
+      "degenerate_full_rank": true,
+      "degeneracy_note": "radial_only_null(tax_targets) is a full-rank random 100-D continuous target; LEACE erases \u2248the whole PCA space against it, so its taxonomy-collapse is a target-dimensionality artifact, NOT a depth signal. Use the primary 1-D depth-magnitude null instead."
+    },
+    "note": "real-LEACE collapse much larger than the depth-magnitude collapse \u21d2 LEACE erased real DIRECTIONAL taxonomy structure, not merely the radial/depth axis."
+  },
+  "step7_identity_strata": {
+    "binning": "cluster size (mmseqs 0.9): singleton vs multi-member",
+    "strata": {
+      "singleton_low_identity": {
+        "n_rows": 228,
+        "function_purity_within_clade": {
+          "original": 0.8035555555555555,
+          "tax_erased": 0.7591111111111112
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.7017543859649122,
+          "tax_erased": 0.6359649122807017
+        }
+      },
+      "multi_member_high_identity": {
+        "n_rows": 224,
+        "function_purity_within_clade": {
+          "original": 0.8758928571428571,
+          "tax_erased": 0.8723214285714286
+        },
+        "taxonomy_clade_acc": {
+          "original": 0.6160714285714286,
+          "tax_erased": 0.29464285714285715
+        }
+      }
+    }
+  },
+  "disentanglement_matrix": {
+    "leace_erased_rank_k": 18,
+    "taxonomy_recoverability_clade_acc": {
+      "original": 0.7367,
+      "tax_erased": 0.5597,
+      "function_erased": 0.6195,
+      "matched_control": 0.7323
+    },
+    "function_recoverability_within_clade_purity": {
+      "original": 0.8732,
+      "tax_erased": 0.8528,
+      "function_erased": 0.6843,
+      "matched_control": 0.8741
+    }
+  },
+  "coherence": {
+    "k": 18,
+    "pca_dim": 64,
+    "overlap": 0.8164846852094911,
+    "random_baseline_mean": 0.2767060617108545,
+    "random_baseline_std": 0.017764269740685658,
+    "expected_random_k_over_pca_dim": 0.28125,
+    "n_random_seeds": 20,
+    "overlap_exceeds_baseline_3sigma": true,
+    "interpretation": "READ and CLEAN target the SAME subspace (overlap >> random baseline)"
+  },
+  "entanglement_verdict": {
+    "reads_as_entangled": true,
+    "function_relative_drop_on_taxonomy_erasure": 0.0234,
+    "taxonomy_relative_drop_on_function_erasure": 0.1591,
+    "expected_for_pla2": true,
+    "interpretation": "ENTANGLED (expected for the PLA2 single-family hard contrast): within one gene family, Gene Group \u2248 paralog lineage \u2248 taxonomy, so the function and taxonomy subspaces overlap and cannot be cleanly separated. A clean DISentangled result requires the multi-family testbed."
+  },
+  "runtime_sec": 258.2
+}
