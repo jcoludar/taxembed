@@ -1,0 +1,10 @@
+{
+  "source_npz": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean_transitive.npz",
+  "n_nodes": 1102163,
+  "max_depth": 40,
+  "init_depth_norm_r": {
+    "log": 0.9571510891739138,
+    "linear": 0.9999999999999568
+  },
+  "note": "Computed here: the correlation BEFORE any gradient step, from target_radius() alone. The released cellular model's TRAINED value on the same closure-derived depths was measured at 0.957244 during the 2026-08-11 objective review; that figure is not recomputed by this script. Against the log floor below, training moves the depth-norm correlation by ~1e-4."
+}
