@@ -386,6 +386,8 @@ def handle_train(args: argparse.Namespace) -> None:
         "--radial-nudge",
         str(args.radial_nudge),
     ]
+    if args.seed is not None:
+        train_cmd.extend(["--seed", str(args.seed)])
     if args.curriculum:
         train_cmd.append("--curriculum")
         train_cmd.extend(["--curriculum-phases", args.curriculum_phases])
@@ -455,6 +457,7 @@ def handle_train(args: argparse.Namespace) -> None:
                     "margin": args.margin,
                     "lambda_reg": args.lambda_reg,
                     "early_stopping": args.early_stopping,
+                    "seed": args.seed,
                     "gpu": args.gpu,
                     "max_depth": args.max_depth,
                     "optimizer": args.optimizer,
@@ -706,6 +709,8 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--margin", type=float, default=0.2)
     train_parser.add_argument("--lambda-reg", type=float, default=0.1)
     train_parser.add_argument("--early-stopping", type=int, default=15)
+    train_parser.add_argument("--seed", type=int, default=None,
+                              help="RNG seed forwarded to the trainer.")
     train_parser.add_argument("--gpu", type=int, default=-1, help="GPU device index (-1 for CPU)")
     train_parser.add_argument("--optimizer", choices=["radam", "adam"], default="adam",
                               help="Optimizer: adam (Euclidean, default) or radam (Riemannian Adam)")

@@ -25,6 +25,25 @@ import os
 from taxembed.utils.training_pairs import TrainingPairs  # noqa: F401  (re-exported for downstream importers)
 
 
+def seed_everything(seed: int) -> None:
+    """Seed every RNG the training loop actually uses.
+
+    The negative sampler and epoch subsampler use the LEGACY global numpy RNG
+    (np.random.randint / choice / shuffle), so np.random.seed is required --
+    np.random.default_rng does not affect them. Direction init uses global torch.
+
+    --amp plus CUDA scatter nondeterminism means this gives run-to-run reproducibility
+    on CPU and near-reproducibility on GPU, not bitwise equality.
+    """
+    import random
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
 def target_radius(depth, max_depth, schedule='linear'):
     """Compute target radius for a node at the given depth.
 

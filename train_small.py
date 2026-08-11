@@ -33,7 +33,8 @@ from train_hierarchical import (
     TrainingPairs,
     ranking_loss_with_margin,
     softmax_loss,
-    radial_regularizer
+    radial_regularizer,
+    seed_everything
 )
 
 
@@ -1064,8 +1065,15 @@ def main():
                             'at each curriculum phase boundary.')
     parser.add_argument('--lr-min-multiplier', type=float, default=0.01,
                        help='Cosine LR floor as fraction of base LR (default 0.01 = 1%%).')
+    parser.add_argument('--seed', type=int, default=None,
+                       help='RNG seed for init, negative sampling, and epoch subsampling. '
+                            'Omit for the historical unseeded behaviour.')
 
     args = parser.parse_args()
+
+    if args.seed is not None:
+        seed_everything(args.seed)
+        print(f"  ✓ seeded: {args.seed}")
 
     # Validate: radam + euclidean-param is incompatible
     if getattr(args, 'euclidean_param', False) and args.optimizer == 'radam':

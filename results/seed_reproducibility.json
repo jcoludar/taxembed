@@ -1,0 +1,14 @@
+{
+  "source_npz": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/echinodermata_7586_clean/taxonomy_edges_echinodermata_7586_clean_transitive.npz",
+  "epochs": 2,
+  "dim": 50,
+  "best_loss": {
+    "seed0_run_a": 3.932757,
+    "seed0_run_b": 3.932757,
+    "seed1": 3.932451
+  },
+  "same_seed_reproducible": true,
+  "different_seed_differs": true,
+  "passed": true,
+  "note": "CPU run. On GPU, --amp plus CUDA scatter nondeterminism gives near-reproducibility, not bitwise equality."
+}

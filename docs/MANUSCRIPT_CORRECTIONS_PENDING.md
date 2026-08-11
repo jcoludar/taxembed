@@ -57,20 +57,36 @@ answer. A true cousin makes it answerable.
 
 ---
 
-## C2 — The seeded-reproducibility claim is unsupported
+## C2 — The seeded-reproducibility claim — RESOLVED, claim is now true
 
-**Status:** UNCONDITIONAL, but the *resolution* is a fork
-**Evidence:** `seed` occurs zero times in `train_hierarchical.py`, `train_small.py`,
-`src/taxembed/cli/main.py`. The negative sampler uses the **legacy global** numpy RNG, so switching
-to `default_rng` alone would not fix it.
+**Status:** RESOLVED 2026-08-11 by landing plan v2 Task 5. The claim can stand, with a caveat.
+**Evidence:** `results/seed_reproducibility.json` · `scripts/verify_seed_reproducibility.py` ·
+`tests/test_negative_sampling.py`
 
-`docs/specs/2026-06-09-taxembed-paper-design.md:24` claims "Reproducible (seeded; repro run matches
-to ±0.01)". Nothing in the training path seeds anything.
+**Was:** `seed` occurred zero times in `train_hierarchical.py`, `train_small.py` or
+`src/taxembed/cli/main.py`, so `docs/specs/2026-06-09-taxembed-paper-design.md:24`'s "Reproducible
+(seeded; repro run matches to ±0.01)" was unsupported by the code. The negative sampler uses the
+**legacy global** numpy RNG, so `np.random.default_rng` would not have fixed it.
 
-Two ways to close it, decide before the edit pass:
-- **(a)** land plan v2 Task 5 (`seed_everything` + `--seed` through the real entrypoint) and make the
-  claim true. Small task; preferred.
-- **(b)** delete the claim.
+**Now:** `seed_everything` seeds `random`, legacy global `np.random`, and global `torch` (plus CUDA
+when present); `--seed` is wired through `train_small.py` (the real entrypoint) and the CLI, and is
+recorded in `run.json`.
+
+Verified by moving a number, not by reading the flag — `--help` alone would look identical if the
+seed were ignored. Echinodermata, 2 epochs, both directions:
+
+| run | best loss |
+|---|---|
+| seed 0, run a | 3.932757 |
+| seed 0, run b | 3.932757 (identical) |
+| seed 1 | 3.932451 (differs) |
+
+**Caveat the Methods must carry:** this is CPU reproducibility. With `--amp` and CUDA scatter
+nondeterminism the shipped GPU recipe gives near-reproducibility, not bitwise equality — so quote a
+tolerance, not exactness.
+
+⚠ The shipped 1.1M artifact was trained **before** this landed, so it is not itself reproducible from
+a seed. The claim applies to runs from here on; do not retroactively attach it to the released model.
 
 ---
 
