@@ -1,0 +1,296 @@
+{
+  "n_pairs": 21399053,
+  "n_nodes": 1102163,
+  "max_depth": 40,
+  "overall_rate": 0.47375239782636186,
+  "by_anchor_depth": [
+    {
+      "anchor_depth": 0,
+      "n_pairs": 1102162,
+      "fn_rate": 1.0,
+      "n_zero_pool": 1102162
+    },
+    {
+      "anchor_depth": 1,
+      "n_pairs": 1102159,
+      "fn_rate": 0.9236402556392879,
+      "n_zero_pool": 746067
+    },
+    {
+      "anchor_depth": 2,
+      "n_pairs": 1102113,
+      "fn_rate": 0.6635803099924248,
+      "n_zero_pool": 290613
+    },
+    {
+      "anchor_depth": 3,
+      "n_pairs": 1052529,
+      "fn_rate": 0.6009205371308021,
+      "n_zero_pool": 290613
+    },
+    {
+      "anchor_depth": 4,
+      "n_pairs": 1050539,
+      "fn_rate": 0.5859823511995798,
+      "n_zero_pool": 290613
+    },
+    {
+      "anchor_depth": 5,
+      "n_pairs": 1041614,
+      "fn_rate": 0.5712380238138345,
+      "n_zero_pool": 290613
+    },
+    {
+      "anchor_depth": 6,
+      "n_pairs": 1022748,
+      "fn_rate": 0.4497767763074133,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 7,
+      "n_pairs": 1002143,
+      "fn_rate": 0.43997308614340347,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 8,
+      "n_pairs": 941634,
+      "fn_rate": 0.4612179793254593,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 9,
+      "n_pairs": 897345,
+      "fn_rate": 0.45721912625449024,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 10,
+      "n_pairs": 853363,
+      "fn_rate": 0.4671252742042277,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 11,
+      "n_pairs": 824195,
+      "fn_rate": 0.4211203778613451,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 12,
+      "n_pairs": 800538,
+      "fn_rate": 0.4261426238075921,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 13,
+      "n_pairs": 773196,
+      "fn_rate": 0.41692251960611415,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 14,
+      "n_pairs": 746067,
+      "fn_rate": 0.36640277621723133,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 15,
+      "n_pairs": 697493,
+      "fn_rate": 0.35920604672095907,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 16,
+      "n_pairs": 656945,
+      "fn_rate": 0.35751589936961903,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 17,
+      "n_pairs": 620196,
+      "fn_rate": 0.36894818143162494,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 18,
+      "n_pairs": 589536,
+      "fn_rate": 0.3776464270038067,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 19,
+      "n_pairs": 535510,
+      "fn_rate": 0.3857763279853467,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 20,
+      "n_pairs": 483089,
+      "fn_rate": 0.3581948013725934,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 21,
+      "n_pairs": 439361,
+      "fn_rate": 0.31805137683623863,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 22,
+      "n_pairs": 398411,
+      "fn_rate": 0.29562738522326465,
+      "n_zero_pool": 804
+    },
+    {
+      "anchor_depth": 23,
+      "n_pairs": 374545,
+      "fn_rate": 0.23352987312845652,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 24,
+      "n_pairs": 352836,
+      "fn_rate": 0.21525506078162185,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 25,
+      "n_pairs": 335490,
+      "fn_rate": 0.1889276032042962,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 26,
+      "n_pairs": 317218,
+      "fn_rate": 0.170426110795949,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 27,
+      "n_pairs": 290613,
+      "fn_rate": 0.1725489726204599,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 28,
+      "n_pairs": 259787,
+      "fn_rate": 0.17846396384556232,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 29,
+      "n_pairs": 216296,
+      "fn_rate": 0.16410598399070078,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 30,
+      "n_pairs": 161150,
+      "fn_rate": 0.08971051855609775,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 31,
+      "n_pairs": 128100,
+      "fn_rate": 0.05791963125995007,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 32,
+      "n_pairs": 102839,
+      "fn_rate": 0.029999575764937256,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 33,
+      "n_pairs": 74849,
+      "fn_rate": 0.024116951113239995,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 34,
+      "n_pairs": 35583,
+      "fn_rate": 0.02491239522091254,
+      "n_zero_pool": 205
+    },
+    {
+      "anchor_depth": 35,
+      "n_pairs": 12081,
+      "fn_rate": 0.02732172715991001,
+      "n_zero_pool": 0
+    },
+    {
+      "anchor_depth": 36,
+      "n_pairs": 3686,
+      "fn_rate": 0.04293103846625704,
+      "n_zero_pool": 0
+    },
+    {
+      "anchor_depth": 37,
+      "n_pairs": 804,
+      "fn_rate": 0.12220718439619638,
+      "n_zero_pool": 0
+    },
+    {
+      "anchor_depth": 38,
+      "n_pairs": 205,
+      "fn_rate": 0.19621712099473929,
+      "n_zero_pool": 0
+    },
+    {
+      "anchor_depth": 39,
+      "n_pairs": 85,
+      "fn_rate": 0.12941176470588234,
+      "n_zero_pool": 0
+    }
+  ],
+  "n_zero_pool": 3026809,
+  "frac_zero_pool": 0.1414459322101777,
+  "n_root_anchored": 1102162,
+  "frac_root_anchored": 0.051505176420657495,
+  "nodes_per_depth": [
+    1,
+    3,
+    46,
+    49584,
+    1990,
+    8925,
+    18866,
+    20605,
+    60509,
+    44289,
+    43982,
+    29168,
+    23657,
+    27342,
+    27129,
+    48574,
+    40548,
+    36749,
+    30660,
+    54026,
+    52421,
+    43728,
+    40950,
+    23866,
+    21709,
+    17346,
+    18272,
+    26605,
+    30826,
+    43491,
+    55146,
+    33050,
+    25261,
+    27990,
+    39266,
+    23502,
+    8395,
+    2882,
+    599,
+    120,
+    85
+  ],
+  "source_npz": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean_transitive.npz"
+}
