@@ -1,0 +1,71 @@
+{
+  "status": "PRE-REGISTERED -- no runs executed yet",
+  "registered_at": "2026-08-11",
+  "task": "plan v2 Task 9 -- does Figure 4's recipe claim survive on the unplanted metric?",
+
+  "why": [
+    "Figure 4 claims canonical recipe beats the prior approach. That claim has only ever been",
+    "measured on depth-norm r, which Task 4 shows is fixed at initialization (log floor 0.957151,",
+    "trained 0.957244 -- training moves it by ~1e-4). So the figure measures the given part of the",
+    "embedding, not the learned part. Nobody has checked whether the two recipes differ at all on",
+    "metrics that measure learned angular structure."
+  ],
+
+  "arm_definition_step1": {
+    "source": "artifacts/tags/metazoa_softmax/run.json vs artifacts/tags/metazoa_lower_lr_bigger_batch/run.json",
+    "warning": "NOT a clean one-factor contrast. The manuscript describes the prior approach as 'softmax without the scale-aware effective batch'; the recorded configs differ in four substantive factors. Spec v3 section 6 already flags this ablation as confounded. Any Results sentence must say which factors are in play rather than implying one lever.",
+    "differs": {
+      "effective_batch": {"prior": "128 x 4 = 512", "canonical": "256 x 8 = 2048", "ratio": 4},
+      "n_negatives": {"prior": 100, "canonical": 300},
+      "lr": {"prior": 0.005, "canonical": 0.001},
+      "lr_schedule": {"prior": "const (flag absent)", "canonical": "cosine_warmrestart + warm_restart_on_phase, lr_min_multiplier 0.01"}
+    },
+    "identical": [
+      "epochs 200", "dim 100", "margin 0.2", "lambda_reg 0.1", "early_stopping 999",
+      "optimizer adam", "curriculum true", "curriculum_phases auto", "burnin 0",
+      "radial_nudge 0.05", "epoch_fraction 0.3", "depth_scale_margin true",
+      "margin_min 0.05", "margin_max 1.0", "radial_schedule log", "euclidean_param true",
+      "loss softmax", "amp"
+    ],
+    "note_both_arms_have_curriculum": "The collapse curve HAS a curriculum, so 'prior approach' is not literally Nickel-Kiela, which has none. The manuscript already uses 'prior (Nickel-Kiela) approach' as a fixed term; keep it, but do not let it imply an unmodified N&K baseline."
+  },
+
+  "deviation_from_plan": {
+    "plan_says": "Task 9 Step 2 runs both arms with --exclude-descendant-negatives --drop-root-anchored so the objective defect is not confounded with the recipe contrast.",
+    "doing_instead": "Both arms run UNFIXED, i.e. with the shipped sampler.",
+    "why": "Those two flags are Task 6, which has not landed. Running both arms unfixed audits the figure AS SHIPPED, which is the question a reviewer actually asks of the published claim. The defect is present in both arms equally, so it does not confound the contrast; it only means the result speaks to the shipped recipe rather than to a hypothetical fixed one. Re-run under Task 6 later if the fixed objective changes the picture."
+  },
+
+  "prior_evidence_informing_the_expectation": {
+    "source": "docs/PROJECT_STATE.md 'Current metrics' table, 498k metazoa, n=1 per arm",
+    "depth_norm_r": {"prior_final_ep200": 0.669, "canonical_final_ep200": 0.984},
+    "separation_ratio_phylum_class_order_family": {
+      "prior_final_ep200": [1.03, 1.04, 1.04, 1.03],
+      "canonical_final_ep200": [2.56, 3.86, 6.65, 10.31]
+    },
+    "reading": "Separation ratio compares groups WITHIN a taxonomic rank, so it is largely angular rather than radial and is not the planted axis. On that already-documented evidence the canonical recipe does not merely preserve the radial prior, it produces far better angular structure. This experiment tests whether that holds at clade scale, across seeds, and on retrieval and purity as well.",
+    "caveat": "Rank and depth are not identical in NCBI, so within-rank comparison controls for the planted radius substantially but not perfectly. n=1 per arm. This is why the experiment is still worth running."
+  },
+
+  "preregistered_readings_step4": {
+    "1_canonical_beats_prior_on_learned_metrics": "Figure 4's claim HOLDS, and the figure should be RE-PLOTTED on a learned metric, because the current y-axis measures the planted axis. Expected outcome given the prior evidence above.",
+    "2_indistinguishable_on_learned_metrics_differing_only_on_depth_norm": "The recipe's demonstrated benefit is PRESERVATION OF THE RADIAL PRIOR, not acquisition of structure. Figure 4's caption and the Results sentence must say that, and the 'collapse' language needs rewriting.",
+    "3_prior_beats_canonical_on_learned_metrics": "Escalate. The recipe claim does not survive and the manuscript needs restructuring before submission."
+  },
+
+  "protocol": {
+    "clade": "echinodermata_7586_clean (3,965 nodes, 34,938 pairs)",
+    "seeds": [0, 1, 2],
+    "epochs": 200,
+    "arms": ["echino_canonical_s<S>", "echino_prior_s<S>"],
+    "planted_family_metric": ["depth-norm r, quoted beside the Task 4 initialization floor"],
+    "learned_family_metrics": [
+      "kNN retrieval precision@10 against cophenetic distance",
+      "family-level kNN purity",
+      "per-rank separation ratio"
+    ],
+    "primary": "The learned family. depth-norm r is reported only to show it is at its floor in both arms."
+  },
+
+  "results": null
+}
