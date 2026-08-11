@@ -67,5 +67,47 @@
     "primary": "The learned family. depth-norm r is reported only to show it is at its floor in both arms."
   },
 
-  "results": null
+  "results": {
+    "run_1_echinodermata": {
+      "verdict": "INVALID -- UNINFORMATIVE. The canonical arm did not train. Do NOT read this as pre-registered reading 3.",
+      "executed": "2026-08-11, 6 runs (2 arms x seeds 0/1/2), 200 epochs, echinodermata_7586_clean, both arms unfixed sampler",
+      "raw_final_epoch": {
+        "canonical": [
+          {"seed": 0, "depth_corr": 0.980, "knn_pct": 59.7, "separation": 0.89},
+          {"seed": 1, "depth_corr": 0.980, "knn_pct": 64.5, "separation": 0.89},
+          {"seed": 2, "depth_corr": 0.980, "knn_pct": 59.1, "separation": 0.88}
+        ],
+        "prior": [
+          {"seed": 0, "depth_corr": 0.981, "knn_pct": 98.7, "separation": 0.94},
+          {"seed": 1, "depth_corr": 0.982, "knn_pct": 99.7, "separation": 0.95},
+          {"seed": 2, "depth_corr": 0.980, "knn_pct": 98.2, "separation": 0.95}
+        ]
+      },
+      "why_invalid": {
+        "canonical_trajectory_seed0": "loss 5.743145 (ep1) -> 5.715695 (ep200) = -0.5%. kNN has no trend, wandering 48.9-74.5%. Separation flat 0.88-0.89, IDENTICAL to its value after 2 epochs. This is noise, not learning.",
+        "prior_trajectory_seed0": "loss 4.631657 -> 4.046630 = -12.6%. kNN climbs monotonically 47.0 -> 98.7%. Separation 0.89 -> 0.94.",
+        "mechanism": "epoch_fraction 0.3 over 34,938 pairs is ~10,481 pairs/epoch. Canonical (batch 256, grad-accum 8) gets ~5.1 optimizer steps/epoch at lr 0.001 with cosine decay; prior (batch 128, grad-accum 4) gets ~20.5 at lr 0.005 constant. Four times fewer steps at a fifth the LR. The recipe is scale-aware BY DESIGN and echinodermata is ~125x smaller than the metazoa scale where Figure 4's contrast was measured.",
+        "optimizer_steps_per_epoch_by_clade": {
+          "echinodermata (3,965 nodes)": {"canonical": 5.1, "prior": 20.5},
+          "mollusca (32,017)": {"canonical": 40.8, "prior": 163.3},
+          "arthropoda (324,983)": {"canonical": 946.6, "prior": 3786.6},
+          "metazoa (498,246) -- Figure 4's scale": {"canonical": 1734.5, "prior": 6938.0},
+          "cellular (1,102,163)": {"canonical": 3134.6, "prior": 12538.5}
+        },
+        "also_not_cross_comparable": "n_negatives 300 vs 100 changes the softmax denominator, so the arms' absolute losses differ by construction. Only within-arm trajectories are meaningful here."
+      },
+      "defect_in_this_preregistration": "The three pre-registered readings covered outcomes but included NO VALIDITY GATE, so a run in which one arm never trains maps onto 'prior beats canonical' by default. Any re-run must gate on both arms showing a real loss decrease and a trending learned metric before the contrast is read at all.",
+      "what_it_does_establish": "Nothing about the recipe claim. It does independently re-confirm that depth-norm r is planted: both arms sit at +0.980 to +0.982 from epoch 1 onward, including the arm that learned nothing at all. An arm with a flat loss and directionless kNN still scores +0.980 on the metric Figure 4 uses as its y-axis. That is the Task 4 finding reproduced from the opposite direction."
+    }
+  },
+
+  "next": {
+    "immediate": "Re-run at mollusca (32,017 nodes; canonical 40.8 steps/epoch, 8x echinodermata) as a cheap local check that the canonical arm trains at all once it is not starved.",
+    "real_test": "arthropoda_6656_clean (324,983 nodes; canonical 946.6 steps/epoch) is within ~2x of metazoa's regime and is the honest scale for this contrast. LRZ, under Rule 16 (static check + smoke before submit).",
+    "validity_gate_for_any_rerun": [
+      "both arms must show a loss decrease clearly above their own last-10-epoch noise span",
+      "both arms must show a trending learned metric, not a wandering one",
+      "if either arm fails, the contrast is UNINFORMATIVE and is not read in either direction"
+    ]
+  }
 }
