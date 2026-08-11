@@ -1,5 +1,5 @@
 {
-  "status": "PRE-REGISTERED -- no runs executed yet",
+  "status": "IN PROGRESS -- 2 runs executed, neither decisive. No reading has been called. The preregistered_readings_step4 block below is unchanged from before any run.",
   "registered_at": "2026-08-11",
   "task": "plan v2 Task 9 -- does Figure 4's recipe claim survive on the unplanted metric?",
 
@@ -98,11 +98,43 @@
       },
       "defect_in_this_preregistration": "The three pre-registered readings covered outcomes but included NO VALIDITY GATE, so a run in which one arm never trains maps onto 'prior beats canonical' by default. Any re-run must gate on both arms showing a real loss decrease and a trending learned metric before the contrast is read at all.",
       "what_it_does_establish": "Nothing about the recipe claim. It does independently re-confirm that depth-norm r is planted: both arms sit at +0.980 to +0.982 from epoch 1 onward, including the arm that learned nothing at all. An arm with a flat loss and directionless kNN still scores +0.980 on the metric Figure 4 uses as its y-axis. That is the Task 4 finding reproduced from the opposite direction."
+    },
+
+    "run_2_mollusca_200ep": {
+      "verdict": "TRAINING GATE PASSED, CONVERGENCE GATE FAILED for canonical. Still not decisive, but far more informative than run 1.",
+      "executed": "2026-08-11, 6 runs (2 arms x seeds 0/1/2), 200 epochs, mollusca_6447_clean (32,017 nodes, 278,695 pairs), both arms unfixed sampler",
+      "raw_final_epoch": {
+        "canonical": [
+          {"seed": 0, "depth_corr": 0.990, "knn_pct": 73.4, "separation": 1.02},
+          {"seed": 1, "depth_corr": 0.990, "knn_pct": 69.5, "separation": 1.02},
+          {"seed": 2, "depth_corr": 0.990, "knn_pct": 71.1, "separation": 1.03}
+        ],
+        "prior": [
+          {"seed": 0, "depth_corr": 0.972, "knn_pct": 99.6, "separation": 1.13},
+          {"seed": 1, "depth_corr": 0.971, "knn_pct": 99.3, "separation": 1.13},
+          {"seed": 2, "depth_corr": 0.972, "knn_pct": 99.5, "separation": 1.13}
+        ]
+      },
+      "training_gate": {
+        "canonical_seed0": "loss 5.712142 -> 5.303981 (-7.1%), which is ~99x its own last-10-epoch noise span of 0.004129. kNN climbs 32.7% (ep125) -> 63.5 (150) -> 85.1 (175). PASSES: this arm trained, unlike at echinodermata.",
+        "prior_seed0": "loss 4.647873 -> 3.812738 (-18.0%), noise span 0.006396. kNN 25.8 -> 99.6% monotone. PASSES."
+      },
+      "convergence_gate": {
+        "result": "FAILED for canonical",
+        "detail": "Prior flattens by ~ep100-125 (loss pinned at 3.81, kNN at ~99%). Canonical is still improving at ep200 (loss 5.394 ep150 -> 5.318 ep175 -> 5.304 ep200; kNN still climbing). Comparing a converged arm against a still-improving one at a fixed epoch budget is not a fair contrast.",
+        "structural_cause": "Canonical takes 4x fewer optimizer steps per epoch BY CONSTRUCTION (batch 256/accum 8 vs 128/accum 4). At equal epochs it gets a quarter of the steps. At metazoa/cellular scale both arms get hundreds of thousands of steps and this is moot; at 32k nodes it decides the outcome.",
+        "fix": "Match optimizer STEPS, not epochs. Canonical at 800 epochs is ~32,640 steps, matching prior's 200 epochs at ~32,660."
+      },
+      "pattern_emerging_NOT_a_verdict": {
+        "observation": "Canonical holds depth-norm at +0.990 flat from epoch 1 and it never moves. Prior's depth-norm DIPS to 0.896 by epoch 2, recovers to 0.987 by ep75, and settles at 0.972 -- while its kNN reaches 99.6% and separation 1.13 against canonical's 73.4% and 1.02.",
+        "reading": "This is pre-registered reading 2's signature: the canonical recipe's demonstrated benefit looks like PRESERVATION OF THE RADIAL PRIOR rather than acquisition of angular structure. NOT CALLED, because a non-converged arm cannot be compared against a converged one.",
+        "guard": "Do not let this pattern harden into a conclusion before the step-matched run and the arthropoda run report. It is currently confounded with step count."
+      }
     }
   },
 
   "next": {
-    "immediate": "Re-run at mollusca (32,017 nodes; canonical 40.8 steps/epoch, 8x echinodermata) as a cheap local check that the canonical arm trains at all once it is not starved.",
+    "running": "Step-matched mollusca: both arms at 800 epochs, so canonical reaches ~32,640 optimizer steps. Also lets prior run 4x past its convergence point, which independently probes Figure 4's central claim that the prior recipe COLLAPSES under continued training.",
     "real_test": "arthropoda_6656_clean (324,983 nodes; canonical 946.6 steps/epoch) is within ~2x of metazoa's regime and is the honest scale for this contrast. LRZ, under Rule 16 (static check + smoke before submit).",
     "validity_gate_for_any_rerun": [
       "both arms must show a loss decrease clearly above their own last-10-epoch noise span",
