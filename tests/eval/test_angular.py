@@ -197,6 +197,53 @@ def test_collapsed_directions_do_not_score_through_tie_breaking():
     assert abs(out["S"]) < 3 * out["S_bootstrap_se"], f"S={out['S']:.4f}"
 
 
+def _naive_level_auc(parent, depth, emb, q, j):
+    """Brute-force Mann-Whitney AUC of cosine: pool members inside q's depth-j ancestor vs outside."""
+    a = _naive_ancestors(parent, q)[j]
+    unit = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+    pool = [v for v in range(len(parent)) if depth[v] == depth[q] and v != q]
+    inside = [v for v in pool if a in _naive_ancestors(parent, v)]
+    outside = [v for v in pool if v not in inside]
+    if not inside or not outside:
+        return None
+    ci = unit[inside] @ unit[q]
+    co = unit[outside] @ unit[q]
+    return float(((ci[:, None] > co[None, :]).sum() + 0.5 * (ci[:, None] == co[None, :]).sum())
+                 / (len(ci) * len(co)))
+
+
+def test_level_auc_matches_brute_force_mann_whitney():
+    from taxembed.eval.angular import level_auc
+
+    parent, depth = _random_tree(300, 13)
+    idx = TreeIndex(parent, depth)
+    rng = np.random.default_rng(7)
+    emb = _perfect_directions(parent, depth) + 1.0 * rng.standard_normal((300, 300))
+    q = select_queries(idx, n=60, k=3, seed=0)
+    out = level_auc(emb, idx, q, per_query=True)
+    checked = 0
+    for (qq, j), auc in out["per_query"].items():
+        want = _naive_level_auc(parent, depth, emb, qq, j)
+        assert want is not None
+        assert auc == pytest.approx(want, abs=1e-9)
+        checked += 1
+    assert checked > 50
+
+
+def test_level_auc_is_one_for_perfect_and_half_for_random():
+    from taxembed.eval.angular import level_auc
+
+    parent, depth = _random_tree(1500, 14)
+    idx = TreeIndex(parent, depth)
+    q = select_queries(idx, n=800, k=5, seed=0)
+    perfect = level_auc(_perfect_directions(parent, depth), idx, q)
+    assert perfect["mean_auc"] == pytest.approx(1.0)
+    rand = level_auc(np.random.default_rng(2).standard_normal((1500, 32)), idx, q)
+    assert abs(rand["mean_auc"] - 0.5) < 0.02
+    flat = level_auc(np.ones((1500, 8)), idx, q)            # all ties -> 0.5, never tree order
+    assert abs(flat["mean_auc"] - 0.5) < 0.02
+
+
 def test_forest_is_rejected():
     parent = np.array([0, 0, 2, 2])          # two roots: 0 and 2
     depth = np.array([0, 1, 0, 1])

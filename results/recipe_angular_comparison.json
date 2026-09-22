@@ -91,6 +91,14 @@
     ]
   },
 
+  "preregistration_v2_amendment_1_20260922": {
+    "status": "Added 2026-09-22 ~14:00, BEFORE any seeded-array (5802007) result exists. Adds a coarse-structure condition; changes nothing else in preregistration_v2_20260922.",
+    "why": "Review item 5 (k=10 same-depth retrieval saturates on congeners, cannot see coarse arrangement) was confirmed on mollusca: S_angle canonical 0.822 vs prior 0.866, but level AUC 8-11 generations up is ~0.90 vs ~0.9996 (results/task9_scorer_mollusca_levelauc.json).",
+    "added_metric": "level AUC (taxembed.eval.angular.level_auc): Mann-Whitney AUC of cosine, inside vs outside each ancestor's subtree within the same-depth pool; null exactly 0.5, perfect 1. Reported per checkpoint as mean and by generations-up.",
+    "added_condition": "Reading 1 (or 3) additionally requires the per-run mean level AUC (mean over epoch 196-200) to agree in sign with S_angle: all 3 seeds of the winning arm above all 3 of the other on mean level AUC. If S_angle and level AUC disagree, the result is MIXED and is reported per metric and per generations-up band.",
+    "also_done": ["dose-response validation passed on mollusca (results/task9_scorer_dose_response_mollusca.json)", "radius-transplant 2x2 script ready (scripts/radius_transplant_2x2.py); LRZ run pending"]
+  },
+
   "protocol": {
     "clade": "echinodermata_7586_clean (3,965 nodes, 34,938 pairs)",
     "seeds": [0, 1, 2],

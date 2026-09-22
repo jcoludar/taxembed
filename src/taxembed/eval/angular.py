@@ -47,6 +47,7 @@ class TreeIndex:
         self.n_nodes = n
         self.max_depth = int(self.depth.max())
         self.tin, self.tout = euler_intervals(self.parent)
+        self.node_by_tin = np.argsort(self.tin)
 
         # anc[v, j] = ancestor of v at depth j (j <= depth[v]); -1 beyond. anc[v, depth[v]] = v.
         anc = np.full((n, self.max_depth + 1), -1, dtype=np.int64)
@@ -217,6 +218,80 @@ def same_depth_neighbors(emb, idx: TreeIndex, queries, k: int, metric: str = "co
             top = np.argpartition(-score, k - 1, axis=1)[:, :k]
             order = np.argsort(-np.take_along_axis(score, top, axis=1), axis=1)
             out[r_] = pool[np.take_along_axis(top, order, axis=1)]
+    return out
+
+
+def level_auc(emb, idx: TreeIndex, queries, chunk: int = 512, tie_seed: int = 0,
+              per_query: bool = False) -> dict:
+    """Per-level Mann-Whitney AUC of cosine (review item 5: k=10 retrieval saturates on congeners
+    and cannot see COARSE arrangement).
+
+    For query q at depth d and each ancestor level j < d: among q's same-depth pool, AUC_j = P(a
+    member inside subtree(a_j) out-ranks, by cosine, a member outside it). 0.5 = random
+    directions exactly; 1 = every level perfectly nested. Radius-free like S_angle.
+
+    Inside members are one contiguous block of the tin-ordered pool, so one row of ranks plus a
+    prefix sum gives every level: U = R_in - n_in(n_in+1)/2, AUC = U / (n_in * n_out).
+    """
+    rng = np.random.default_rng(tie_seed)
+    emb = np.asarray(emb, dtype=np.float64)
+    queries = np.asarray(queries, dtype=np.int64)
+    unit = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+    by_abs: dict[int, list] = {}
+    by_gen: dict[int, list] = {}
+    per_q: dict = {}
+    all_auc = []
+    for d in np.unique(idx.depth[queries]):
+        d = int(d)
+        if d == 0:
+            continue
+        pt = idx.pool_tin[d]
+        pool = idx.node_by_tin[pt]                       # same-depth nodes in tin order
+        P = len(pool)
+        qs_all = queries[idx.depth[queries] == d]
+        anc = idx.anc[qs_all, :d]                        # levels 0..d-1, all defined
+        lo_all = np.searchsorted(pt, idx.tin[anc], side="left")
+        hi_all = np.searchsorted(pt, idx.tout[anc], side="left")
+        for start in range(0, len(qs_all), chunk):
+            qs = qs_all[start:start + chunk]
+            lo, hi = lo_all[start:start + chunk], hi_all[start:start + chunk]
+            score = unit[qs] @ unit[pool].T
+            score += rng.uniform(0.0, 1e-12, size=score.shape)
+            self_pos = np.searchsorted(pt, idx.tin[qs])
+            score[np.arange(len(qs)), self_pos] = -np.inf           # q ranks 0 -> contributes 0
+            order = np.argsort(score, axis=1)
+            ranks = np.empty_like(order)
+            np.put_along_axis(ranks, order, np.arange(P)[None, :].repeat(len(qs), 0), axis=1)
+            cum = np.zeros((len(qs), P + 1), dtype=np.int64)
+            np.cumsum(ranks, axis=1, out=cum[:, 1:])
+            R = np.take_along_axis(cum, hi, axis=1) - np.take_along_axis(cum, lo, axis=1)
+            n_in = (hi - lo - 1).astype(np.float64)
+            n_out = (P - 1) - n_in
+            ok = (n_in > 0) & (n_out > 0)
+            auc = np.full(n_in.shape, np.nan)
+            auc[ok] = (R[ok] - n_in[ok] * (n_in[ok] + 1) / 2) / (n_in[ok] * n_out[ok])
+            for j in range(d):
+                col = auc[:, j][ok[:, j]]
+                if len(col):
+                    by_abs.setdefault(j, []).append(col)
+                    by_gen.setdefault(d - j, []).append(col)
+                    all_auc.append(col)
+            if per_query:
+                for r, q in enumerate(qs):
+                    for j in np.flatnonzero(ok[r]):
+                        per_q[(int(q), int(j))] = float(auc[r, j])
+
+    def _agg(dct):
+        return {int(k): {"n": int(sum(len(c) for c in v)), "auc": float(np.concatenate(v).mean())}
+                for k, v in sorted(dct.items())}
+
+    out = {
+        "mean_auc": float(np.concatenate(all_auc).mean()) if all_auc else float("nan"),
+        "by_ancestor_depth": _agg(by_abs),
+        "by_generations_up": _agg(by_gen),
+    }
+    if per_query:
+        out["per_query"] = per_q
     return out
 
 

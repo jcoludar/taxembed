@@ -32,7 +32,7 @@ sys.path.insert(0, str(_REPO / "src"))
 sys.path.insert(0, str(_REPO))
 
 from taxembed.eval.angular import (  # noqa: E402
-    CLUSTER_LEVEL, TreeIndex, choose_clade_level, paired_S_difference, query_bounds,
+    CLUSTER_LEVEL, TreeIndex, choose_clade_level, level_auc, paired_S_difference, query_bounds,
     score_embedding, select_queries,
 )
 from taxembed.eval.subtree import parent_from_closure  # noqa: E402
@@ -96,7 +96,11 @@ def score_one(label: str, emb: np.ndarray, idx: TreeIndex, queries, k, bounds, s
                         extra_ks=(1, 100), clade_level=clade_level)
     p = score_embedding(emb, idx, queries, k, "poincare", bounds=bounds, seed=seed,
                         radii=radii, clade_level=clade_level)
+    lv = level_auc(emb, idx, queries)
     row = {
+        "level_auc_mean": lv["mean_auc"],
+        "level_auc_by_ancestor_depth": lv["by_ancestor_depth"],
+        "level_auc_by_generations_up": lv["by_generations_up"],
         "S_angle": a["S"], "S_angle_cluster_se": a["S_cluster_se"],
         "S_angle_cluster_ci95": a["S_cluster_ci95"], "n_clusters": a["n_clusters"],
         "S_angle_by_band": a["by_band"], "S_angle_by_clade": a["by_clade"],
@@ -183,7 +187,8 @@ def main() -> None:
             arrays.update({f"{arm}__ep{epoch}__{key}": val for key, val in arr.items()})
             arm_s.setdefault(arm, []).append(arr["s_angle"])
             print(f"[{arm} ep{epoch:>3}] S_angle {row['S_angle']:+.4f} "
-                  f"(cluster se {row['S_angle_cluster_se']:.4f}) | S_poincare {row['S_poincare']:+.4f} "
+                  f"(cluster se {row['S_angle_cluster_se']:.4f}) | level AUC {row['level_auc_mean']:.4f} "
+                  f"| S_poincare {row['S_poincare']:+.4f} "
                   f"| depth-norm r {row['depth_norm_r']:+.4f} | radial dev {row['radial_dev_mean']:.4f} "
                   f"| loss {meta['loss']} | {row['seconds']}s", flush=True)
         vals = [r["S_angle"] for r in rows]
