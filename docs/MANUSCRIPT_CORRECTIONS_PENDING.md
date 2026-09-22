@@ -162,6 +162,29 @@ but note their unit-norm-ball explanation is explicitly their own speculation.
 
 ---
 
+## C7 — kNN purity under Poincaré distance rewards destroying the planted radius
+
+**Status:** UNCONDITIONAL. Found 2026-09-22 by a planted-truth test.
+**Evidence:** `results/task9_scorer_dose_response_mollusca.json` · `scripts/validate_task9_scorer.py`
+
+On a trained mollusca checkpoint:
+- Directions were held fixed.
+- Each node's radius was blended toward a random, depth-independent value, which drove depth-norm r
+  from 0.990 to −0.009.
+- The trainer's top-level kNN purity **rose** from 0.715 (±0.076) to 0.969 (±0.005). Sep rose
+  slightly, 1.022 → 1.036.
+- The radius-free S_angle stayed **bit-identical** (0.8218), because the angular structure never
+  changed.
+
+So any kNN-purity or separation figure computed with Poincaré distance across depths is confounded
+with the radial schedule. It favours embeddings whose radius has drifted away from depth, and
+Figure 4's prior arm is exactly such an embedding. Before the manuscript quotes kNN purity
+(e.g. family purity 0.907) or separation ratios as evidence of learned structure, check each against
+S_angle or a same-depth / radius-rectified variant. The Task 9 local runs' "prior kNN 99.6% vs
+canonical 73.4%" is partly this artefact.
+
+---
+
 ## Still to be added
 
 - Task 9 verdict — Figure 4 re-plot or caption rewrite (the single most likely change to what the

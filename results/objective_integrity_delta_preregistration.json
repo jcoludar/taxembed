@@ -1,0 +1,32 @@
+{
+  "status": "PRE-REGISTERED 2026-09-22, before any fixed-sampler run was submitted. Frozen at commit time; revise only by adding a dated amendment block, never by editing this one.",
+  "task": "plan v2 Task 8 -- does the ancestry-aware sampler (Task 6, commit 3e871e3) materially change what the canonical recipe learns?",
+  "why": "The shipped sampler scores same-depth draws against the ANCHOR with no ancestry check: 47.375240% of draws are false negatives (results/negative_sampler_audit.json). Methods describe a clean Nickel-Kiela softmax. The manuscript must say either 'the fix materially changes the result' (shipped artifact trained on a defective objective; retrain scoped) or 'robust to the fix' (a reportable robustness result).",
+
+  "arms": {
+    "unfixed": "Task 9 canonical seeds 0/1/2 = LRZ array 5802007 tasks 0-2 (tags task9_canonical_s{0,1,2}); shipped sampler. Its code path is proven identical to the shipped sampler by tests/test_negative_sampling.py::test_flags_off_matches_the_pinned_shipped_sampler.",
+    "fixed": "tags task8_fixed_canonical_s{0,1,2}; IDENTICAL flags to task9_canonical plus --exclude-descendant-negatives --drop-root-anchored; --save-every 20 instead of 10 (storage; milestones every 20 epochs are a subset of the unfixed arm's)",
+    "scale": "metazoa_33208_clean (498,246 nodes) -- Figure 4's scale; the canonical recipe does not train below it (echinodermata run 1, INVALID)"
+  },
+
+  "declared_confounds": [
+    "The fixed arm drops root-anchored pairs (5.1505% of the full closure) from each epoch, so it takes ~5% fewer optimizer steps per epoch.",
+    "Where no valid same-depth negative exists (14.1446% of pairs over the full closure, fewer once root pairs are dropped), the fixed arm draws from outside the anchor's subtree at ANY depth -- easier negatives than the same-depth design. Rows affected are logged per epoch ('zero-pool rows').",
+    "Unfixed and fixed arms run in different LRZ src trees (src vs src_task8) at different times, possibly on different GPUs of the same partition; the default sampler path is hash-pinned identical."
+  ],
+
+  "metrics": {
+    "primary": "S_angle at k=10 (src/taxembed/eval/angular.py), same 10,000 queries seed 0 as Task 9, per run = mean over rolling epoch 196-200 checkpoints",
+    "secondary": ["S_poincare", "S_angle by depth band and clade (clade level from choose_clade_level)", "depth-norm r beside its metazoa init floor 0.984167", "final-phase training loss (NOT comparable across arms: the fixed arm's softmax denominator has no false negatives)", "per-epoch observed FN rate and zero-pool rows from the fixed arm's log"]
+  },
+
+  "validity_gate": "Same as preregistration_v2_20260922 in results/recipe_angular_comparison.json: (a) max_t S_angle(t) - S_angle(init) > 10 x within-run jitter SD; (b) final-phase (epoch >= 130) loss falls by more than its within-run jitter. Either failing => UNINFORMATIVE.",
+
+  "readings": {
+    "MATERIAL": "all 3 fixed seeds on one side of all 3 unfixed seeds on S_angle AND |mean difference| >= max(0.01, 2 x pooled within-arm seed SD) AND the same sign in every depth band and every clade stratum with n >= 500. Report the direction. If fixed > unfixed: the shipped artifact under-learned because of the defect; Methods must say so and a cellular retrain with the fix is scoped. If fixed < unfixed: report it; the false negatives were acting as a regularizer or the depth-relaxed negatives are too easy -- investigate before any retrain.",
+    "ROBUST": "3v3 ranges overlap OR |mean difference| < max(0.01, 2 x pooled seed SD) => the defect does not materially change learned structure at this scale. Methods still states the deviation (C1) and reports this as a robustness result.",
+    "MIXED": "anything else (e.g. seed-separated aggregate whose sign flips in a stratum) -- reported per stratum, no aggregate claim."
+  },
+
+  "manuscript_hooks": "docs/MANUSCRIPT_CORRECTIONS_PENDING.md C1 (Methods: sampler deviation) and 'Still to be added: Task 8 verdict'."
+}

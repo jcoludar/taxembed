@@ -1,0 +1,162 @@
+{
+  "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+  "direction_dose": [
+    {
+      "p": 0.0,
+      "S_angle": 0.8659067305658453,
+      "S_cluster_se": 0.023300874664854303
+    },
+    {
+      "p": 0.25,
+      "S_angle": 0.48528835455818586,
+      "S_cluster_se": 0.01541606091907828
+    },
+    {
+      "p": 0.5,
+      "S_angle": 0.21343473116153372,
+      "S_cluster_se": 0.0071287942608265304
+    },
+    {
+      "p": 0.75,
+      "S_angle": 0.05142204693879931,
+      "S_cluster_se": 0.0026087250212068554
+    },
+    {
+      "p": 1.0,
+      "S_angle": -0.0018407140153298832,
+      "S_cluster_se": 0.001382622753122451
+    }
+  ],
+  "radius_dose": [
+    {
+      "alpha": 0.0,
+      "depth_norm_r": 0.9899288642352525,
+      "S_angle": 0.8217788445315397,
+      "S_poincare": 0.8217788445315397,
+      "S_angle_identical_to_alpha0": true,
+      "knn_purity_mean": 0.7147,
+      "knn_purity_sd": 0.07606281121546848,
+      "class_sep_mean": 1.022160565545558,
+      "class_sep_sd": 0.005895243866876601,
+      "multiscale_knn_mean": {
+        "1": 0.7147,
+        "2": 0.54957,
+        "3": 0.49803,
+        "4": 0.46784
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "alpha": 0.25,
+      "depth_norm_r": 0.6271173568575443,
+      "S_angle": 0.8217788445315397,
+      "S_poincare": 0.7699418189255184,
+      "S_angle_identical_to_alpha0": true,
+      "knn_purity_mean": 0.8781800000000001,
+      "knn_purity_sd": 0.05748740731673328,
+      "class_sep_mean": 1.031226295769662,
+      "class_sep_sd": 0.009320369809767878,
+      "multiscale_knn_mean": {
+        "1": 0.8781800000000001,
+        "2": 0.68577,
+        "3": 0.63772,
+        "4": 0.5558799999999999
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "alpha": 0.5,
+      "depth_norm_r": 0.25564490549360047,
+      "S_angle": 0.8217788445315397,
+      "S_poincare": 0.7536358977154344,
+      "S_angle_identical_to_alpha0": true,
+      "knn_purity_mean": 0.9327,
+      "knn_purity_sd": 0.03729136964499962,
+      "class_sep_mean": 1.0359196313807852,
+      "class_sep_sd": 0.012359736904289115,
+      "multiscale_knn_mean": {
+        "1": 0.9327,
+        "2": 0.7754999999999999,
+        "3": 0.7308300000000001,
+        "4": 0.62546
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "alpha": 0.75,
+      "depth_norm_r": 0.08226640996901494,
+      "S_angle": 0.8217788445315397,
+      "S_poincare": 0.7464542590377439,
+      "S_angle_identical_to_alpha0": true,
+      "knn_purity_mean": 0.96404,
+      "knn_purity_sd": 0.005246475007088077,
+      "class_sep_mean": 1.037505058879163,
+      "class_sep_sd": 0.015119952504310214,
+      "multiscale_knn_mean": {
+        "1": 0.96404,
+        "2": 0.84649,
+        "3": 0.8023900000000002,
+        "4": 0.67874
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "alpha": 1.0,
+      "depth_norm_r": -0.008503033435019606,
+      "S_angle": 0.8217788445315397,
+      "S_poincare": 0.7409313882316261,
+      "S_angle_identical_to_alpha0": true,
+      "knn_purity_mean": 0.9686299999999999,
+      "knn_purity_sd": 0.004971745166438051,
+      "class_sep_mean": 1.035596996164104,
+      "class_sep_sd": 0.017600603266795977,
+      "multiscale_knn_mean": {
+        "1": 0.9686299999999999,
+        "2": 0.88157,
+        "3": 0.8411799999999999,
+        "4": 0.71809
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "checks": {
+    "direction_dose_monotone": true,
+    "direction_dose_p1_near_zero": true,
+    "radius_dose_S_angle_invariant": true
+  }
+}
