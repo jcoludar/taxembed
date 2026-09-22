@@ -165,7 +165,14 @@ but note their unit-norm-ball explanation is explicitly their own speculation.
 ## Still to be added
 
 - Task 9 verdict — Figure 4 re-plot or caption rewrite (the single most likely change to what the
-  manuscript says).
+  manuscript says). **2026-09-22, provisional (n=1 historical pair, REPORTED not read):** on the
+  radius-free S_angle (`src/taxembed/eval/angular.py`, `results/fig4_runs_20260922_104857.json`),
+  prior peaks at 0.938 (ep40) and collapses in steps at each curriculum transition to 0.62.
+  Canonical climbs to 0.973. So the collapse is **angular, not only radial**, which points to
+  reading 1. That would mean re-plotting Fig 4 on S_angle, with the radius floor in the caption.
+  The verdict waits for seeded array 5802007 under `preregistration_v2_20260922`.
+- C4's valid null now exists: S_angle's closed-form null is the initialization state. On metazoa
+  it scores −0.0015 (cluster se 0.0033), against the degenerate radial-only null.
 - Task 8 verdict — whether the sampler fix materially moves the numbers. If yes, Methods must say the
   shipped artifact was trained with a defective objective and a retrain is scoped; if no, it is a
   robustness result worth reporting.

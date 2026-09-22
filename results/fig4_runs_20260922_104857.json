@@ -1,0 +1,5295 @@
+{
+  "design": "docs/specs/2026-09-22-task9-radius-free-scorer-design.md",
+  "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+  "n_nodes": 498246,
+  "max_depth": 37,
+  "k": 10,
+  "n_queries": 10000,
+  "seed": 0,
+  "radial_schedule": "log",
+  "cluster_level": 3,
+  "clade_level": 4,
+  "uncertainty_note": "*_cluster_se / ci95 are CLUSTER bootstraps over depth-3 clades for ONE trained run: query-sampling uncertainty only. They say nothing about run-to-run spread, which needs independent seeds.",
+  "runs": {
+    "prior": {
+      "checkpoints": [
+        {
+          "epoch": 10,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch10.pth",
+          "trainer": {
+            "loss": 3.756997000681211,
+            "reg_loss": 0.00025776416257267804,
+            "depth_norm_corr": 0.8526781407222622,
+            "hierarchy_pct": 96.0,
+            "knn_purity": 0.75005,
+            "class_sep_ratio": 0.7937113173100903,
+            "epoch": 10
+          },
+          "S_angle": 0.4928484622909325,
+          "S_angle_cluster_se": 0.0556021785876583,
+          "S_angle_cluster_ci95": [
+            0.44120966404529827,
+            0.6645172813559412
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.6016226295207283
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5409350738521311
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.41357999458723216
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.4374962345264683
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5077063448543072
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.584228222084367
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.691047060688585
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.19512822397032245
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85920,
+            "modal_share": 9e-05
+          },
+          "S_poincare": 0.2810823233676836,
+          "S_poincare_cluster_se": 0.06693255224941749,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.45778277059389083
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.35502555634823896
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.15887334017782398
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.22298716323434317
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.2886718510037239
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4397883732031374
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 16.5303,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.8526781407567479,
+          "radial_dev_mean": 0.038981230750494894,
+          "norm_min": 0.35488348140274795,
+          "norm_max": 0.988561301785187,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.9
+        },
+        {
+          "epoch": 20,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch20.pth",
+          "trainer": {
+            "loss": 2.9569997001592427,
+            "reg_loss": 0.00019811707233987374,
+            "depth_norm_corr": 0.9142257108447126,
+            "hierarchy_pct": 98.0,
+            "knn_purity": 0.63265,
+            "class_sep_ratio": 0.7717131553720558,
+            "epoch": 20
+          },
+          "S_angle": 0.7866222716419674,
+          "S_angle_cluster_se": 0.03968073802076527,
+          "S_angle_cluster_ci95": [
+            0.7457681642612243,
+            0.8926799584663814
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.8569652149104401
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8129363794254025
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7428811799722912
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7432810260111343
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7991091211118433
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8546584402172615
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9316830593583294
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.35642004837295826
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 82884,
+            "modal_share": 0.00012
+          },
+          "S_poincare": 0.651595644446647,
+          "S_poincare_cluster_se": 0.05833846844335132,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.7710906722675522
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6838517430525337
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.5968594943702539
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.5824074661269695
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6752109975544006
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.7352054750015382
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 19.92633,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9142257107578291,
+          "radial_dev_mean": 0.03483257171751864,
+          "norm_min": 0.41136958355144243,
+          "norm_max": 0.9868228364465725,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.8
+        },
+        {
+          "epoch": 30,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch30.pth",
+          "trainer": {
+            "loss": 2.6796508349784434,
+            "reg_loss": 0.00018685378347994356,
+            "depth_norm_corr": 0.9280580674908834,
+            "hierarchy_pct": 97.89999999999999,
+            "knn_purity": 0.83265,
+            "class_sep_ratio": 0.8071978843601202,
+            "epoch": 30
+          },
+          "S_angle": 0.8739197270368522,
+          "S_angle_cluster_se": 0.0292138329100145,
+          "S_angle_cluster_ci95": [
+            0.840792956321207,
+            0.9473334245450155
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9148634417079495
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8929035360437851
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8426929862809416
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8386483121899686
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8843112233533734
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9284089002670167
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.963266005545775
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.4271620944982115
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 81704,
+            "modal_share": 0.00013
+          },
+          "S_poincare": 0.8075521730776095,
+          "S_poincare_cluster_se": 0.04796895169930634,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.869041322469596
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8309762290386749
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7686530279614608
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7389833704016233
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.833084840551727
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8790639576436365
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 20.93549,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9280580673317149,
+          "radial_dev_mean": 0.03407203027090984,
+          "norm_min": 0.4314908913103827,
+          "norm_max": 0.981658362596941,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.1
+        },
+        {
+          "epoch": 40,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch40.pth",
+          "trainer": {
+            "loss": 4.335810689595536,
+            "reg_loss": 0.00020379076396157952,
+            "depth_norm_corr": 0.8452295688059689,
+            "hierarchy_pct": 96.89999999999999,
+            "knn_purity": 0.9365,
+            "class_sep_ratio": 0.7997249572079108,
+            "epoch": 40
+          },
+          "S_angle": 0.9382388409630465,
+          "S_angle_cluster_se": 0.07215033812062073,
+          "S_angle_cluster_ci95": [
+            0.7057715538902744,
+            0.9509661238659733
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.7212431838428134
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9335695405165234
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9528725960275024
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9541271977332608
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9427610764205518
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.869334971601037
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9603986732593413
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.80369781192039
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 81087,
+            "modal_share": 9e-05
+          },
+          "S_poincare": 0.7311621418282921,
+          "S_poincare_cluster_se": 0.07954280682397391,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.4785805113902152
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.7587394124914016
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6962858050520542
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7032858997985796
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7532259283759557
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.7069795508608738
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.679019999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.8452295686165209,
+          "radial_dev_mean": 0.03575210510701547,
+          "norm_min": 0.12272499402628764,
+          "norm_max": 0.9788096820853078,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.9
+        },
+        {
+          "epoch": 50,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch50.pth",
+          "trainer": {
+            "loss": 3.7986658310528165,
+            "reg_loss": 0.00023658573043227327,
+            "depth_norm_corr": 0.8750377267058935,
+            "hierarchy_pct": 98.2,
+            "knn_purity": 0.8131,
+            "class_sep_ratio": 0.7761569822794615,
+            "epoch": 50
+          },
+          "S_angle": 0.8235677215454528,
+          "S_angle_cluster_se": 0.11383804865425537,
+          "S_angle_cluster_ci95": [
+            0.47529721710222106,
+            0.8746290633688492
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.5139366707439668
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8002168732846611
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.870689887975964
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8809846165222827
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8173224298577365
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6834876089531333
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8178947960857786
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.8566045890273257
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 63462,
+            "modal_share": 0.00024
+          },
+          "S_poincare": 0.7895798799498185,
+          "S_poincare_cluster_se": 0.1485818508226672,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.38995529980329763
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.7668296033336252
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8387816710026692
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8596557144500155
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.779899772043909
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6381529069180439
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 20.35342,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.8750377270426957,
+          "radial_dev_mean": 0.03797335672622092,
+          "norm_min": 0.12979702537026053,
+          "norm_max": 0.9763224595786227,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.8
+        },
+        {
+          "epoch": 60,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch60.pth",
+          "trainer": {
+            "loss": 3.7911976088699735,
+            "reg_loss": 0.00023675140781169896,
+            "depth_norm_corr": 0.8747302809641989,
+            "hierarchy_pct": 97.6,
+            "knn_purity": 0.881,
+            "class_sep_ratio": 0.8012410239770146,
+            "epoch": 60
+          },
+          "S_angle": 0.824445747995429,
+          "S_angle_cluster_se": 0.11381688298428383,
+          "S_angle_cluster_ci95": [
+            0.4694837855657631,
+            0.8764835369280868
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.5184987558218702
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8017551994894646
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8704058385667061
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8826772992943153
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8182444205348444
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6820401256638684
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.819239651051982
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.8577293682724345
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 64269,
+            "modal_share": 0.00023
+          },
+          "S_poincare": 0.7895902605580939,
+          "S_poincare_cluster_se": 0.14822490177963052,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.39418193744900204
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.76694429680649
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8384863497914565
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8617303499904123
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7794888691122217
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6319951706301057
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 20.36357,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.8747302809118559,
+          "radial_dev_mean": 0.03808390520595463,
+          "norm_min": 0.128777842418981,
+          "norm_max": 0.9794709814896878,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 70,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch70.pth",
+          "trainer": {
+            "loss": 3.7877225302975925,
+            "reg_loss": 0.00023679385624733498,
+            "depth_norm_corr": 0.8747522914835355,
+            "hierarchy_pct": 97.7,
+            "knn_purity": 0.94765,
+            "class_sep_ratio": 0.8001788910540742,
+            "epoch": 70
+          },
+          "S_angle": 0.8245184122533584,
+          "S_angle_cluster_se": 0.11736749643365213,
+          "S_angle_cluster_ci95": [
+            0.46033669368266394,
+            0.8741432949527469
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.5095758541253825
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8011086150361874
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8719117513078511
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8802591810485546
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8188977997548421
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6883402373573081
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8178778796711095
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.8582000875990464
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 63858,
+            "modal_share": 0.00024
+          },
+          "S_poincare": 0.7894726136643042,
+          "S_poincare_cluster_se": 0.15857721152856422,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.36090555217488296
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.7662848093375157
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8403349253120233
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8570507416125368
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7811368367004383
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.6426614614255901
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 20.364410000000003,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.8747522915178152,
+          "radial_dev_mean": 0.03809443212513116,
+          "norm_min": 0.13243306193064713,
+          "norm_max": 0.9762543729268368,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.2
+        },
+        {
+          "epoch": 80,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch80.pth",
+          "trainer": {
+            "loss": 4.21976152180819,
+            "reg_loss": 0.0002829991104902157,
+            "depth_norm_corr": 0.7963251734241925,
+            "hierarchy_pct": 96.5,
+            "knn_purity": 0.9917,
+            "class_sep_ratio": 0.8835881995771675,
+            "epoch": 80
+          },
+          "S_angle": 0.7694492853513966,
+          "S_angle_cluster_se": 0.11161108837401515,
+          "S_angle_cluster_ci95": [
+            0.43532306596084713,
+            0.8362338835874372
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.47395133682587215
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.7352559239222686
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8331457700253315
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.842638207295474
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7605670069010863
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.5797315321939458
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.7637538109369197
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.7978828857299813
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 68110,
+            "modal_share": 0.00038
+          },
+          "S_poincare": 0.7043611413621191,
+          "S_poincare_cluster_se": 0.15607799790723917,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.29361479727580775
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6637330742435806
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.782048437404397
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8106970635582882
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6841100225307702
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.48151623163218993
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 19.72781,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.796325173398576,
+          "radial_dev_mean": 0.04221930972113266,
+          "norm_min": 0.11246556306891077,
+          "norm_max": 0.9798289014530105,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.8
+        },
+        {
+          "epoch": 90,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch90.pth",
+          "trainer": {
+            "loss": 4.26277402180401,
+            "reg_loss": 0.00035962072217340403,
+            "depth_norm_corr": 0.7845598018333999,
+            "hierarchy_pct": 97.2,
+            "knn_purity": 0.81275,
+            "class_sep_ratio": 0.8471428601473503,
+            "epoch": 90
+          },
+          "S_angle": 0.7102002335171338,
+          "S_angle_cluster_se": 0.12984771177600535,
+          "S_angle_cluster_ci95": [
+            0.32630675775566514,
+            0.7904148181054496
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3631195052273951
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6687580820234839
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7870283195079727
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.798246502454263
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6942795071015797
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.5234576531694944
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.7053160564620775
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.7373171225632774
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 67425,
+            "modal_share": 0.0004
+          },
+          "S_poincare": 0.6436034411251385,
+          "S_poincare_cluster_se": 0.17625292176327204,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.19123624096873984
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5982431012375984
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7301305176011622
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7750463066031739
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6109693006903983
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.42697458670800625
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 19.04289,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.7845598018584384,
+          "radial_dev_mean": 0.04362519093658356,
+          "norm_min": 0.1186317571364266,
+          "norm_max": 0.9778283935543832,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.6
+        },
+        {
+          "epoch": 100,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch100.pth",
+          "trainer": {
+            "loss": 4.2614136971531416,
+            "reg_loss": 0.00035915804643163164,
+            "depth_norm_corr": 0.7849303802403779,
+            "hierarchy_pct": 95.89999999999999,
+            "knn_purity": 0.80245,
+            "class_sep_ratio": 0.8627598484358607,
+            "epoch": 100
+          },
+          "S_angle": 0.7068767087675683,
+          "S_angle_cluster_se": 0.1264168928260109,
+          "S_angle_cluster_ci95": [
+            0.32740739268321994,
+            0.7889048787699464
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3769399394339847
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6638276963586944
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7856554140298931
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7958805935797172
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6899134819581731
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.5209067604875934
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.7056205519261235
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.7349586158486756
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 67520,
+            "modal_share": 0.00045
+          },
+          "S_poincare": 0.6406441027159082,
+          "S_poincare_cluster_se": 0.17403749251300804,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.19546287861444434
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5928711457022784
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7307234143839785
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7699187967775041
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6080552293692081
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4264406789373757
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 19.004469999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.7849303803051918,
+          "radial_dev_mean": 0.043624319757296734,
+          "norm_min": 0.11560380160583758,
+          "norm_max": 0.9794459885488187,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.4
+        },
+        {
+          "epoch": 110,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch110.pth",
+          "trainer": {
+            "loss": 4.26101725123978,
+            "reg_loss": 0.000359600561182084,
+            "depth_norm_corr": 0.7834823553796566,
+            "hierarchy_pct": 96.1,
+            "knn_purity": 0.9032,
+            "class_sep_ratio": 0.8529303071273829,
+            "epoch": 110
+          },
+          "S_angle": 0.7089934878050976,
+          "S_angle_cluster_se": 0.12104283438253025,
+          "S_angle_cluster_ci95": [
+            0.35267157319287096,
+            0.7905506072857132
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.39136417901853227
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6670190422411667
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.785668940192239
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7984498442158381
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6934272102079388
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.5112252329134941
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.7033791269824511
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.7377760762228006
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 67116,
+            "modal_share": 0.00049
+          },
+          "S_poincare": 0.6418352775155309,
+          "S_poincare_cluster_se": 0.1722392434820254,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.1927122096704144
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5919880059612168
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.73530878341914
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7775358692516504
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6113337410997748
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3827788879169283
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 19.028940000000002,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.78348235542817,
+          "radial_dev_mean": 0.043684386264445776,
+          "norm_min": 0.11279597815539902,
+          "norm_max": 0.9800774440673289,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.1
+        },
+        {
+          "epoch": 120,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch120.pth",
+          "trainer": {
+            "loss": 4.383325784066872,
+            "reg_loss": 0.0004260152027145035,
+            "depth_norm_corr": 0.6733962487165746,
+            "hierarchy_pct": 96.0,
+            "knn_purity": 0.9112,
+            "class_sep_ratio": 0.9073411670180911,
+            "epoch": 120
+          },
+          "S_angle": 0.6489399388294773,
+          "S_angle_cluster_se": 0.12049297131982141,
+          "S_angle_cluster_ci95": [
+            0.31512306651176497,
+            0.751738835068414
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3665410690358225
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.6056322282269334
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7265280496964478
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7583420556759242
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.6180882302807296
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4791907666756659
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6473012123539658
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6698919754836249
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70006,
+            "modal_share": 0.00033
+          },
+          "S_poincare": 0.5492402516973414,
+          "S_poincare_cluster_se": 0.1620170140704609,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.18627161897219782
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5004439769255118
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.638166139813357
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.724186135454553
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.48752709063313243
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.35792251503979905
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.33472,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6733962493041284,
+          "radial_dev_mean": 0.04932369201608445,
+          "norm_min": 0.11268220519643099,
+          "norm_max": 0.9747450698371172,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.1
+        },
+        {
+          "epoch": 130,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch130.pth",
+          "trainer": {
+            "loss": 4.404647278661995,
+            "reg_loss": 0.0004977735615357621,
+            "depth_norm_corr": 0.6692136201166455,
+            "hierarchy_pct": 95.39999999999999,
+            "knn_purity": 0.9894,
+            "class_sep_ratio": 0.9234363114200937,
+            "epoch": 130
+          },
+          "S_angle": 0.6210835765219533,
+          "S_angle_cluster_se": 0.12491069775594238,
+          "S_angle_cluster_ci95": [
+            0.28698701582826064,
+            0.7389347130198033
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.32601901922620985
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5787738842187445
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6975279576274592
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7462981780950498
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5828783500919609
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4443681154134344
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6204464040665688
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6432223580562519
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70789,
+            "modal_share": 0.00027
+          },
+          "S_poincare": 0.5016122908275926,
+          "S_poincare_cluster_se": 0.17711385898824544,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.1274341393645317
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.44378683499855404
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.605112707761467
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7062645818194939
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.42177971765549044
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.33497634551981414
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.0127,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6692136197895047,
+          "radial_dev_mean": 0.04972231262203332,
+          "norm_min": 0.1099069602170441,
+          "norm_max": 0.9723237389965452,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 140,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch140.pth",
+          "trainer": {
+            "loss": 4.4046949601613266,
+            "reg_loss": 0.000499719099362927,
+            "depth_norm_corr": 0.6681047925988527,
+            "hierarchy_pct": 96.7,
+            "knn_purity": 0.95465,
+            "class_sep_ratio": 0.8840764962764807,
+            "epoch": 140
+          },
+          "S_angle": 0.6176294291182532,
+          "S_angle_cluster_se": 0.1270191065504266,
+          "S_angle_cluster_ci95": [
+            0.28787418132497633,
+            0.7365888964180389
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3217923815805052
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5747653473421088
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6949715129441392
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7433936883384937
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5769892253890482
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4558056063220515
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6130200980267786
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6401963581812014
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70469,
+            "modal_share": 0.00032
+          },
+          "S_poincare": 0.4930802958757539,
+          "S_poincare_cluster_se": 0.17293596542308448,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.1313924190644774
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4504634287877147
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.5722463876220243
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7026374044508528
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4135326199452967
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.2962739644576676
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.972769999999997,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6681047934592381,
+          "radial_dev_mean": 0.04981406550729153,
+          "norm_min": 0.10810523587603248,
+          "norm_max": 0.971262023625134,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.4
+        },
+        {
+          "epoch": 150,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch150.pth",
+          "trainer": {
+            "loss": 4.404978707892368,
+            "reg_loss": 0.0004984142764779003,
+            "depth_norm_corr": 0.6697686215369582,
+            "hierarchy_pct": 96.1,
+            "knn_purity": 0.9889,
+            "class_sep_ratio": 0.9303341904323119,
+            "epoch": 150
+          },
+          "S_angle": 0.6200524360999122,
+          "S_angle_cluster_se": 0.1175991221366124,
+          "S_angle_cluster_ci95": [
+            0.31438051092487634,
+            0.737389997761796
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3405103482971971
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5789459244280419
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6940832949501105
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7440147050697915
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5782974357828655
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4725109872342225
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6179596911101926
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.641655115614154
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70249,
+            "modal_share": 0.0003
+          },
+          "S_poincare": 0.5132368419948646,
+          "S_poincare_cluster_se": 0.17989993679362237,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.1156263897511347
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4597062890322327
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6107711523427138
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7123373560503251
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.43747243456601465
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3396391400499867
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.00078,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6697686211092915,
+          "radial_dev_mean": 0.04971538528882228,
+          "norm_min": 0.10997159763915704,
+          "norm_max": 0.9732005364923318,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.2
+        },
+        {
+          "epoch": 160,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch160.pth",
+          "trainer": {
+            "loss": 4.404445242936758,
+            "reg_loss": 0.0004986430369374414,
+            "depth_norm_corr": 0.6678209161921479,
+            "hierarchy_pct": 96.3,
+            "knn_purity": 0.99425,
+            "class_sep_ratio": 0.9454128527980549,
+            "epoch": 160
+          },
+          "S_angle": 0.6171095336537852,
+          "S_angle_cluster_se": 0.12514668951494792,
+          "S_angle_cluster_ci95": [
+            0.2778945616751702,
+            0.7338088507225392
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3158214172873669
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.575194014196942
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6931432266670904
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7405798780161542
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5772026626009141
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4607175578118519
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.615371479665801
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6396143745540059
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70307,
+            "modal_share": 0.0003
+          },
+          "S_poincare": 0.515912443777896,
+          "S_poincare_cluster_se": 0.1764523535100942,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.12226824890867057
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4683097331655273
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6039922906471722
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7109771645370848
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.44362871877221577
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.33176103427890613
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.966760000000004,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.667820914968707,
+          "radial_dev_mean": 0.04982454154570316,
+          "norm_min": 0.11680401756235648,
+          "norm_max": 0.9736478248078776,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 170,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch170.pth",
+          "trainer": {
+            "loss": 4.404746686185462,
+            "reg_loss": 0.000497529340660469,
+            "depth_norm_corr": 0.6698335730090422,
+            "hierarchy_pct": 95.6,
+            "knn_purity": 0.89705,
+            "class_sep_ratio": 0.8987059089690775,
+            "epoch": 170
+          },
+          "S_angle": 0.6176363495237704,
+          "S_angle_cluster_se": 0.14127352751474492,
+          "S_angle_cluster_ci95": [
+            0.23646750750196377,
+            0.7393670599607218
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.29012614398094033
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5769387886529026
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6926359955791301
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7477078311178623
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5768527417297599
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.44860378372710286
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6123434414400096
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6400636006934949
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70895,
+            "modal_share": 0.00035
+          },
+          "S_poincare": 0.5109505130221677,
+          "S_poincare_cluster_se": 0.1716720074252485,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.14219382638127803
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4638839987813445
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.5973509449354775
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7062096245866359
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.44087871823293606
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.30709449527577853
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.972849999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6698335732802754,
+          "radial_dev_mean": 0.049749538587489754,
+          "norm_min": 0.11062716374616609,
+          "norm_max": 0.9743736992048445,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.9
+        },
+        {
+          "epoch": 180,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch180.pth",
+          "trainer": {
+            "loss": 4.40468227535134,
+            "reg_loss": 0.0004984694274563748,
+            "depth_norm_corr": 0.6685224318594254,
+            "hierarchy_pct": 95.5,
+            "knn_purity": 0.9779,
+            "class_sep_ratio": 0.8899837889605281,
+            "epoch": 180
+          },
+          "S_angle": 0.6194780424419966,
+          "S_angle_cluster_se": 0.131004119134193,
+          "S_angle_cluster_ci95": [
+            0.27817391432776223,
+            0.7374232215005888
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.30743523148239754
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5788140269342471
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6939052004792267
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7449709609215242
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5800746272612596
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4539547260505328
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6180019821468659
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.642042641483711
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70297,
+            "modal_share": 0.00024
+          },
+          "S_poincare": 0.5160975646254773,
+          "S_poincare_cluster_se": 0.17218982403014885,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.12609234963573654
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4701605990838883
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6014358459638518
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.703151254578077
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4496935298876173
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.31785570300826366
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.994139999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6685224319901912,
+          "radial_dev_mean": 0.04979581805243166,
+          "norm_min": 0.10958599438479898,
+          "norm_max": 0.9744711896403475,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.4
+        },
+        {
+          "epoch": 190,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch190.pth",
+          "trainer": {
+            "loss": 4.404630287231716,
+            "reg_loss": 0.000498050619936181,
+            "depth_norm_corr": 0.6687625246807543,
+            "hierarchy_pct": 96.1,
+            "knn_purity": 0.6768,
+            "class_sep_ratio": 0.8737287354950862,
+            "epoch": 190
+          },
+          "S_angle": 0.6187738911806362,
+          "S_angle_cluster_se": 0.12354280990755412,
+          "S_angle_cluster_ci95": [
+            0.2836311013262034,
+            0.736635423412911
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.32662282460416775
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5753975951112775
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6967975448607965
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7436355001630699
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5797218024824606
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4489122637723559
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6175029479141236
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6419214643769978
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 71011,
+            "modal_share": 0.00028
+          },
+          "S_poincare": 0.517272303461997,
+          "S_poincare_cluster_se": 0.16198026060736245,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.15950291388273516
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4628976349147044
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.614795185640533
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7050665141431852
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.45018138637188204
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3154115918804886
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.985999999999997,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6687625243126561,
+          "radial_dev_mean": 0.049782643573399454,
+          "norm_min": 0.11228999262067844,
+          "norm_max": 0.9731160555720445,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.9
+        },
+        {
+          "epoch": 200,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch200.pth",
+          "trainer": {
+            "loss": 4.404843275984827,
+            "reg_loss": 0.0004978842356110656,
+            "depth_norm_corr": 0.6693561044098654,
+            "hierarchy_pct": 96.0,
+            "knn_purity": 0.90825,
+            "class_sep_ratio": 0.8884813287551638,
+            "epoch": 200
+          },
+          "S_angle": 0.6209685247802323,
+          "S_angle_cluster_se": 0.12092356386315904,
+          "S_angle_cluster_ci95": [
+            0.29327332003700796,
+            0.7372220489942156
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3440660910785044
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5790090058381177
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6962519896461901
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7438141111698592
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5813581544401001
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4621294472497411
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6173168673527619
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6439400637486874
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70364,
+            "modal_share": 0.00038
+          },
+          "S_poincare": 0.5178527524747399,
+          "S_poincare_cluster_se": 0.17365255854638384,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.12642779706793542
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4691814035593022
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6075383995421129
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7073362478602291
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4476012644298022
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3389391276396046
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.01137,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.669356104202676,
+          "radial_dev_mean": 0.0497782223983484,
+          "norm_min": 0.10936379754987507,
+          "norm_max": 0.9777110332761597,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.4
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.7030676310659126,
+      "S_angle_sd_over_checkpoints": 0.11321666803967362
+    },
+    "canonical": {
+      "checkpoints": [
+        {
+          "epoch": 10,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch10.pth",
+          "trainer": {
+            "loss": 5.5691470242526435,
+            "reg_loss": 1.4503927110899272e-06,
+            "depth_norm_corr": 0.9831357594600713,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.421,
+            "class_sep_ratio": 0.7389792212757954,
+            "epoch": 10
+          },
+          "S_angle": 0.001961607648322113,
+          "S_angle_cluster_se": 0.020152183933806647,
+          "S_angle_cluster_ci95": [
+            0.0010852921410786382,
+            0.07673254177475974
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.05262936198420365
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.0020477915953719924
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.00012353580856676476
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.0007785836187841813
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.0009047671170200953
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.00719256820408194
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.004409789264688225
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.001954869548983385
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 90552,
+            "modal_share": 4e-05
+          },
+          "S_poincare": 0.0030550317200166745,
+          "S_poincare_cluster_se": 0.017594903845584917,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.046993845123264114
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.0025882845862489276
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.002312519748164854
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": -0.0008261675806751682
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.0038188384382101307
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.006077294194320636
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 10.85564,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9831357593588366,
+          "radial_dev_mean": 0.0024100564936026065,
+          "norm_min": 0.14796620407433952,
+          "norm_max": 0.95112024922354,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.8
+        },
+        {
+          "epoch": 20,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch20.pth",
+          "trainer": {
+            "loss": 5.4218322128465735,
+            "reg_loss": 2.622085687936268e-07,
+            "depth_norm_corr": 0.9840473236865188,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.36865,
+            "class_sep_ratio": 0.7351646890835367,
+            "epoch": 20
+          },
+          "S_angle": 0.014696018850392388,
+          "S_angle_cluster_se": 0.10253505640080218,
+          "S_angle_cluster_ci95": [
+            0.007390718403644236,
+            0.36370346156450284
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.27368921980320005
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.016893427989350805
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.0025379557872582813
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.004521171176427618
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.010979874689385634
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.04321354579595095
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.03255870327428089
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.007697904734186444
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 90510,
+            "modal_share": 5e-05
+          },
+          "S_poincare": 0.014971104969695033,
+          "S_poincare_cluster_se": 0.10189835791663801,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.2738233987760797
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.01694360638372921
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.0031714310571111003
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.004108991929991136
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.011948327888804565
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.04105418547917873
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 11.002850000000002,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9840473236815146,
+          "radial_dev_mean": 0.001193401682218729,
+          "norm_min": 0.1672783862915725,
+          "norm_max": 0.9503740884795915,
+          "n_norm_below_0p05": 0,
+          "seconds": 33.0
+        },
+        {
+          "epoch": 30,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch30.pth",
+          "trainer": {
+            "loss": 5.351091193009729,
+            "reg_loss": 2.4401165322717082e-08,
+            "depth_norm_corr": 0.9841897705626036,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.6163,
+            "class_sep_ratio": 0.7385314916056532,
+            "epoch": 30
+          },
+          "S_angle": 0.028317107009334902,
+          "S_angle_cluster_se": 0.13775162515696737,
+          "S_angle_cluster_ci95": [
+            0.014557049311903334,
+            0.49346853047572914
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.390961642099894
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.034928976597390665
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.0057346388216043985
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.009648681002097648
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.02175046814259318
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.09662805209324804
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.05444854385625968
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.012834683813632522
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 90462,
+            "modal_share": 5e-05
+          },
+          "S_poincare": 0.02836295469588534,
+          "S_poincare_cluster_se": 0.13684177840125147,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.38982112083041803
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.034774140409022776
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.006135914971190875
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.00980530911574357
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.021683678266771183
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.09758908608038282
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 11.16031,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841897705953891,
+          "radial_dev_mean": 0.0003523155904476457,
+          "norm_min": 0.17832849288698058,
+          "norm_max": 0.9500823225364576,
+          "n_norm_below_0p05": 0,
+          "seconds": 33.0
+        },
+        {
+          "epoch": 40,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch40.pth",
+          "trainer": {
+            "loss": 5.678925384356831,
+            "reg_loss": 9.068367091738097e-07,
+            "depth_norm_corr": 0.9834500363166434,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.3903,
+            "class_sep_ratio": 0.7329725068474077,
+            "epoch": 40
+          },
+          "S_angle": 0.04952209456427967,
+          "S_angle_cluster_se": 0.159968606296413,
+          "S_angle_cluster_ci95": [
+            0.0273125165989646,
+            0.5773809827923352
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.47509185809534793
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.06623886102115725
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.008935830576732156
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.020420298642304758
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.040493740033595564
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.16845644416873365
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.08923715062352368
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.023342628883827477
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 90490,
+            "modal_share": 5e-05
+          },
+          "S_poincare": 0.04966569297875865,
+          "S_poincare_cluster_se": 0.15854484652351417,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.46912089380220967
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.06538869565354455
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.010847528188245166
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.021981084055477714
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.04069701356870619
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.16363940961593423
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 11.40544,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9834500362566807,
+          "radial_dev_mean": 0.0019910682550958367,
+          "norm_min": 0.10073876166141014,
+          "norm_max": 0.9506246328943867,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.5
+        },
+        {
+          "epoch": 50,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch50.pth",
+          "trainer": {
+            "loss": 5.215702400579081,
+            "reg_loss": 5.905158687054463e-07,
+            "depth_norm_corr": 0.9838947366261155,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.6808,
+            "class_sep_ratio": 0.7413540779837298,
+            "epoch": 50
+          },
+          "S_angle": 0.7954656848420734,
+          "S_angle_cluster_se": 0.05919676773430723,
+          "S_angle_cluster_ci95": [
+            0.7649915167010136,
+            0.9630883645677146
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9503537800345804
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8318220934010551
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7330927471548512
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8541627390258382
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7474442482558868
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8997558499098481
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8189436137952707
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.7814877528919799
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 79913,
+            "modal_share": 0.00015
+          },
+          "S_poincare": 0.79342935551868,
+          "S_poincare_cluster_se": 0.05999257682830733,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9505550484938995
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.8300644159293973
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.7305430655527034
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.8530086371358159
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.7449004251593621
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8975964895930761
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 20.02856,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9838947366026342,
+          "radial_dev_mean": 0.0016443733683400579,
+          "norm_min": 0.09951569030060753,
+          "norm_max": 0.9501560325487185,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.3
+        },
+        {
+          "epoch": 60,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch60.pth",
+          "trainer": {
+            "loss": 4.808431272473929,
+            "reg_loss": 1.9090046952064148e-07,
+            "depth_norm_corr": 0.9842181471365893,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.68675,
+            "class_sep_ratio": 0.737011858892593,
+            "epoch": 60
+          },
+          "S_angle": 0.896685266035893,
+          "S_angle_cluster_se": 0.03181741865445518,
+          "S_angle_cluster_ci95": [
+            0.8805078309565688,
+            0.9852306052212114
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9830263599307416
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.921625648986032
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8545667024599963
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9279977813708298
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8700109301583557
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9614993174289805
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9124660122940883
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.8954541732542179
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 73121,
+            "modal_share": 0.00034
+          },
+          "S_poincare": 0.8965278268103796,
+          "S_poincare_cluster_se": 0.031871295107626096,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.982623823012103
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9214865831501832
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8543886079891123
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9278548925653984
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.8698729945452457
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9611552435323519
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.198660000000004,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9842181470341671,
+          "radial_dev_mean": 0.000888537488315202,
+          "norm_min": 0.10012371269010914,
+          "norm_max": 0.950077853046971,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.2
+        },
+        {
+          "epoch": 70,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch70.pth",
+          "trainer": {
+            "loss": 4.639007304441483,
+            "reg_loss": 1.9927170095502586e-08,
+            "depth_norm_corr": 0.9842254914055077,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.76225,
+            "class_sep_ratio": 0.7440584760783799,
+            "epoch": 70
+          },
+          "S_angle": 0.9231359209727648,
+          "S_angle_cluster_se": 0.02386898528962617,
+          "S_angle_cluster_ci95": [
+            0.9114819956405454,
+            0.9907266157045236
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9886618767916809
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9456524978828635
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.885528088069099
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9454192241868787
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9032926156712198
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9748944701632427
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9373754328945243
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9219589786992957
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 73452,
+            "modal_share": 0.0004
+          },
+          "S_poincare": 0.9231713880510398,
+          "S_poincare_cluster_se": 0.02386507845821399,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9886618767916809
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9456682682353826
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8855957188808271
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9454769292813802
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.903314394978553
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9749419286317432
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 21.50443,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9842254913840226,
+          "radial_dev_mean": 0.0002641887133086147,
+          "norm_min": 0.1000023598795505,
+          "norm_max": 0.9500317571346097,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.8
+        },
+        {
+          "epoch": 80,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch80.pth",
+          "trainer": {
+            "loss": 5.12215994045868,
+            "reg_loss": 7.515561525443709e-07,
+            "depth_norm_corr": 0.9839321288027978,
+            "hierarchy_pct": 99.9,
+            "knn_purity": 0.74795,
+            "class_sep_ratio": 0.7394986754074185,
+            "epoch": 80
+          },
+          "S_angle": 0.9280814157653898,
+          "S_angle_cluster_se": 0.018218617053790572,
+          "S_angle_cluster_ci95": [
+            0.9184099182875677,
+            0.9818698256415378
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9792022592036754
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9468868863845746
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8967931269426016
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9476230092244926
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9126243228866104
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9633501977004995
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9407164247916963
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9289167495291627
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 72619,
+            "modal_share": 0.0004
+          },
+          "S_poincare": 0.9274161917850633,
+          "S_poincare_cluster_se": 0.018330591659561666,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9778604694748807
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9465227346082278
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.8956772185490883
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9472932658273435
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9117095919786133
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9634213854032506
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.5616,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9839321289386238,
+          "radial_dev_mean": 0.0017912097876460681,
+          "norm_min": 0.10012505633998034,
+          "norm_max": 0.9501636789556795,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.7
+        },
+        {
+          "epoch": 90,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch90.pth",
+          "trainer": {
+            "loss": 4.91218883994852,
+            "reg_loss": 7.795252705629788e-07,
+            "depth_norm_corr": 0.9842675503480572,
+            "hierarchy_pct": 99.9,
+            "knn_purity": 0.9228,
+            "class_sep_ratio": 0.750006674315077,
+            "epoch": 90
+          },
+          "S_angle": 0.9460519787918014,
+          "S_angle_cluster_se": 0.011442352868829723,
+          "S_angle_cluster_ci95": [
+            0.9091666306472288,
+            0.9547402880234785
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.932575066128045
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9502617418236304
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9398852258153251
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9572048027733197
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9449985372605881
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9179680371969096
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9505786945438554
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9580335330680217
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 73864,
+            "modal_share": 0.00057
+          },
+          "S_poincare": 0.9459239512897357,
+          "S_poincare_cluster_se": 0.011395083401235554,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9323737976687255
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9500280538726679
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9399258043023623
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9570124524583161
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9448969004930329
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9179561725797847
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.76934,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9842675503906521,
+          "radial_dev_mean": 0.00159642314923355,
+          "norm_min": 0.10066658518711148,
+          "norm_max": 0.950096675877251,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.6
+        },
+        {
+          "epoch": 100,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch100.pth",
+          "trainer": {
+            "loss": 4.846100466447548,
+            "reg_loss": 3.0443577639750464e-07,
+            "depth_norm_corr": 0.9844027248385205,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9226,
+            "class_sep_ratio": 0.7506458797210109,
+            "epoch": 100
+          },
+          "S_angle": 0.9568504065504756,
+          "S_angle_cluster_se": 0.010532599134883063,
+          "S_angle_cluster_ci95": [
+            0.9227258208811138,
+            0.9614186853858963
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9379422250432257
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9561412159763789
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9586009257808683
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9635606067533706
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.959162346796318
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9200680744280564
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9571168888135114
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9723469766186829
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 77610,
+            "modal_share": 0.0003
+          },
+          "S_poincare": 0.9567716869377187,
+          "S_poincare_cluster_se": 0.010571726813465025,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9378751355567857
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9560810019031244
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9584927164821038
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9636018246780144
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9590069877373403
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.920139262130807
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.894170000000003,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9844027247609047,
+          "radial_dev_mean": 0.0009536505227318403,
+          "norm_min": 0.09952613988784424,
+          "norm_max": 0.950046900518209,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.7
+        },
+        {
+          "epoch": 110,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch110.pth",
+          "trainer": {
+            "loss": 4.8219809074825495,
+            "reg_loss": 3.4565454622570875e-08,
+            "depth_norm_corr": 0.9843002322536818,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9086,
+            "class_sep_ratio": 0.7431054939035748,
+            "epoch": 110
+          },
+          "S_angle": 0.9668157904950336,
+          "S_angle_cluster_se": 0.009631154354607175,
+          "S_angle_cluster_ci95": [
+            0.9350725691466532,
+            0.9706881034087859
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9514272118176165
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9666829798010939
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.967541719091317
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9721806487271794
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9688628502825509
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9347208765775813
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9663870840522475
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9804643604796863
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 79375,
+            "modal_share": 0.00017
+          },
+          "S_poincare": 0.9667941642277934,
+          "S_poincare_cluster_se": 0.00984806679898009,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9510246748989779
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9666586074381102
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9675372103705348
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9721641615573217
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9688541385596177
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9346378242577053
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 22.009369999999997,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9843002321981772,
+          "radial_dev_mean": 0.0002977560127267386,
+          "norm_min": 0.10002202256433268,
+          "norm_max": 0.9500292491115594,
+          "n_norm_below_0p05": 0,
+          "seconds": 30.6
+        },
+        {
+          "epoch": 120,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch120.pth",
+          "trainer": {
+            "loss": 5.114019047323927,
+            "reg_loss": 1.1089658478015701e-06,
+            "depth_norm_corr": 0.9840952152022822,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9347,
+            "class_sep_ratio": 0.7504232815349439,
+            "epoch": 120
+          },
+          "S_angle": 0.9543746314767491,
+          "S_angle_cluster_se": 0.014739836324684473,
+          "S_angle_cluster_ci95": [
+            0.9031952360711517,
+            0.9578711127243419
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9263357438891481
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9502302011185931
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9618336785814692
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9605104803297404
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9584799284998754
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9086424481365645
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9518135928147087
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9740506822704045
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 79592,
+            "modal_share": 0.00018
+          },
+          "S_poincare": 0.9542180573019261,
+          "S_poincare_cluster_se": 0.015015870151315839,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9258661174840696
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9500911352827439
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9616600928313674
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9604555230968823
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9583042420873871
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9082746450056856
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.86555,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9840952151588034,
+          "radial_dev_mean": 0.0019456958633622737,
+          "norm_min": 0.10035428656114312,
+          "norm_max": 0.9500797501909566,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 130,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch130.pth",
+          "trainer": {
+            "loss": 5.093023542232079,
+            "reg_loss": 1.3144235764053909e-06,
+            "depth_norm_corr": 0.9842716851090038,
+            "hierarchy_pct": 99.9,
+            "knn_purity": 0.9474,
+            "class_sep_ratio": 0.755467647427388,
+            "epoch": 130
+          },
+          "S_angle": 0.9452985196411323,
+          "S_angle_cluster_se": 0.017841490011329276,
+          "S_angle_cluster_ci95": [
+            0.8832901823239205,
+            0.9496941015164941
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9043974818233474
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9371967215958829
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.959412495521605
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9524345149612282
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9497420703977719
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8940726983069153
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9405388024376695
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9699155598253476
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 81028,
+            "modal_share": 0.00015
+          },
+          "S_poincare": 0.9452327757887203,
+          "S_poincare_cluster_se": 0.018015338514082213,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9037936764453899
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9371436758646828
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9593448647098769
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9523960448982275
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9496723766143057
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8941201567754158
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.760630000000003,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9842716851235327,
+          "radial_dev_mean": 0.0019833419128974243,
+          "norm_min": 0.09979964106963933,
+          "norm_max": 0.9500393436640959,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 140,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch140.pth",
+          "trainer": {
+            "loss": 5.080281948967673,
+            "reg_loss": 1.0727952087629153e-06,
+            "depth_norm_corr": 0.9843330290983378,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.96815,
+            "class_sep_ratio": 0.7564787784830491,
+            "epoch": 140
+          },
+          "S_angle": 0.9471791398403917,
+          "S_angle_cluster_se": 0.01748098969469421,
+          "S_angle_cluster_ci95": [
+            0.8890902994436063,
+            0.949349629390323
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9049341977148655
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9379293261538089
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9631434619686025
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9521679723818657
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9527229315947838
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8968371540970684
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9400651428269311
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9733516904736541
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 82308,
+            "modal_share": 0.00014
+          },
+          "S_poincare": 0.9471004202276354,
+          "S_poincare_cluster_se": 0.01735899061657593,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9052025556606245
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9378031633336571
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.963127681445866
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9520827886709355
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9526590456266064
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.8966710494573166
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.78237,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9843330291153171,
+          "radial_dev_mean": 0.0017742125444952404,
+          "norm_min": 0.09985470973218621,
+          "norm_max": 0.9500520410450018,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.2
+        },
+        {
+          "epoch": 150,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch150.pth",
+          "trainer": {
+            "loss": 5.071335033059086,
+            "reg_loss": 7.42772387491373e-07,
+            "depth_norm_corr": 0.9844140555267201,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9761,
+            "class_sep_ratio": 0.7597192600631187,
+            "epoch": 150
+          },
+          "S_angle": 0.9512742898051089,
+          "S_angle_cluster_se": 0.01662099949059178,
+          "S_angle_cluster_ci95": [
+            0.8947050150759355,
+            0.9532110310902832
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9105026250893653
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9420396534876124
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.967165240906031
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9559517778641531
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9567172565597035
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9026864103397534
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9424672737099613
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9777893851133022
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 83109,
+            "modal_share": 0.00014
+          },
+          "S_poincare": 0.9512838053626947,
+          "S_poincare_cluster_se": 0.01643735046843119,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9105697145758053
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9420625921821855
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9671517147436851
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9559490300025101
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.956718708513526
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9027694626596291
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 21.829710000000002,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9844140555485599,
+          "radial_dev_mean": 0.0014598743742094678,
+          "norm_min": 0.1000278443576794,
+          "norm_max": 0.9500188411814745,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 160,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch160.pth",
+          "trainer": {
+            "loss": 5.064288181748641,
+            "reg_loss": 4.3411579316083595e-07,
+            "depth_norm_corr": 0.984461185324601,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.98465,
+            "class_sep_ratio": 0.7675723195575342,
+            "epoch": 160
+          },
+          "S_angle": 0.9555337994008557,
+          "S_angle_cluster_se": 0.014014381920890714,
+          "S_angle_cluster_ci95": [
+            0.9084115522503781,
+            0.9572128454919009
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9220420167570034
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9466144893865199
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9706842974762803
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9595926945410084
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.960814670246001
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9087017712221899
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9466540863405947
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9818098154650026
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 84010,
+            "modal_share": 0.00014
+          },
+          "S_poincare": 0.9555121731336148,
+          "S_poincare_cluster_se": 0.013857383373822144,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9226458221349614
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9465528416448549
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9707045867197985
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9596284167423665
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9607696596775123
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9084644788796875
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.87895,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.984461185313969,
+          "radial_dev_mean": 0.0010913915244638436,
+          "norm_min": 0.09997999479157282,
+          "norm_max": 0.9500180163398361,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.2
+        },
+        {
+          "epoch": 170,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch170.pth",
+          "trainer": {
+            "loss": 5.058568436771623,
+            "reg_loss": 1.9363480357127883e-07,
+            "depth_norm_corr": 0.9844692652552545,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9814,
+            "class_sep_ratio": 0.7604256174179644,
+            "epoch": 170
+          },
+          "S_angle": 0.9604118202396899,
+          "S_angle_cluster_se": 0.01240079662516578,
+          "S_angle_cluster_ci95": [
+            0.9190427971452345,
+            0.96089663741231
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.932306708182286
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9520896690474184
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9744423162479691
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.962728004675569
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9657716405950505
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9176476925345316
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9520673390347472
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.985332567363138
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 84786,
+            "modal_share": 8e-05
+          },
+          "S_poincare": 0.9603798133641732,
+          "S_poincare_cluster_se": 0.012531031321133194,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.931702902804328
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.952045225326683
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.974449079329142
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.962728004675569
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9657542171491836
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9174815878947797
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.935340000000004,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9844692652448767,
+          "radial_dev_mean": 0.0007045478442931417,
+          "norm_min": 0.1000565990412272,
+          "norm_max": 0.9500111176367716,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 180,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch180.pth",
+          "trainer": {
+            "loss": 5.054999818029374,
+            "reg_loss": 5.320485646391127e-08,
+            "depth_norm_corr": 0.9843572574746613,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.97645,
+            "class_sep_ratio": 0.7623637539284438,
+            "epoch": 180
+          },
+          "S_angle": 0.9654490104054155,
+          "S_angle_cluster_se": 0.008853851243280995,
+          "S_angle_cluster_ci95": [
+            0.9352438713145608,
+            0.9657918043044722
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9449195316329602
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9579734442053988
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9778937420064908
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9672235063233694
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9703801420267681
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9260715706933678
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9576412976682575
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9885355154597654
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85431,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9654403598985192,
+          "S_poincare_cluster_se": 0.008927548762991244,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9447182631736407
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9579605411897018
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9778982507272725
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9672399934932274
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9703583627194352
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9261190291618682
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 21.99357,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9843572574573888,
+          "radial_dev_mean": 0.00036097781178604795,
+          "norm_min": 0.10002412858168404,
+          "norm_max": 0.9500068777460348,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 190,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch190.pth",
+          "trainer": {
+            "loss": 5.05306436820345,
+            "reg_loss": 6.509810088281023e-09,
+            "depth_norm_corr": 0.9842429323194174,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9709,
+            "class_sep_ratio": 0.7556587683946441,
+            "epoch": 190
+          },
+          "S_angle": 0.9704178615666607,
+          "S_angle_cluster_se": 0.006318424981879964,
+          "S_angle_cluster_ci95": [
+            0.949626276800548,
+            0.970898019198932
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9569956391921163
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9639833821835311
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9809867244628537
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9704824702318608
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9752049845779961
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.936453110677849
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9633421294117867
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9908060112788192
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85869,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9704204567187301,
+          "S_poincare_cluster_se": 0.006293947419483217,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9571298181649958
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9639848158519421
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9809867244628537
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9704907138167896
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9752049845779961
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.936453110677849
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.051009999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9842429322506508,
+          "radial_dev_mean": 0.00011986910924298876,
+          "norm_min": 0.10000156831518871,
+          "norm_max": 0.9500023467959151,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.0
+        },
+        {
+          "epoch": 200,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch200.pth",
+          "trainer": {
+            "loss": 5.052446682743876,
+            "reg_loss": 2.3210088299235776e-10,
+            "depth_norm_corr": 0.9841817191878526,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9868,
+            "class_sep_ratio": 0.7605305750417445,
+            "epoch": 200
+          },
+          "S_angle": 0.9728988269445251,
+          "S_angle_cluster_se": 0.005372033947489763,
+          "S_angle_cluster_ci95": [
+            0.9536477909482377,
+            0.9734664860598504
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.963234961431014
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9669783154937216
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9825332156910354
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725351228791145
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774772923097661
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9412938744648988
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9663955422595821
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9917198423037556
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85928,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9729005570459044,
+          "S_poincare_cluster_se": 0.005388038551813523,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9631678719445737
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.966982616498954
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9825332156910354
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725378707407575
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774787442635879
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9412820098477735
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.079690000000003,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841817189807497,
+          "radial_dev_mean": 2.284262205643038e-05,
+          "norm_min": 0.09999996825283938,
+          "norm_max": 0.950000722510594,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.3
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.7565210595423144,
+      "S_angle_sd_over_checkpoints": 0.3780064472272004
+    },
+    "prior_roll": {
+      "checkpoints": [
+        {
+          "epoch": 196,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_epoch196.pth",
+          "trainer": {
+            "loss": 4.404606930080358,
+            "reg_loss": 0.0004981624853137357,
+            "depth_norm_corr": 0.6693758012543374,
+            "hierarchy_pct": 96.3,
+            "knn_purity": 0.9363,
+            "class_sep_ratio": 0.9076056941280215,
+            "epoch": 196
+          },
+          "S_angle": 0.6179503629241069,
+          "S_angle_cluster_se": 0.12218695982434136,
+          "S_angle_cluster_ci95": [
+            0.2854579873439511,
+            0.7388722519239035
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3327950573566252
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5746836282426921
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6955666640873458
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7459299646348999
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.575647620057319
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.461109090176981
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6163949227532892
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6423843090445347
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70381,
+            "modal_share": 0.00037
+          },
+          "S_poincare": 0.5208293918977633,
+          "S_poincare_cluster_se": 0.19021200039113528,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.09596917022428607
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4708315559001489
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6137243644548386
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7165360886406917
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.44966158690352864
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3313220434452766
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.97648,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6693758008369013,
+          "radial_dev_mean": 0.04975145907965738,
+          "norm_min": 0.10578455105003041,
+          "norm_max": 0.9779301155067606,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.1
+        },
+        {
+          "epoch": 197,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_epoch197.pth",
+          "trainer": {
+            "loss": 4.404677560742495,
+            "reg_loss": 0.0004984538634950836,
+            "depth_norm_corr": 0.6676684038386094,
+            "hierarchy_pct": 95.8,
+            "knn_purity": 0.8153,
+            "class_sep_ratio": 0.8683683379754632,
+            "epoch": 197
+          },
+          "S_angle": 0.6166363509265561,
+          "S_angle_cluster_se": 0.11946948375519188,
+          "S_angle_cluster_ci95": [
+            0.30728832602648615,
+            0.7373642838344683
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3500370553716427
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.574670725226995
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6915832092765635
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7440751580259355
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5745876937671003
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4561022217501796
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6176213628168082
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6384341021231773
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70344,
+            "modal_share": 0.0004
+          },
+          "S_poincare": 0.514321615559663,
+          "S_poincare_cluster_se": 0.1698200961204761,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.14273054227279605
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.46355568871526803
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6066344010253478
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7086469778638971
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.44127074576493514
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.33561703484457056
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.961289999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6676684035369534,
+          "radial_dev_mean": 0.04982926153913372,
+          "norm_min": 0.10739723150814236,
+          "norm_max": 0.9769739951993147,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.3
+        },
+        {
+          "epoch": 198,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_epoch198.pth",
+          "trainer": {
+            "loss": 4.404802512232527,
+            "reg_loss": 0.0004985461911478302,
+            "depth_norm_corr": 0.6682043161396737,
+            "hierarchy_pct": 96.2,
+            "knn_purity": 0.8672,
+            "class_sep_ratio": 0.8542877865705294,
+            "epoch": 198
+          },
+          "S_angle": 0.6197038206719906,
+          "S_angle_cluster_se": 0.11989373545748441,
+          "S_angle_cluster_ci95": [
+            0.29473413954301475,
+            0.7361254264143613
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3496345184530041
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5787108028086686
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6932379098035096
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7432205730549903
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5786996269916199
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.470221116129074
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6163526317166163
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6419728812686081
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70728,
+            "modal_share": 0.00032
+          },
+          "S_poincare": 0.5124972236552299,
+          "S_poincare_cluster_se": 0.18038100165243975,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.10502625089365326
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4630954811553969
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6038705551860621
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7048109630103947
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4420228578448436
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3300288001786383
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 17.99675,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6682043164979194,
+          "radial_dev_mean": 0.049807155471274726,
+          "norm_min": 0.10740161668220276,
+          "norm_max": 0.9730342362740714,
+          "n_norm_below_0p05": 0,
+          "seconds": 31.7
+        },
+        {
+          "epoch": 199,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_epoch199.pth",
+          "trainer": {
+            "loss": 4.40476864273935,
+            "reg_loss": 0.0004982998760929512,
+            "depth_norm_corr": 0.6684957361508819,
+            "hierarchy_pct": 95.1,
+            "knn_purity": 0.8329,
+            "class_sep_ratio": 0.9119198164141253,
+            "epoch": 199
+          },
+          "S_angle": 0.6217937831381415,
+          "S_angle_cluster_se": 0.12677040962803718,
+          "S_angle_cluster_ci95": [
+            0.287465389523484,
+            0.7447124481088272
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3345393840040591
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5821401376473357
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6937992455408527
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7523462215710948
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5787097906683757
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4630548873855009
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6207170667012767
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6428072245584071
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70588,
+            "modal_share": 0.00043
+          },
+          "S_poincare": 0.5174098465216486,
+          "S_poincare_cluster_se": 0.17108395196903822,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.14078494716604317
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4820285061886062
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.5857004104351252
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7152638287000244
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4424671557144421
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.34210698041201204
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.020910000000004,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.6684957358455161,
+          "radial_dev_mean": 0.04974345605757478,
+          "norm_min": 0.11087239507381909,
+          "norm_max": 0.9755902871738291,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.0
+        },
+        {
+          "epoch": 200,
+          "path": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_epoch200.pth",
+          "trainer": {
+            "loss": 4.404843275984827,
+            "reg_loss": 0.0004978842356110656,
+            "depth_norm_corr": 0.6693561044098654,
+            "hierarchy_pct": 96.0,
+            "knn_purity": 0.90825,
+            "class_sep_ratio": 0.8884813287551638,
+            "epoch": 200
+          },
+          "S_angle": 0.6209685247802323,
+          "S_angle_cluster_se": 0.12092356386315904,
+          "S_angle_cluster_ci95": [
+            0.29327332003700796,
+            0.7372220489942156
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.3440660910785044
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.5790090058381177
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6962519896461901
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7438141111698592
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.5813581544401001
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.4621294472497411
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.6173168673527619
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.6439400637486874
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 70364,
+            "modal_share": 0.00038
+          },
+          "S_poincare": 0.5178527524747399,
+          "S_poincare_cluster_se": 0.17365255854638384,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.12642779706793542
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.4691814035593022
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.6075383995421129
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.7073362478602291
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.4476012644298022
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.3389391276396046
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 18.01137,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.669356104202676,
+          "radial_dev_mean": 0.0497782223983484,
+          "norm_min": 0.10936379754987507,
+          "norm_max": 0.9777110332761597,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.3
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.6194105684882054,
+      "S_angle_sd_over_checkpoints": 0.0021225821590470143
+    },
+    "canonical_roll": {
+      "checkpoints": [
+        {
+          "epoch": 196,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_epoch196.pth",
+          "trainer": {
+            "loss": 5.0523484474164535,
+            "reg_loss": 8.330006840811769e-10,
+            "depth_norm_corr": 0.9841959031817396,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.97435,
+            "class_sep_ratio": 0.7583482542535107,
+            "epoch": 196
+          },
+          "S_angle": 0.9722855060055761,
+          "S_angle_cluster_se": 0.005810157404330183,
+          "S_angle_cluster_ci95": [
+            0.9531059741118527,
+            0.9727611325980676
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9610880978649414
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9662156038991685
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9822063334343497
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9721531701107503
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9768761834273678
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9397989327071333
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9655835543554591
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9915015752827955
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85962,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9722837759041966,
+          "S_poincare_cluster_se": 0.005825821643109045,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9610210083785019
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9662170375675793
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9822018247135674
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9721504222491073
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9768761834273678
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9397989327071333
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 22.0726,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841959031652565,
+          "radial_dev_mean": 4.243534239536202e-05,
+          "norm_min": 0.09999849533368156,
+          "norm_max": 0.9500007560838433,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.3
+        },
+        {
+          "epoch": 197,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_epoch197.pth",
+          "trainer": {
+            "loss": 5.053084221721967,
+            "reg_loss": 5.658026578687913e-10,
+            "depth_norm_corr": 0.9841882830838147,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.97135,
+            "class_sep_ratio": 0.7557253297351266,
+            "epoch": 197
+          },
+          "S_angle": 0.9724879278669496,
+          "S_angle_cluster_se": 0.005601749106957722,
+          "S_angle_cluster_ci95": [
+            0.9541932013123225,
+            0.9730016471044436
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9621615296479775
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9665009039129203
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9822491662817773
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9722383538216807
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9770721971933674
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9403684343291392
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9656765946361399
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9915723545714255
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85927,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9724887929176396,
+          "S_poincare_cluster_se": 0.005602001658623075,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9621615296479775
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9665037712497423
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9822469119213865
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9722356059600373
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9770707452395448
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9404040281805145
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.074939999999998,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841882831798592,
+          "radial_dev_mean": 3.511583573676635e-05,
+          "norm_min": 0.10000096682329077,
+          "norm_max": 0.9500007040487469,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.3
+        },
+        {
+          "epoch": 198,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_epoch198.pth",
+          "trainer": {
+            "loss": 5.052345236325752,
+            "reg_loss": 3.990557632204592e-10,
+            "depth_norm_corr": 0.9841864889172431,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9853,
+            "class_sep_ratio": 0.7644801656502203,
+            "epoch": 198
+          },
+          "S_angle": 0.9726436369910836,
+          "S_angle_cluster_se": 0.005529771469459079,
+          "S_angle_cluster_ci95": [
+            0.9540016227770015,
+            0.9731542272378283
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.962295708620857
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9667030511588456
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9823325776162422
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9724004776586119
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9771709300532777
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9409735298025205
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.966065672173532
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9916175643788234
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85882,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9726445020417729,
+          "S_poincare_cluster_se": 0.005530014716341646,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.962362798107297
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9667030511588456
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9823325776162422
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9724032255202553
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9771709300532777
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9409735298025205
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.07674,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841864889635453,
+          "radial_dev_mean": 2.9363184925050794e-05,
+          "norm_min": 0.09999935105776228,
+          "norm_max": 0.950000661915988,
+          "n_norm_below_0p05": 0,
+          "seconds": 33.7
+        },
+        {
+          "epoch": 199,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_epoch199.pth",
+          "trainer": {
+            "loss": 5.052928058068118,
+            "reg_loss": 2.9092165927049155e-10,
+            "depth_norm_corr": 0.9841831346496666,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9738,
+            "class_sep_ratio": 0.7529768371163797,
+            "epoch": 199
+          },
+          "S_angle": 0.9728538443086645,
+          "S_angle_cluster_se": 0.005616069373397421,
+          "S_angle_cluster_ci95": [
+            0.9535281705668696,
+            0.9734164918844859
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9626311560530559
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9669510757939163
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9824791110416525
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725158878476143
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774569649562547
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9410565821223963
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9663194183935705
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9916693518426252
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85944,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9728547093593535,
+          "S_poincare_cluster_se": 0.005632222506532396,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9625640665666161
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9669553767991486
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9824768566812614
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725158878476143
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774598688638992
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9410565821223963
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.079170000000005,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841831345186005,
+          "radial_dev_mean": 2.521488235879805e-05,
+          "norm_min": 0.0999990751048745,
+          "norm_max": 0.950000746005916,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.8
+        },
+        {
+          "epoch": 200,
+          "path": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_epoch200.pth",
+          "trainer": {
+            "loss": 5.052446682743876,
+            "reg_loss": 2.3210088299235776e-10,
+            "depth_norm_corr": 0.9841817191878526,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.9868,
+            "class_sep_ratio": 0.7605305750417445,
+            "epoch": 200
+          },
+          "S_angle": 0.9728988269445251,
+          "S_angle_cluster_se": 0.005372033947489763,
+          "S_angle_cluster_ci95": [
+            0.9536477909482377,
+            0.9734664860598504
+          ],
+          "n_clusters": 16,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.963234961431014
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.9669783154937216
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9825332156910354
+            }
+          },
+          "S_angle_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725351228791145
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774772923097661
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9412938744648988
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.9663955422595821
+            },
+            "100": {
+              "n": 9999,
+              "S": 0.9917198423037556
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 85928,
+            "modal_share": 7e-05
+          },
+          "S_poincare": 0.9729005570459044,
+          "S_poincare_cluster_se": 0.005388038551813523,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 327,
+              "S": 0.9631678719445737
+            },
+            "mid": {
+              "n": 6433,
+              "S": 0.966982616498954
+            },
+            "deep": {
+              "n": 3240,
+              "S": 0.9825332156910354
+            }
+          },
+          "S_poincare_by_clade": {
+            "1419": {
+              "n": 1907,
+              "S": 0.9725378707407575
+            },
+            "233221": {
+              "n": 6651,
+              "S": 0.9774787442635879
+            },
+            "398899": {
+              "n": 1092,
+              "S": 0.9412820098477735
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 22.079690000000003,
+          "mean_mu0": 10.832963783775526,
+          "mean_mustar": 22.392979999999998,
+          "depth_norm_r": 0.9841817189807497,
+          "radial_dev_mean": 2.284262205643038e-05,
+          "norm_min": 0.09999996825283938,
+          "norm_max": 0.950000722510594,
+          "n_norm_below_0p05": 0,
+          "seconds": 32.1
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.9726339484233598,
+      "S_angle_sd_over_checkpoints": 0.0002556085000046594
+    }
+  },
+  "init_null": {
+    "S_angle": -0.0014579377277925533,
+    "S_angle_cluster_se": 0.0033109884393743116,
+    "S_angle_cluster_ci95": [
+      -0.010244259115015026,
+      0.0026135065077827575
+    ],
+    "n_clusters": 16,
+    "S_angle_by_band": {
+      "shallow": {
+        "n": 327,
+        "S": -0.002384016896396425
+      },
+      "mid": {
+        "n": 6433,
+        "S": -0.00210411212234542
+      },
+      "deep": {
+        "n": 3240,
+        "S": -0.0004107476040846501
+      }
+    },
+    "S_angle_by_clade": {
+      "1419": {
+        "n": 1907,
+        "S": 0.0017705616718747812
+      },
+      "233221": {
+        "n": 6651,
+        "S": -0.0035077205486980386
+      },
+      "398899": {
+        "n": 1092,
+        "S": -4.484824224215757e-05
+      }
+    },
+    "S_angle_at_k": {
+      "1": {
+        "n": 10000,
+        "S": 0.0016270390516005188
+      },
+      "100": {
+        "n": 9999,
+        "S": -0.00035546278068671885
+      }
+    },
+    "hubness_angle": {
+      "n_distinct_neighbours": 90582,
+      "modal_share": 5e-05
+    },
+    "S_poincare": -0.0014579377277925533,
+    "S_poincare_cluster_se": 0.0033109884393743116,
+    "S_poincare_by_band": {
+      "shallow": {
+        "n": 327,
+        "S": -0.002384016896396425
+      },
+      "mid": {
+        "n": 6433,
+        "S": -0.00210411212234542
+      },
+      "deep": {
+        "n": 3240,
+        "S": -0.0004107476040846501
+      }
+    },
+    "S_poincare_by_clade": {
+      "1419": {
+        "n": 1907,
+        "S": 0.0017705616718747812
+      },
+      "233221": {
+        "n": 6651,
+        "S": -0.0035077205486980386
+      },
+      "398899": {
+        "n": 1092,
+        "S": -4.484824224215757e-05
+      }
+    },
+    "poincare_radius_source": "2*artanh(|x|)",
+    "flag_poincare_above_angle": false,
+    "mean_s_angle": 10.816109999999998,
+    "mean_mu0": 10.832963783775526,
+    "mean_mustar": 22.392979999999998,
+    "depth_norm_r": 0.9841667829402657,
+    "radial_dev_mean": 5.780718106865054e-17,
+    "norm_min": 0.09999999999999999,
+    "norm_max": 0.9500000000000002,
+    "n_norm_below_0p05": 0,
+    "seconds": 30.6
+  },
+  "paired": [
+    {
+      "a": "canonical_roll",
+      "b": "prior_roll",
+      "S_angle_a_minus_b": {
+        "diff": 0.3532233799351542,
+        "ci95": [
+          0.23297155152419205,
+          0.6627486576668732
+        ],
+        "se": 0.11785586154481852
+      }
+    }
+  ]
+}
