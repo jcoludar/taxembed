@@ -1,0 +1,155 @@
+{
+  "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+  "prior_ckpt": "/app/artifacts/tags/metazoa_softmax_milestones/metazoa_softmax_milestones_milestone_epoch200.pth",
+  "canonical_ckpt": "/app/artifacts/tags/metazoa_lower_lr_bigger_batch/metazoa_lower_lr_bigger_batch_milestone_epoch200.pth",
+  "note": "Reading aid, not pre-registered. Trainer kNN%/Sep are radius-confounded (C7).",
+  "conditions": {
+    "init (random dirs, planted radii)": {
+      "S_angle": -0.0014579377277925533,
+      "S_poincare": -0.0014579377277925533,
+      "depth_norm_r": 0.9841667829402657,
+      "knn_purity_mean": 0.5120166666666667,
+      "knn_purity_sd": 0.11942237367149142,
+      "class_sep_mean": 0.7436845378404175,
+      "class_sep_sd": 0.006368401843612169,
+      "multiscale_knn_mean": {
+        "1": 0.5120166666666667,
+        "2": 0.07811666666666667,
+        "3": 0.018883333333333332,
+        "4": 0.0073
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "prior raw": {
+      "S_angle": 0.6209685247802323,
+      "S_poincare": 0.5178527524747399,
+      "depth_norm_r": 0.669356104202676,
+      "knn_purity_mean": 0.9466666666666667,
+      "knn_purity_sd": 0.03025022038487213,
+      "class_sep_mean": 0.9030677353940516,
+      "class_sep_sd": 0.011461175763985719,
+      "multiscale_knn_mean": {
+        "1": 0.9466666666666667,
+        "2": 0.8849,
+        "3": 0.7765166666666667,
+        "4": 0.5750666666666667
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "prior dirs + planted radii": {
+      "S_angle": 0.6209685247802323,
+      "S_poincare": 0.6209685247802323,
+      "depth_norm_r": 0.9841667829402656,
+      "knn_purity_mean": 0.6440333333333333,
+      "knn_purity_sd": 0.09593040880416037,
+      "class_sep_mean": 0.7474648025075626,
+      "class_sep_sd": 0.006630990677823861,
+      "multiscale_knn_mean": {
+        "1": 0.6440333333333333,
+        "2": 0.32359999999999994,
+        "3": 0.2619833333333333,
+        "4": 0.2213166666666667
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "canonical raw": {
+      "S_angle": 0.9728988269445251,
+      "S_poincare": 0.9729005570459044,
+      "depth_norm_r": 0.9841817189807497,
+      "knn_purity_mean": 0.97715,
+      "knn_purity_sd": 0.006209065952299091,
+      "class_sep_mean": 0.7640874912217633,
+      "class_sep_sd": 0.0056008615584194335,
+      "multiscale_knn_mean": {
+        "1": 0.97715,
+        "2": 0.9630166666666667,
+        "3": 0.9586333333333333,
+        "4": 0.9545666666666666
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "canonical dirs + planted radii": {
+      "S_angle": 0.9728988269445251,
+      "S_poincare": 0.9728988269445251,
+      "depth_norm_r": 0.9841667829402654,
+      "knn_purity_mean": 0.9771666666666666,
+      "knn_purity_sd": 0.0062268236953789795,
+      "class_sep_mean": 0.7640732275445742,
+      "class_sep_sd": 0.005582109662666808,
+      "multiscale_knn_mean": {
+        "1": 0.9771666666666666,
+        "2": 0.9630166666666667,
+        "3": 0.9586,
+        "4": 0.9546
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "canonical dirs + prior radii": {
+      "S_angle": 0.9728988269445251,
+      "S_poincare": 0.9634118160313325,
+      "depth_norm_r": 0.6693561042026758,
+      "knn_purity_mean": 0.9941833333333333,
+      "knn_purity_sd": 0.0010152996273678208,
+      "class_sep_mean": 0.9213874137164176,
+      "class_sep_sd": 0.011482189921727878,
+      "multiscale_knn_mean": {
+        "1": 0.9941833333333333,
+        "2": 0.9838166666666668,
+        "3": 0.9824166666666668,
+        "4": 0.9726499999999999
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "prior dirs + canonical radii": {
+      "S_angle": 0.6209685247802323,
+      "S_poincare": 0.6209806354898874,
+      "depth_norm_r": 0.9841817189807498,
+      "knn_purity_mean": 0.6437499999999999,
+      "knn_purity_sd": 0.09593022203664496,
+      "class_sep_mean": 0.7474789336659885,
+      "class_sep_sd": 0.006653362915539389,
+      "multiscale_knn_mean": {
+        "1": 0.6437499999999999,
+        "2": 0.3235166666666667,
+        "3": 0.26189999999999997,
+        "4": 0.22136666666666663
+      },
+      "n_sample": 2000,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  }
+}

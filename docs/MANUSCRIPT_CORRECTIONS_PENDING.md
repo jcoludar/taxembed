@@ -183,6 +183,27 @@ Figure 4's prior arm is exactly such an embedding. Before the manuscript quotes 
 S_angle or a same-depth / radius-rectified variant. The Task 9 local runs' "prior kNN 99.6% vs
 canonical 73.4%" is partly this artefact.
 
+**Confirmed on the actual Figure 4 runs** (metazoa, ep200, `results/transplant_2x2_20260922_132857.json`,
+3 seeds × 2,000-node samples of the trainer's own metrics):
+
+| condition | trainer kNN% | trainer Sep | purity 4 levels down | S_angle |
+|---|---|---|---|---|
+| init (random directions) | 0.512 | 0.744 | 0.007 | −0.002 |
+| prior, raw | 0.947 | 0.903 | 0.575 | 0.621 |
+| prior directions, planted radii | 0.644 | 0.747 | 0.221 | 0.621 |
+| canonical, raw (= planted radii) | 0.977 | 0.764 | 0.955 | 0.973 |
+| canonical directions + prior radii | 0.994 | 0.921 | 0.973 | 0.973 |
+
+- **Sep, the trainer's top-level separation ratio, measures radius almost entirely.** Canonical's
+  0.764 barely clears random directions (0.744) and rises to 0.921 on the prior's radii. Do not
+  quote it as learned structure.
+- **About +0.30 of the prior's raw kNN% is radial drift.**
+- With radii equalised, canonical directions dominate on the paper's own metrics (kNN 0.977 vs
+  0.644), which points to Task 9 reading 1. This is n=1, reported not read.
+- ⚠ The headline per-rank separation ratios in PROJECT_STATE come from
+  `analyze_hierarchy_hyperbolic.py`, a different metric. They have not been transplant-tested yet;
+  do so before quoting them.
+
 ---
 
 ## Still to be added
