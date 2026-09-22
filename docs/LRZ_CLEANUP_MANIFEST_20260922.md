@@ -32,6 +32,11 @@ ssh ai rm -r /dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_
 | `$R/artifacts/task9_scoring/fig4_runs_SMOKE_*` | small | the smoke output, once the full scoring has run |
 | `$R/logs/task9_*` (the `.err` files especially) | varies | after trajectories are parsed into a local file |
 
+| `$R/artifacts/tags/task8_fixed_canonical_s{0,1,2}/` | ~20 G total | array 5802297 scored and banked locally |
+| `$R/artifacts/tags/smoke_task8_fixed/` | small | smoke 5802277 PASSED 2026-09-22; delete any time |
+| `$R/src_task8/` | ~5 M | after array 5802297 and its scoring are done (keep until then: it is mounted) |
+| `$R/artifacts/task9_scoring/*` | small | once each JSON/NPZ is banked locally with md5 (fig4_runs_20260922_104857 and transplant_2x2_20260922_132857 already are) |
+
 **Keep** the per-run `run.json` and the final `task9_*_s*.pth` until the USER decides whether the
 seeded runs become a release artifact. They are small relative to the milestones.
 
@@ -64,3 +69,4 @@ The ablation-era runs may back the manuscript's ablation table (spec v3 §6). Ch
 | date | action | container before → after |
 |---|---|---|
 | 2026-09-22 | manifest written; nothing deleted yet | 840 / 1000 GB |
+| 2026-09-22 pm | Task 8 queued (+~20 G expected); section B extended; nothing deleted | 840 / 1000 GB (arrays not started) |
