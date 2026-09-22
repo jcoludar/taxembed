@@ -202,7 +202,8 @@ class HierarchicalDataLoader:
 
     def __init__(self, training_data, n_nodes, batch_size=32,
                  n_negatives=50, depth_stratify=True, epoch_fraction=1.0,
-                 tiered_negatives=False, class_balanced=False):
+                 tiered_negatives=False, class_balanced=False,
+                 exclude_descendant_negatives=False, drop_root_anchored=False):
         # Normalize to TrainingPairs if needed
         if isinstance(training_data, TrainingPairs):
             self.pairs = training_data
@@ -236,6 +237,156 @@ class HierarchicalDataLoader:
         # Curriculum state: None means full dataset
         self._curriculum_max_depth_diff = None
         self._curriculum_indices = None
+
+        # Ancestry-aware negatives (plan v2 Task 6 / spec v3 P1.3). Everything below is inert
+        # when both flags are off: no RNG is consumed and the shipped sampler runs unchanged
+        # (pinned by tests/test_negative_sampling.py::test_flags_off_matches_the_pinned_shipped_sampler).
+        if exclude_descendant_negatives and not drop_root_anchored:
+            raise ValueError(
+                "exclude_descendant_negatives requires drop_root_anchored: every node descends "
+                "from the root, so root-anchored pairs have no valid negative at any depth."
+            )
+        self.exclude_descendant_negatives = exclude_descendant_negatives
+        self.drop_root_anchored = drop_root_anchored
+        self._reset_sampler_stats()
+        if exclude_descendant_negatives:
+            self._build_ancestry_index()
+        if drop_root_anchored:
+            n_root = int((self.pairs.ancestor_depth == 0).sum())
+            print(f"  ✓ excluding {n_root:,} root-anchored pairs from training (no contrastive "
+                  f"signal: every node descends from the root; d(root, x) is held by the radial "
+                  f"regularizer)")
+
+    @classmethod
+    def from_arrays(cls, ancestor_idx, descendant_idx, depth_diff, **kwargs):
+        """Build a loader straight from closure arrays (test seam: no .npz on disk)."""
+        from taxembed.eval.subtree import parent_from_closure
+
+        anc = np.asarray(ancestor_idx, dtype=np.int32)
+        des = np.asarray(descendant_idx, dtype=np.int32)
+        dd = np.asarray(depth_diff, dtype=np.int16)
+        n_nodes = int(max(anc.max(), des.max())) + 1
+        parent = parent_from_closure(anc, des, dd, n_nodes)
+        depth = np.zeros(n_nodes, dtype=np.int64)
+        for v in range(n_nodes):
+            steps, cur = 0, v
+            while int(parent[cur]) != cur:
+                cur = int(parent[cur])
+                steps += 1
+            depth[v] = steps
+        pairs = TrainingPairs(
+            ancestor_idx=anc, descendant_idx=des, depth_diff=dd,
+            ancestor_depth=depth[anc].astype(np.int16), descendant_depth=depth[des].astype(np.int16),
+            ancestor_taxid=anc.copy(), descendant_taxid=des.copy(),
+        )
+        return cls(training_data=pairs, n_nodes=n_nodes, **kwargs)
+
+    def _build_ancestry_index(self):
+        """Euler intervals + per-depth pools sorted by tin, packed for vectorized lookups.
+
+        An anchor's descendants at any depth form ONE contiguous tin block, so sampling
+        uniformly from 'same depth, not under the anchor' is an index remap -- no rejection loop.
+        """
+        from taxembed.eval.subtree import euler_intervals, parent_from_closure
+
+        parent = parent_from_closure(self.pairs.ancestor_idx, self.pairs.descendant_idx,
+                                     self.pairs.depth_diff, self.n_nodes)
+        self._tin, self._tout = euler_intervals(parent)
+        self._node_by_tin = np.argsort(self._tin)                   # tin is a permutation of 0..N-1
+        max_d = max(self._depth_to_nodes) if self._depth_to_nodes else 0
+        self._depth_offset = np.zeros(max_d + 2, dtype=np.int64)
+        self._depth_len = np.zeros(max_d + 2, dtype=np.int64)
+        nodes_sorted, keys = [], []
+        pos = 0
+        stride = self.n_nodes + 1
+        for d in range(max_d + 1):
+            pool = self._depth_to_nodes.get(d)
+            pool = np.asarray(pool if pool is not None else [], dtype=np.int64)
+            pool = pool[np.argsort(self._tin[pool])]
+            self._depth_offset[d] = pos
+            self._depth_len[d] = len(pool)
+            nodes_sorted.append(pool)
+            keys.append(d * stride + self._tin[pool])
+            pos += len(pool)
+        self._depth_sorted_nodes = np.concatenate(nodes_sorted)
+        self._depth_sorted_keys = np.concatenate(keys)                 # sorted: depth-major, then tin
+        self._key_stride = stride
+
+    def _reset_sampler_stats(self):
+        self._n_rows = 0                 # rows (pairs) served
+        self._n_draws = 0                # negatives drawn
+        self._n_replaced = 0             # draws that were descendants of the anchor (false negatives)
+        self._zero_pool_hits = 0         # rows whose same-depth valid pool was EMPTY (depth relaxed)
+        self._realized_sum = 0           # valid negatives after the fix, summed over rows
+        self._realized_count = 0
+
+    def sampler_stats(self) -> dict:
+        """Counters for the current epoch. observed_fn_rate is the empirical counterpart of the
+        closed-form 47.375240% (restricted to the non-root pairs actually served)."""
+        return {
+            "n_rows": int(self._n_rows),
+            "n_draws": int(self._n_draws),
+            "n_replaced": int(self._n_replaced),
+            "zero_pool_rows": int(self._zero_pool_hits),
+            "observed_fn_rate": (self._n_replaced / self._n_draws) if self._n_draws else 0.0,
+            "mean_realized_valid_negatives": (self._realized_sum / self._realized_count
+                                              if self._realized_count else 0.0),
+        }
+
+    def _resample_descendant_negatives(self, negatives, anc_idxs, desc_depths):
+        """Replace every negative that descends from its anchor (a FALSE negative).
+
+        Same-depth complement first: uniform over the descendant's depth pool minus the anchor's
+        subtree, via the contiguous tin block [lo, hi). If that pool is EMPTY (the 3,026,809-pair
+        census), relax the DEPTH constraint, never the ancestry one (spec v3 P1.3): uniform over
+        all nodes outside the anchor's subtree. Fully vectorized; draws use the legacy global
+        numpy RNG so --seed governs them.
+        """
+        anc_idxs = np.asarray(anc_idxs, dtype=np.int64)
+        desc_depths = np.asarray(desc_depths, dtype=np.int64)
+        tin, tout = self._tin, self._tout
+        t_neg = tin[negatives]
+        bad = (tin[anc_idxs][:, None] <= t_neg) & (t_neg < tout[anc_idxs][:, None])
+
+        self._n_rows += int(negatives.shape[0])
+        self._n_draws += int(negatives.size)
+        self._n_replaced += int(bad.sum())
+
+        if bad.any():
+            rows, cols = np.nonzero(bad)
+            a_r = anc_idxs[rows]
+            d_r = desc_depths[rows]
+            off = self._depth_offset[d_r]
+            ln = self._depth_len[d_r]
+            base = d_r * self._key_stride
+            lo = np.searchsorted(self._depth_sorted_keys, base + tin[a_r], side="left") - off
+            hi = np.searchsorted(self._depth_sorted_keys, base + tout[a_r], side="left") - off
+            blk = hi - lo
+            n_valid = ln - blk
+            ok = n_valid > 0
+
+            if ok.any():
+                j = (np.random.random(int(ok.sum())) * n_valid[ok]).astype(np.int64)
+                j = np.where(j < lo[ok], j, j + blk[ok])
+                negatives[rows[ok], cols[ok]] = self._depth_sorted_nodes[off[ok] + j]
+
+            z = ~ok
+            if z.any():
+                a_z = a_r[z]
+                size = tout[a_z] - tin[a_z]
+                n_glob = self.n_nodes - size                          # > 0 once root pairs are dropped
+                j2 = (np.random.random(int(z.sum())) * n_glob).astype(np.int64)
+                j2 = np.where(j2 < tin[a_z], j2, j2 + size)
+                negatives[rows[z], cols[z]] = self._node_by_tin[j2]
+                self._zero_pool_hits += int(len(np.unique(rows[z])))
+
+            t_neg = tin[negatives]
+            still = (tin[anc_idxs][:, None] <= t_neg) & (t_neg < tout[anc_idxs][:, None])
+        else:
+            still = bad
+        self._realized_sum += int(negatives.size - still.sum())
+        self._realized_count += int(negatives.shape[0])
+        return negatives
 
     def _build_depth_index(self):
         """Build depth-to-nodes arrays for hard negative sampling.
@@ -574,7 +725,9 @@ class HierarchicalDataLoader:
         return np.arange(len(self.pairs), dtype=np.int64)
 
     def __len__(self):
-        n = len(self._active_indices())
+        active = self._active_indices()
+        n = (int((self.pairs.ancestor_depth[active] != 0).sum()) if self.drop_root_anchored
+             else len(active))
         if self.epoch_fraction < 1.0:
             n = int(n * self.epoch_fraction)
         return n // self.batch_size
@@ -641,6 +794,12 @@ class HierarchicalDataLoader:
             else:
                 np.random.shuffle(indices)
 
+        # Root-anchored pairs leave the EPOCH INDEX only -- never self.pairs, whose positional
+        # indices back _depth_diff_masks and the curriculum (plan v1 broke exactly that).
+        if self.drop_root_anchored:
+            indices = indices[self.pairs.ancestor_depth[indices] != 0]
+        self._reset_sampler_stats()
+
         for i in range(0, len(indices), self.batch_size):
             batch_indices = indices[i:i + self.batch_size]
             batch_size = len(batch_indices)
@@ -658,6 +817,11 @@ class HierarchicalDataLoader:
                 negatives = self._sample_negatives_tiered_vectorized(desc_depths, desc_idxs, batch_size)
             else:
                 negatives = self._sample_negatives_default_vectorized(desc_depths, desc_idxs, batch_size)
+
+            if self.exclude_descendant_negatives:
+                negatives = self._resample_descendant_negatives(
+                    negatives, self.pairs.ancestor_idx[batch_indices], desc_depths
+                )
 
             negatives = torch.from_numpy(negatives)
 

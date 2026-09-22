@@ -896,6 +896,12 @@ def train_with_visualization(model, dataloader, optimizer, n_epochs,
         # Update tracker and display
         tracker.update(epoch, metrics)
         tracker.print_epoch_summary(epoch, metrics, n_epochs)
+        if getattr(dataloader, "exclude_descendant_negatives", False):
+            st = dataloader.sampler_stats()
+            print(f"  sampler: observed FN rate {st['observed_fn_rate']:.4%} "
+                  f"({st['n_replaced']:,}/{st['n_draws']:,} replaced) | zero-pool rows "
+                  f"{st['zero_pool_rows']:,}/{st['n_rows']:,} (depth relaxed) | "
+                  f"valid negatives/row {st['mean_realized_valid_negatives']:.1f}")
 
         # Save checkpoint (always save Poincare-space embeddings for downstream compat)
         if checkpoint_base:
@@ -1068,8 +1074,23 @@ def main():
     parser.add_argument('--seed', type=int, default=None,
                        help='RNG seed for init, negative sampling, and epoch subsampling. '
                             'Omit for the historical unseeded behaviour.')
+    parser.add_argument('--exclude-descendant-negatives', action='store_true',
+                        help='Replace sampled negatives that descend from the anchor (restores '
+                             "Nickel-Kiela's {v' : (u,v') not in D}). Same-depth complement first; "
+                             'depth relaxed only where that pool is empty. Requires --drop-root-anchored.')
+    parser.add_argument('--drop-root-anchored', action='store_true',
+                        help='Exclude root-anchored pairs from each epoch: every node descends '
+                             'from the root, so they carry no contrastive signal.')
 
     args = parser.parse_args()
+
+    if args.exclude_descendant_negatives and not args.drop_root_anchored:
+        raise SystemExit("--exclude-descendant-negatives requires --drop-root-anchored: "
+                         "root-anchored pairs have no valid negative at any depth.")
+    if args.drop_root_anchored and (getattr(args, 'tiered_negatives', False)
+                                    or getattr(args, 'class_balanced', False)):
+        raise SystemExit("--drop-root-anchored is not validated with --tiered-negatives/"
+                         "--class-balanced; run without them.")
 
     if args.seed is not None:
         seed_everything(args.seed)
@@ -1213,6 +1234,8 @@ def main():
         epoch_fraction=args.epoch_fraction,
         tiered_negatives=getattr(args, 'tiered_negatives', False),
         class_balanced=getattr(args, 'class_balanced', False),
+        exclude_descendant_negatives=args.exclude_descendant_negatives,
+        drop_root_anchored=args.drop_root_anchored,
     )
     
     # Optimizer selection
