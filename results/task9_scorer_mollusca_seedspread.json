@@ -1,0 +1,751 @@
+{
+  "design": "docs/specs/2026-09-22-task9-radius-free-scorer-design.md",
+  "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+  "n_nodes": 32017,
+  "max_depth": 14,
+  "k": 10,
+  "n_queries": 10000,
+  "seed": 0,
+  "radial_schedule": "log",
+  "cluster_level": 3,
+  "clade_level": 2,
+  "uncertainty_note": "*_cluster_se / ci95 are CLUSTER bootstraps over depth-3 clades for ONE trained run: query-sampling uncertainty only. They say nothing about run-to-run spread, which needs independent seeds.",
+  "runs": {
+    "canonical": {
+      "checkpoints": [
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_canonical_s2_epoch200.pth",
+          "trainer": {
+            "loss": 5.303660732525933,
+            "reg_loss": 2.060629224168988e-11,
+            "depth_norm_corr": 0.9899408663286438,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.7106,
+            "class_sep_ratio": 1.026686416542217,
+            "epoch": 200
+          },
+          "S_angle": 0.8209865339517592,
+          "S_angle_cluster_se": 0.0425584809514284,
+          "S_angle_cluster_ci95": [
+            0.7628554114280487,
+            0.9057724261229927
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8764770407693895
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6692774845422679
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8873171786214457
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7204397019823587
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8588502844235549
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.831803107723466
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.8521133812827967
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 23457,
+            "modal_share": 0.0008
+          },
+          "S_poincare": 0.820975941564329,
+          "S_poincare_cluster_se": 0.04256343128061191,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8764741474179598
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6692458432673789
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8872858234015838
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7204119645237306
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.858888309670208
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 6.4469,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.9899408662865063,
+          "radial_dev_mean": 5.5320794253120556e-06,
+          "norm_min": 0.09999991781731415,
+          "norm_max": 0.9499997059056101,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.4
+        },
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_canonical_s1_epoch200.pth",
+          "trainer": {
+            "loss": 5.306406961668522,
+            "reg_loss": 2.169429478482896e-11,
+            "depth_norm_corr": 0.9899403610270484,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.6951,
+            "class_sep_ratio": 1.016970268115509,
+            "epoch": 200
+          },
+          "S_angle": 0.820365820048348,
+          "S_angle_cluster_se": 0.04442180934874236,
+          "S_angle_cluster_ci95": [
+            0.7590817959447496,
+            0.9070455040873836
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8747902168859579
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6715714769717148
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8906016379019753
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7149865176161377
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8607515467562119
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8290886567584659
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.8517215971371095
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 23454,
+            "modal_share": 0.00083
+          },
+          "S_poincare": 0.8203827678682364,
+          "S_poincare_cluster_se": 0.04441590948993627,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8748017902916764
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6716031182466037
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8906173155119065
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7150198025664909
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8607515467562117
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 6.443969999999999,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.9899403613036833,
+          "radial_dev_mean": 5.473541888251795e-06,
+          "norm_min": 0.09999774049559437,
+          "norm_max": 0.950000661464253,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.4
+        },
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_canonical_s0_epoch200.pth",
+          "trainer": {
+            "loss": 5.303981250214649,
+            "reg_loss": 2.0868468077437242e-11,
+            "depth_norm_corr": 0.9899397592803938,
+            "hierarchy_pct": 100.0,
+            "knn_purity": 0.73425,
+            "class_sep_ratio": 1.0219900177536765,
+            "epoch": 200
+          },
+          "S_angle": 0.8217788445315397,
+          "S_angle_cluster_se": 0.04193884692405601,
+          "S_angle_cluster_ci95": [
+            0.7640179360806675,
+            0.9039122025933002
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8748943775374222
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6765628880854422
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8859453877524891
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7223591341194008
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8619208230907959
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8319814293197068
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.8544749249895606
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 23457,
+            "modal_share": 0.00086
+          },
+          "S_poincare": 0.8217851999639978,
+          "S_poincare_cluster_se": 0.04194168774190316,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8749030575917107
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.6765628880854422
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8859610653624203
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.7223591341194008
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8619303294024591
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": true,
+          "mean_s_angle": 6.45064,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.9899397593340288,
+          "radial_dev_mean": 5.417406624498713e-06,
+          "norm_min": 0.0999971731484016,
+          "norm_max": 0.9499996527975356,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.4
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.8210437328438823,
+      "S_angle_sd_over_checkpoints": 0.0007082466607544783
+    },
+    "prior": {
+      "checkpoints": [
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_prior_s0_epoch200.pth",
+          "trainer": {
+            "loss": 3.8127381674011183,
+            "reg_loss": 2.7486308422882148e-05,
+            "depth_norm_corr": 0.9719417618541495,
+            "hierarchy_pct": 98.9,
+            "knn_purity": 0.99625,
+            "class_sep_ratio": 1.1347969152611863,
+            "epoch": 200
+          },
+          "S_angle": 0.8659067305658453,
+          "S_angle_cluster_se": 0.023300874664854303,
+          "S_angle_cluster_ci95": [
+            0.799280024647952,
+            0.8904835547100004
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8486401066656298
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9131130591550208
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8313324335580972
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9075510503936183
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8919797805701009
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8446224491421154
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.9466031519011536
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 24644,
+            "modal_share": 0.00037
+          },
+          "S_poincare": 0.8648707950751696,
+          "S_poincare_cluster_se": 0.023427995736957478,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8474364724709343
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9125356058882979
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8304388097920342
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9066357142589019
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8912668071953543
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 6.658939999999999,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.9719417612445533,
+          "radial_dev_mean": 0.011186890527277888,
+          "norm_min": 0.10184723300262284,
+          "norm_max": 0.9532105223547336,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.4
+        },
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_prior_s1_epoch200.pth",
+          "trainer": {
+            "loss": 3.8129240638983726,
+            "reg_loss": 2.7346223320655163e-05,
+            "depth_norm_corr": 0.9708747052073691,
+            "hierarchy_pct": 98.7,
+            "knn_purity": 0.99255,
+            "class_sep_ratio": 1.126739371401616,
+            "epoch": 200
+          },
+          "S_angle": 0.8666566715959052,
+          "S_angle_cluster_se": 0.02282044408179799,
+          "S_angle_cluster_ci95": [
+            0.8020786619581484,
+            0.890955664506926
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8501967297347308
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9116575605101305
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8319830543702307
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9077174751453847
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8911622377670583
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8457518192516411
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.9474612702121528
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 24516,
+            "modal_share": 0.00043
+          },
+          "S_poincare": 0.8652266992928253,
+          "S_poincare_cluster_se": 0.022792300224013344,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8487326939113757
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9103207166460735
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8308072336254111
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9062529373298382
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8898123415108717
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 6.66248,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.9708747050690212,
+          "radial_dev_mean": 0.01130533001453723,
+          "norm_min": 0.0996329510895421,
+          "norm_max": 0.9527697030607776,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.4
+        },
+        {
+          "epoch": 200,
+          "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_prior_s2_epoch200.pth",
+          "trainer": {
+            "loss": 3.8073811199322387,
+            "reg_loss": 2.7691262884265588e-05,
+            "depth_norm_corr": 0.9721473382558822,
+            "hierarchy_pct": 98.0,
+            "knn_purity": 0.9949,
+            "class_sep_ratio": 1.1330071066331422,
+            "epoch": 200
+          },
+          "S_angle": 0.8662583978285285,
+          "S_angle_cluster_se": 0.023291709929375397,
+          "S_angle_cluster_ci95": [
+            0.8001340794068474,
+            0.8908536991926741
+          ],
+          "n_clusters": 45,
+          "S_angle_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8495833392316652
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9118474081594642
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_angle_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8305171978416891
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9081779169586063
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8902496318473833
+            }
+          },
+          "S_angle_at_k": {
+            "1": {
+              "n": 10000,
+              "S": 0.8426014710513856
+            },
+            "100": {
+              "n": 9965,
+              "S": 0.9476206803604994
+            }
+          },
+          "hubness_angle": {
+            "n_distinct_neighbours": 24641,
+            "modal_share": 0.00051
+          },
+          "S_poincare": 0.8649936667693601,
+          "S_poincare_cluster_se": 0.02350084842269456,
+          "S_poincare_by_band": {
+            "shallow": {
+              "n": 7396,
+              "S": 0.8480730097854368
+            },
+            "mid": {
+              "n": 2604,
+              "S": 0.9112541342552966
+            },
+            "deep": {
+              "n": 0,
+              "S": null
+            }
+          },
+          "S_poincare_by_clade": {
+            "1128": {
+              "n": 3341,
+              "S": 0.8287221115045972
+            },
+            "4126": {
+              "n": 3905,
+              "S": 0.9073402457080475
+            },
+            "26046": {
+              "n": 1482,
+              "S": 0.8893655448626976
+            }
+          },
+          "poincare_radius_source": "z_embeddings",
+          "flag_poincare_above_angle": false,
+          "mean_s_angle": 6.6606,
+          "mean_mu0": 2.571538853327239,
+          "mean_mustar": 7.291910000000001,
+          "depth_norm_r": 0.972147338768542,
+          "radial_dev_mean": 0.011174900213154804,
+          "norm_min": 0.10524011958700315,
+          "norm_max": 0.953514320403775,
+          "n_norm_below_0p05": 0,
+          "seconds": 2.3
+        }
+      ],
+      "S_angle_mean_over_checkpoints": 0.866273933330093,
+      "S_angle_sd_over_checkpoints": 0.00037521180818100836
+    }
+  },
+  "init_null": {
+    "S_angle": 0.0007268806977559532,
+    "S_angle_cluster_se": 0.000833535885999779,
+    "S_angle_cluster_ci95": [
+      -0.00041306070164930526,
+      0.002752191255478311
+    ],
+    "n_clusters": 45,
+    "S_angle_by_band": {
+      "shallow": {
+        "n": 7396,
+        "S": 0.002036798323214126
+      },
+      "mid": {
+        "n": 2604,
+        "S": -0.0028543869669292402
+      },
+      "deep": {
+        "n": 0,
+        "S": null
+      }
+    },
+    "S_angle_by_clade": {
+      "1128": {
+        "n": 3341,
+        "S": 0.002229871165868497
+      },
+      "4126": {
+        "n": 3905,
+        "S": -0.000917289566792834
+      },
+      "26046": {
+        "n": 1482,
+        "S": 0.0023506161849683738
+      }
+    },
+    "S_angle_at_k": {
+      "1": {
+        "n": 10000,
+        "S": -0.0006417305503370724
+      },
+      "100": {
+        "n": 9965,
+        "S": -1.3963245676911342e-05
+      }
+    },
+    "hubness_angle": {
+      "n_distinct_neighbours": 30589,
+      "modal_share": 0.00012
+    },
+    "S_poincare": 0.0007268806977559532,
+    "S_poincare_cluster_se": 0.000833535885999779,
+    "S_poincare_by_band": {
+      "shallow": {
+        "n": 7396,
+        "S": 0.002036798323214126
+      },
+      "mid": {
+        "n": 2604,
+        "S": -0.0028543869669292402
+      },
+      "deep": {
+        "n": 0,
+        "S": null
+      }
+    },
+    "S_poincare_by_clade": {
+      "1128": {
+        "n": 3341,
+        "S": 0.002229871165868497
+      },
+      "4126": {
+        "n": 3905,
+        "S": -0.000917289566792834
+      },
+      "26046": {
+        "n": 1482,
+        "S": 0.0023506161849683738
+      }
+    },
+    "poincare_radius_source": "2*artanh(|x|)",
+    "flag_poincare_above_angle": false,
+    "mean_s_angle": 2.5749699999999995,
+    "mean_mu0": 2.571538853327239,
+    "mean_mustar": 7.291910000000001,
+    "depth_norm_r": 0.9899288642352528,
+    "radial_dev_mean": 5.842567305465616e-17,
+    "norm_min": 0.1,
+    "norm_max": 0.9500000000000002,
+    "n_norm_below_0p05": 0,
+    "seconds": 2.4
+  },
+  "paired": [
+    {
+      "a": "canonical",
+      "b": "prior",
+      "S_angle_a_minus_b": {
+        "diff": -0.04523020048621085,
+        "ci95": [
+          -0.12506387282464018,
+          0.10543702109907155
+        ],
+        "se": 0.06401075845203642
+      }
+    }
+  ]
+}

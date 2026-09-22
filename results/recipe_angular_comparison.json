@@ -53,6 +53,44 @@
     "3_prior_beats_canonical_on_learned_metrics": "Escalate. The recipe claim does not survive and the manuscript needs restructuring before submission."
   },
 
+  "preregistration_v2_20260922": {
+    "status": "FROZEN before any metazoa checkpoint was scored. Supersedes the reading rules above for every metazoa result; the three readings themselves are unchanged.",
+    "why_v2": [
+      "Every metric Task 9 had been read on (depth-norm r, the trainer's kNN%/Sep, the headline separation ratios) reads the planted radius through Poincare distance across depths, so it cannot separate reading 1 from reading 2.",
+      "Hostile design review 2026-09-22 (3 blockers, 6 should-fix) -- see docs/specs/2026-09-22-task9-radius-free-scorer-design.md addendum."
+    ],
+    "deviation_declared": "The registered learned metrics (precision@10 vs cophenetic, family purity, per-rank separation) are demoted to SECONDARY and are still owed; the new PRIMARY is S_angle (same-depth angular LCA score, k=10). The design doc was written before the mollusca sensitivity run; the reading rules below were written after it, and after the mollusca seed-spread run.",
+    "primary_metric": "S_angle at k=10, src/taxembed/eval/angular.py, 10,000 queries seed 0, identical across all runs",
+    "per_run_value": "mean of S_angle over the rolling epoch 196-200 checkpoints (annealing noise averaged, within-run jitter reported as their SD)",
+    "who_is_read": "ONLY the seeded array, job 5802007 (3 seeds per arm, metazoa). The historical Figure 4 pair (n=1 per arm, unseeded) is REPORTED, never read.",
+    "validity_gate_per_arm": [
+      "(a) training happened: max over milestones of S_angle(t) minus S_angle(init null) exceeds 10 x the within-run jitter SD (a rise-then-collapse trajectory passes this; monotonicity is NOT required)",
+      "(b) loss is compared only within the final curriculum phase (milestones epoch >= 130), never across phases; it must fall by more than the within-run loss jitter",
+      "either failing => UNINFORMATIVE for that arm, never a pass, never a fail"
+    ],
+    "reading_1_canonical_better": "all 3 canonical seeds above all 3 prior seeds on S_angle AND canonical mean >= prior mean on S_poincare AND the canonical-minus-prior sign is positive in every depth band and every clade stratum with n >= 500 queries (clade level fixed by choose_clade_level before any embedding is read)",
+    "reading_3_prior_better": "mirror of reading 1",
+    "reading_2_equivalent": "3v3 ranges overlap AND |mean difference| < max(0.01, 2 x pooled within-arm seed SD) -- the benefit is preservation of the radial prior",
+    "otherwise": "MIXED -- reported per stratum, no aggregate claim. This includes seed-separated aggregates whose sign flips in any stratum.",
+    "attribution": "Any difference is attributed to the 4-factor package (effective batch, n_negatives, lr, lr schedule), never to the batch lever alone. n_negatives interacts with the unfixed sampler's 33-100% false negatives, which are same-depth nodes -- exactly what this metric scores; re-score once Task 6 fixed-sampler runs exist.",
+    "flags": "any run with S_poincare > S_angle is flagged (structure carried by radius that S_angle cannot see)",
+    "reference_numbers_mollusca": {
+      "note": "NOT evidence about the recipe (canonical not converged at mollusca); calibrates the noise scales only",
+      "seed_sd_S_angle": {"canonical": 0.0007, "prior": 0.0004},
+      "S_angle_ep200_seeds": {"canonical": [0.8210, 0.8204, 0.8218], "prior": [0.8659, 0.8667, 0.8663]},
+      "paired_diff_canonical_minus_prior": -0.0452,
+      "paired_diff_cluster_ci95": [-0.1251, 0.1054],
+      "by_band_seed0": {"canonical": {"shallow": 0.875, "mid": 0.677}, "prior": {"shallow": 0.849, "mid": 0.913}},
+      "lesson": "seed noise is ~100x smaller than the clade-weighting sensitivity; the stratum sign rule, not the seed rule, is the binding one"
+    },
+    "owed_before_the_paper_uses_it": [
+      "per-level AUC (coarse structure; k=10 saturates on congeners)",
+      "radius-transplant 2x2 scored on the trainer's own kNN%/Sep: {prior, canonical} directions x {planted, prior} radii",
+      "dose-response validation on a trained checkpoint: within-depth direction permutation of fraction p; radius scramble to depth-norm ~0.67",
+      "the registered secondary metrics"
+    ]
+  },
+
   "protocol": {
     "clade": "echinodermata_7586_clean (3,965 nodes, 34,938 pairs)",
     "seeds": [0, 1, 2],

@@ -1,0 +1,150 @@
+{
+  "design": "docs/specs/2026-09-22-task9-radius-free-scorer-design.md",
+  "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+  "n_nodes": 32017,
+  "max_depth": 14,
+  "k": 10,
+  "n_queries": 10000,
+  "seed": 0,
+  "radial_schedule": "log",
+  "uncertainty_note": "S_*_se / ci95 are QUERY-SAMPLING bootstraps for ONE trained run. They say nothing about run-to-run spread, which needs seeds.",
+  "runs": {
+    "canonical": [
+      {
+        "epoch": 200,
+        "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_canonical_s0_epoch200.pth",
+        "trainer": {
+          "loss": 5.303981250214649,
+          "reg_loss": 2.0868468077437242e-11,
+          "depth_norm_corr": 0.9899397592803938,
+          "hierarchy_pct": 100.0,
+          "knn_purity": 0.73425,
+          "class_sep_ratio": 1.0219900177536765,
+          "epoch": 200
+        },
+        "S_angle": 0.8217788445315397,
+        "S_angle_se": 0.0015125594746172705,
+        "S_angle_ci95": [
+          0.8188810882381135,
+          0.8247176176359624
+        ],
+        "S_angle_by_band": {
+          "shallow": {
+            "n": 7396,
+            "S": 0.8748943775374222
+          },
+          "mid": {
+            "n": 2604,
+            "S": 0.6765628880854422
+          },
+          "deep": {
+            "n": 0,
+            "S": null
+          }
+        },
+        "S_poincare": 0.8217851999639978,
+        "S_poincare_se": 0.0015126536381430415,
+        "mean_s_angle": 6.45064,
+        "mean_mu0": 2.571538853327239,
+        "mean_mustar": 7.291910000000001,
+        "depth_norm_r": 0.9899397593340288,
+        "radial_dev_mean": 5.417406624498713e-06,
+        "norm_min": 0.0999971731484016,
+        "norm_max": 0.9499996527975356,
+        "n_norm_below_0p05": 0,
+        "seconds": 2.5
+      }
+    ],
+    "prior": [
+      {
+        "epoch": 200,
+        "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/task9_runs_mollusca/echino_prior_s0_epoch200.pth",
+        "trainer": {
+          "loss": 3.8127381674011183,
+          "reg_loss": 2.7486308422882148e-05,
+          "depth_norm_corr": 0.9719417618541495,
+          "hierarchy_pct": 98.9,
+          "knn_purity": 0.99625,
+          "class_sep_ratio": 1.1347969152611863,
+          "epoch": 200
+        },
+        "S_angle": 0.8659067305658453,
+        "S_angle_se": 0.0010871258312552259,
+        "S_angle_ci95": [
+          0.8638557885613487,
+          0.8680216669054043
+        ],
+        "S_angle_by_band": {
+          "shallow": {
+            "n": 7396,
+            "S": 0.8486401066656298
+          },
+          "mid": {
+            "n": 2604,
+            "S": 0.9131130591550208
+          },
+          "deep": {
+            "n": 0,
+            "S": null
+          }
+        },
+        "S_poincare": 0.8648707950751696,
+        "S_poincare_se": 0.0010897958562777607,
+        "mean_s_angle": 6.658939999999999,
+        "mean_mu0": 2.571538853327239,
+        "mean_mustar": 7.291910000000001,
+        "depth_norm_r": 0.9719417612445533,
+        "radial_dev_mean": 0.011186890527277888,
+        "norm_min": 0.10184723300262284,
+        "norm_max": 0.9532105223547336,
+        "n_norm_below_0p05": 0,
+        "seconds": 2.5
+      }
+    ]
+  },
+  "init_null": {
+    "S_angle": 0.0007268806977559532,
+    "S_angle_se": 0.001265982846782221,
+    "S_angle_ci95": [
+      -0.0017270666986335332,
+      0.0031649005728683886
+    ],
+    "S_angle_by_band": {
+      "shallow": {
+        "n": 7396,
+        "S": 0.002036798323214126
+      },
+      "mid": {
+        "n": 2604,
+        "S": -0.0028543869669292402
+      },
+      "deep": {
+        "n": 0,
+        "S": null
+      }
+    },
+    "S_poincare": 0.0007268806977559532,
+    "S_poincare_se": 0.001265982846782221,
+    "mean_s_angle": 2.5749699999999995,
+    "mean_mu0": 2.571538853327239,
+    "mean_mustar": 7.291910000000001,
+    "depth_norm_r": 0.9899288642352528,
+    "radial_dev_mean": 5.842567305465616e-17,
+    "norm_min": 0.1,
+    "norm_max": 0.9500000000000002,
+    "n_norm_below_0p05": 0,
+    "seconds": 1.9
+  },
+  "final_epoch_paired_difference": {
+    "a": "canonical",
+    "b": "prior",
+    "S_angle_a_minus_b": {
+      "diff": -0.04412788603430562,
+      "ci95": [
+        -0.04769482862070837,
+        -0.04026500275160179
+      ],
+      "se": 0.0019086766594147363
+    }
+  }
+}
