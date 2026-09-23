@@ -97,12 +97,25 @@ def validity_gate(result: dict, arm: str, seed: int) -> dict:
     }
 
 
+# The n>=500 qualifier attaches to CLADE strata only, not to depth bands.
+#
+# "the canonical-minus-prior sign is positive in every depth band and every clade stratum with
+# n >= 500 queries" is ambiguous read alone, but score_embedding() settles it: its
+# min_stratum_n=500 filters `by_clade` and never touches `by_band`, which always carries all
+# three bands. Applying the threshold to bands as well would silently drop `shallow`, which is
+# n=327 on the real metazoa query set -- weakening the sign condition from 5 strata to 4 and
+# making a verdict easier to reach than the pre-registration allows.
+MIN_N_BY_FIELD = {"S_angle_by_band": 0, "S_angle_by_clade": MIN_STRATUM_N}
+
+
 def _stratum_means(result: dict, arm: str, seeds, field: str) -> dict:
     """Arm-level mean of a stratum's S, averaged over the rolling window then over seeds.
 
-    Strata below MIN_STRATUM_N are dropped and reported, never silently skipped: the sign rule
-    binds on strata the pre-registration admits, and which ones those are is part of the verdict.
+    Strata below this field's minimum are dropped and reported, never silently skipped: the sign
+    rule binds on strata the pre-registration admits, and which ones those are is part of the
+    verdict.
     """
+    min_n = MIN_N_BY_FIELD.get(field, MIN_STRATUM_N)
     per_stratum: dict[str, list] = {}
     dropped: dict[str, int] = {}
     for seed in seeds:
@@ -112,7 +125,7 @@ def _stratum_means(result: dict, arm: str, seeds, field: str) -> dict:
             for name, d in c[field].items():
                 if d is None or d.get("S") is None:
                     continue
-                if int(d.get("n", 0)) < MIN_STRATUM_N:
+                if int(d.get("n", 0)) < min_n:
                     dropped[str(name)] = int(d.get("n", 0))
                     continue
                 acc.setdefault(str(name), []).append(float(d["S"]))

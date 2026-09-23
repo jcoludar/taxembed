@@ -159,17 +159,34 @@ class TestTask9Readings:
         v = task9_verdict(res)
         assert v["verdict"] == "MIXED"
 
-    def test_small_strata_are_dropped_and_reported_not_silently_skipped(self):
+    def test_small_clade_strata_are_dropped_and_reported_not_silently_skipped(self):
         res = _both_arms(0.90, 0.60)
         for arm in ("canonical", "prior"):
             for seed in (0, 1, 2):
                 for c in res["runs"][f"{arm}_s{seed}_roll"]["checkpoints"]:
-                    c["S_angle_by_band"]["deep"]["n"] = 12
-                    c["S_angle_by_band"]["deep"]["S"] = -5.0   # would flip the sign if counted
+                    c["S_angle_by_clade"]["202"]["n"] = 12
+                    c["S_angle_by_clade"]["202"]["S"] = -5.0   # would flip the sign if counted
         v = task9_verdict(res)
         assert v["verdict"] == "READING_1_CANONICAL_BETTER"
-        dropped = v["comparison"]["strata"]["S_angle_by_band"]["dropped_below_min_n"]
-        assert dropped["deep"] == 12
+        assert v["comparison"]["strata"]["S_angle_by_clade"]["dropped_below_min_n"]["202"] == 12
+
+    def test_a_small_DEPTH_BAND_still_binds_the_sign_rule(self):
+        """The n>=500 qualifier attaches to clade strata, not to depth bands.
+
+        `shallow` is n=327 on the real metazoa query set. Dropping it would weaken the sign
+        condition and make a verdict easier to reach than the pre-registration allows -- so a
+        small band with a flipped sign must still force MIXED.
+        """
+        res = _both_arms(0.90, 0.60)
+        for seed in (0, 1, 2):
+            for c in res["runs"][f"canonical_s{seed}_roll"]["checkpoints"]:
+                c["S_angle_by_band"]["shallow"]["n"] = 327
+                c["S_angle_by_band"]["shallow"]["S"] = 0.10     # below prior in this band only
+            for c in res["runs"][f"prior_s{seed}_roll"]["checkpoints"]:
+                c["S_angle_by_band"]["shallow"]["n"] = 327
+        v = task9_verdict(res)
+        assert v["verdict"] == "MIXED"
+        assert not v["comparison"]["strata"]["S_angle_by_band"]["dropped_below_min_n"]
 
     def test_poincare_above_angle_is_flagged(self):
         specs = {}
