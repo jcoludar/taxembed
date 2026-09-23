@@ -64,9 +64,49 @@ The ablation-era runs may back the manuscript's ablation table (spec v3 §6). Ch
 | `$R/artifacts/tags/metazoa_lower_lr_bigger_batch/` | 11 G | Figure 4 canonical trajectory; Task 9 scoring input |
 | `$R/data/`, `$R/src/`, the container `.sqsh` | ~1 G + image | needed by every job |
 
+## E. Container-wide audit, 2026-09-23 (USER request)
+
+⚠ **This manifest covers TaxEmbed only — ~168 GB of the 743 GB the account holds.** The USER asked
+for a whole-container audit, so the other nine project directories are recorded here. Sizes
+measured 2026-09-23; `du` on this filesystem is slow (~15 min for the large trees).
+
+| dir | size | project / status | verdict |
+|---|---|---|---|
+| `taxembed_lrz` | **168 G** | TaxEmbed — live | KEEP; sections A-D above govern |
+| `unknown_unknowns_lrz` | ~150-215 G | unknown_unknowns — **jobs running now** | KEEP; it has self-cleaned twice |
+| `ant_venoms_lrz` | not measured (du >15 min) | ant_venoms — preprint out, but TE/repeats fetched for only **48 of 54** genomes | KEEP |
+| `oe_autoeval_lrz` | 94 G → **83 G** | ProteEmbedExplorations sweep, complete; 14 reports local | `out/` 80 G still there |
+| `plm_choice_lrz` | 83 G | plm_choice — `paper_revision`; compute done 2026-06-09 | `data/hf_cache` 80 G is the target |
+| `syntile_lrz` | 17 G | syntile — **active**, ERC preprint, needs DSS rows | KEEP (self-capped at 100 G) |
+| `tax_disentangle_lrz` | 1.8 G | tax_disentangle — results "complete and triple-checked" | deletable; back up untracked local panel/H5 first |
+| `exabayes_lrz` | 229 M | **shared container**, not a project | 🛑 KEEP — **16 committed sbatch files** reference `exabayes-1.5.1.sqsh`, and no local copy exists |
+| `fry_lab` | 23 M | Fry_lab — finished 2026-06-20, trees local | deletable |
+| ~~`peptideminer_lrz`~~ | ~~99 G~~ | peptideminer_embeddings — Phase B done | ✅ **DELETED 2026-09-23** |
+
+🧨 **The big directories are mostly CACHES, not results.** `plm_choice`'s real `artifacts/` is
+**547 KB**; its 83 G is a HuggingFace download cache. `oe_autoeval`'s `reports/` is 5.2 MB. Size is
+a poor guide to value here — measure the subdirectories before judging a directory.
+
+🛑 **A dormant directory can break a live one.** `exabayes_lrz` holds the ExaBayes container used by
+ant_venoms and Fry_lab; `taxembed_lrz` holds the PyTorch `.sqsh` that plm_choice used and
+tax_disentangle mounts read-only. Check for cross-mounts before deleting anything.
+
 ## Log
 
 | date | action | container before → after |
 |---|---|---|
 | 2026-09-22 | manifest written; nothing deleted yet | 840 / 1000 GB |
 | 2026-09-22 pm | Task 8 queued (+~20 G expected); section B extended; nothing deleted | 840 / 1000 GB (arrays not started) |
+| 2026-09-23 | container-wide audit (section E) | 920 / 1000 GB |
+| 2026-09-23 | **`peptideminer_lrz` deleted (~99 G)**, USER-authorised. All four primary outputs verified **byte-identical** to `projects/peptideminer_embeddings/work/lrz_candidates/` first | 920 → (quota lags) |
+| 2026-09-23 | **`oe_autoeval_lrz/{venv,pip_cache}` deleted (~11 G)**, USER-authorised. `venv` was already a broken symlink; `venv.freeze.txt` kept, so the env is reproducible. `out/`, `reports/`, `logs/` untouched | → 918 / 1000 GB; files 585,922 → 516,768 |
+| 2026-09-23 | `plm_choice_lrz/{artifacts,logs}` (1.8 MB) banked to `projects/plm_choice/results/lrz_artifacts_20260923/` — the one thing never confirmed downloaded | — |
+| 2026-09-23 | ✅ **`plm_choice_lrz/data/{hf_cache,torch_cache}` deleted (~80 G) — RUN BY THE USER**, after the harness permission classifier refused it to Claude. USER-authorised conditionally ("if not touched in the last week or two"); condition **verified met** — `find -newermt 2026-09-01` returned nothing, against a control at `-newermt 2026-06-01` that returned ~100 hits. `artifacts/` + `logs/` banked first | 918 → **858 / 1000 GB** |
+
+**Net effect of the 2026-09-23 audit: 920 → 858 GB with ~20-30 GB of run output written meanwhile,
+i.e. ~190 GB reclaimed. Free headroom 80 GB → 142 GB**, which clears the overnight risk that the
+Task 8/9 arrays (~37 GB still to write) would hit a full container.
+
+**Still available, not done:** `oe_autoeval_lrz/out` (80 G) · `plm_choice_lrz/data/venv` (781 M,
+another dead env) · `tax_disentangle_lrz` (1.8 G) · `fry_lab` (23 M). `ant_venoms_lrz` was never
+sized — `du` exceeded 15 min twice.
