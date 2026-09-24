@@ -206,6 +206,38 @@ canonical 73.4%" is partly this artefact.
 
 ---
 
+## C8 — P2's held-out protocol: why the obvious alternatives are not what we did
+
+**Status:** UNCONDITIONAL
+**Evidence:** `docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md` ·
+`helpers/p2_check_closure_is_a_tree.py` · `helpers/p2_randomdag_changes_the_chance_floor.py` ·
+`results/p2_heldout_preregistration.json` (`p2_amendment_1_20260924`)
+
+Two protocols borrowed from other papers' benchmarks were tested against our NCBI closures before
+either was written into the P2 evaluation, and both degenerate:
+
+1. Ganea et al. 2018's split — keep the transitive reduction always in training, hold out non-basic
+   edges — hands the mandatory Vendrov trivial baseline **100.00%** of every held-out edge, because
+   all six clade closures on disk are strict trees (single parent per node), and on a tree the
+   reduction determines the whole closure exactly (0/0 symmetric difference on every clade checked).
+   WordNet is a DAG (537 basic edges beyond a tree's count = multiple inheritance), which is why the
+   same protocol is a real prediction task there.
+2. The RandomDAG memorisation control (GRAM, Choi et al. KDD'17) preserves each node's depth and the
+   closure's total pair count exactly, but not fan-out — mean chance-floor ratio randomised/real =
+   **5.403** on mollusca. Comparing arms on raw MRR would have let the control win regardless of what
+   either model learned, producing a false "the model memorises tree shape" verdict.
+
+**What the manuscript should say (final form only — do not narrate the rejected alternative):** the
+held-out evaluation uses a **leaf parent-edge holdout** over the interquartile depth band
+(`depth ∈ [11, 28]`, 501,037 eligible leaves at cellular_organisms scale), and cross-tree comparisons
+against the RandomDAG control use **chance-normalised `normalized_rank`**, not raw MRR. Cite the
+leaf-holdout precedent (TaxoExpan, Arborist, Octet — spec §3.4) as the methodological grounding, not
+Ganea's split. The full reasoning — including why a leaf restriction specifically is required (the
+internal-node leak) and why RandomDAG needs chance normalisation — lives in
+`docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md`, not in the manuscript itself.
+
+---
+
 ## Still to be added
 
 - Task 9 verdict — Figure 4 re-plot or caption rewrite (the single most likely change to what the
