@@ -46,7 +46,12 @@ def main() -> int:
                     help="fraction of depth_diff>=2 closure rows visible in training (0.0 or 0.5)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--frac-test", type=float, default=0.10)
-    ap.add_argument("--frac-val", type=float, default=0.05)
+    ap.add_argument("--frac-val", type=float, default=0.0,
+                    help="fraction of eligible leaves withheld as 'val' -- reserved for "
+                         "threshold-tuning, NOT scored by scripts/score_p2_linkpred.py. Default "
+                         "0.0 (fix round 1, IMPORTANT #3): the old 0.05 default silently withheld "
+                         "5%% of eligible nodes from every reported number whenever this flag was "
+                         "forgotten, with no trace in the output. Pass explicitly to withhold val.")
     ap.add_argument("--band", type=int, nargs=2, default=list(DEFAULT_BAND),
                     metavar=("LO", "HI"), help="inclusive per-node depth band")
     args = ap.parse_args()

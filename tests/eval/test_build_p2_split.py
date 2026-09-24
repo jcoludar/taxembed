@@ -99,3 +99,64 @@ def test_same_seed_reproduces_the_same_split_md5(tmp_path):
         )
         outs.append(json.loads(next(d.glob("*_manifest.json")).read_text())["heldout_md5"])
     assert outs[0] == outs[1]
+
+
+def _write_synthetic_closure(path: Path):
+    """0 -> {1,2}; 1 -> {3,4}; 2 -> {5,6} -- full transitive closure (direct + depth_diff=2 rows),
+    saved as a TrainingPairs .npz. Independent of the Mollusca data file (not on every machine),
+    so the --frac-val default test below always runs."""
+    direct = [(0, 1), (0, 2), (1, 3), (1, 4), (2, 5), (2, 6)]      # depth_diff == 1
+    grandparent = [(0, 3), (0, 4), (0, 5), (0, 6)]                 # depth_diff == 2
+    depth = {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2}
+    rows = [(a, d, 1) for a, d in direct] + [(a, d, 2) for a, d in grandparent]
+    n = len(rows)
+    pairs = TrainingPairs(
+        ancestor_idx=np.array([a for a, d, dd in rows], dtype=np.int32),
+        descendant_idx=np.array([d for a, d, dd in rows], dtype=np.int32),
+        depth_diff=np.array([dd for a, d, dd in rows], dtype=np.int16),
+        ancestor_depth=np.array([depth[a] for a, d, dd in rows], dtype=np.int16),
+        descendant_depth=np.array([depth[d] for a, d, dd in rows], dtype=np.int16),
+        ancestor_taxid=np.array([a for a, d, dd in rows], dtype=np.int32),
+        descendant_taxid=np.array([d for a, d, dd in rows], dtype=np.int32),
+    )
+    assert len(pairs) == n
+    pairs.save(path)
+
+
+def test_frac_val_default_is_zero_and_the_flag_still_works_when_passed(tmp_path):
+    """IMPORTANT #3 (fix round 1): the old --frac-val default of 0.05 silently withheld 5% of
+    eligible nodes from every score_p2_linkpred.py number whenever the flag was forgotten. The
+    default must now be 0.0 (nothing withheld without an explicit flag), and passing --frac-val
+    explicitly must still work exactly as before. Uses a synthetic closure, not Mollusca, so it
+    is not gated on data availability."""
+    npz = tmp_path / "synthetic_transitive.npz"
+    _write_synthetic_closure(npz)
+
+    default_dir = tmp_path / "default"
+    default_dir.mkdir()
+    rc = subprocess.run(
+        [sys.executable, str(REPO / "scripts/build_p2_split.py"),
+         "--npz", str(npz), "--outdir", str(default_dir),
+         "--visibility", "0.5", "--seed", "0", "--frac-test", "0.5", "--band", "2", "2"],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    m_default = json.loads(next(default_dir.glob("*_manifest.json")).read_text())
+    assert m_default["n_val"] == 0
+    held_default = np.load(default_dir / m_default["heldout_npz"])
+    assert len(held_default["val"]) == 0
+
+    explicit_dir = tmp_path / "explicit"
+    explicit_dir.mkdir()
+    rc = subprocess.run(
+        [sys.executable, str(REPO / "scripts/build_p2_split.py"),
+         "--npz", str(npz), "--outdir", str(explicit_dir),
+         "--visibility", "0.5", "--seed", "0", "--frac-test", "0.5", "--frac-val", "0.5",
+         "--band", "2", "2"],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    m_explicit = json.loads(next(explicit_dir.glob("*_manifest.json")).read_text())
+    assert m_explicit["n_val"] == 2  # int(4 eligible leaves * 0.5), the flag still takes effect
+    held_explicit = np.load(explicit_dir / m_explicit["heldout_npz"])
+    assert len(held_explicit["val"]) == 2

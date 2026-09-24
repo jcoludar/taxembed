@@ -229,3 +229,54 @@ def test_jitter_does_not_reorder_candidates_with_a_real_distance_gap():
             emb, node=3, true_parent=1, candidates=np.array([1, 2]), tie_seed=s
         )
         assert r == 1
+
+
+# --- Minor 4 (fix round 1): return_clip recovers clip_count from the ONE distance computation ---
+
+
+def test_return_clip_default_is_still_a_bare_int_rank():
+    """Backward compatibility: existing callers passing nothing must keep getting a bare rank,
+    not a tuple."""
+    emb = np.array([[0.0, 0.0], [0.1, 0.0], [0.9, 0.0], [0.11, 0.0]])
+    r = rank_of_true_parent(emb, node=3, true_parent=1, candidates=np.array([1, 2]))
+    assert r == 1
+    assert isinstance(r, int)
+
+
+def test_return_clip_true_matches_a_separate_poincare_distance_call_without_a_second_call():
+    """`return_clip=True` must return the identical (rank, clip_count) that a caller would get by
+    calling `_poincare_distance` a second time on the same pair -- proving the recovered count is
+    correct -- while the rank itself is unaffected by the flag."""
+    emb = np.array([[0.0, 0.0], [0.1, 0.0], [0.9, 0.0], [0.11, 0.0]])
+    rank_only = rank_of_true_parent(emb, node=3, true_parent=1, candidates=np.array([1, 2]))
+    rank, clip_count = rank_of_true_parent(
+        emb, node=3, true_parent=1, candidates=np.array([1, 2]), return_clip=True
+    )
+    assert rank == rank_only
+    expected_d, expected_clip = _poincare_distance(emb[3], emb[np.array([1, 2])])
+    assert clip_count == expected_clip
+
+
+def test_return_clip_reports_the_floor_hit_on_the_ball_fallback_path():
+    """When no radii are supplied (ball-coordinate fallback), a near-boundary pair must report a
+    non-zero clip_count -- the exact scenario Finding 1 (this file's earlier correction) exists
+    to detect, now reachable through the rank_of_true_parent public API without recomputation."""
+    eps = 1e-7
+    emb = np.array([
+        [1.0 - eps, 0.0],
+        [0.0, 1.0 - eps],  # near boundary -- floor binds for this pair
+        [0.1, 0.1],        # comfortably inside -- floor never binds
+    ])
+    rank, clip_count = rank_of_true_parent(
+        emb, node=0, true_parent=1, candidates=np.array([1, 2]), return_clip=True
+    )
+    assert clip_count == 1
+
+
+def test_return_clip_is_zero_on_the_cosine_path():
+    """Cosine never touches `_poincare_distance`, so its clip_count must always be exactly 0."""
+    emb = np.array([[0.0, 0.0], [0.1, 0.0], [0.9, 0.0], [0.11, 0.0]])
+    _rank, clip_count = rank_of_true_parent(
+        emb, node=3, true_parent=1, candidates=np.array([1, 2]), metric="cosine", return_clip=True
+    )
+    assert clip_count == 0

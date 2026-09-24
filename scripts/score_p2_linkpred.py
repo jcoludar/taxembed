@@ -24,6 +24,38 @@ Usage (single absolute-path invocation, per CLAUDE.md shell hygiene):
       --checkpoints arm=<glob> [--checkpoints arm2=<glob2> ...] --out <result.json>
       [--metric cosine] [--max-checkpoints N] [--seed 0]
 Globs are expanded here, not by a shell, and sorted by the checkpoint's own 'epoch' field.
+
+CORRECTION (2026-09-24, fix round 1, IMPORTANT #1). The radius-overflow guard used a single
+`> 100` threshold regardless of path, but `load_checkpoint` always returns `emb` as float32
+(`.detach().float().numpy()`). On the `ball_coordinates` fallback path (no `z_embeddings` in the
+checkpoint), the guard computed `radius = 2*arctanh(|x|)` from THAT float32 array: float32 cannot
+represent anything closer to 1.0 than ~1.19e-7, so `|x|` can never get close enough to 1 for the
+derived radius to exceed ~17-21, let alone 100 -- the `>100` check was structurally unreachable
+on this path. The two paths now use DIFFERENT guards for their genuinely different failure modes:
+`z_embeddings` path keeps `>100` on the exact `|z|` (meaningful: under `--euclidean-param`
+training, `project_to_ball` is a no-op and `|z|` is genuinely unbounded); `ball_coordinates` path
+instead counts nodes with `||x|| >= 1 - 1e-6` (`n_norm_saturated`) -- the reachable failure mode,
+where `arctanh` loses precision near the ball boundary. Each checkpoint row records
+`radius_guard` (`"z_norm_gt_100"` or `"ball_norm_saturation"`) so the artifact states which test
+actually ran.
+
+CORRECTION (2026-09-24, fix round 1, IMPORTANT #2). `vendrov_recall` is tautologically 0.0 for
+ANY input on the real P2 split: the same `held_out` array both removes edges from the visible
+graph AND supplies the queries, so every query's own edge is guaranteed excluded by construction.
+That is a genuine, reportable property of the task (see the docstring below) -- but it also meant
+no fixture passed to the OLD single-argument `vendrov_recall` could ever produce a non-zero
+result, so a hand-built "does the encode+isin machinery actually work" test was impossible without
+decoupling. `vendrov_recall` is now a thin wrapper around `_vendrov_recall_core`, which takes the
+"removed" and "queried" node sets separately; production still calls it with the same array for
+both (unchanged behaviour), but tests can now hand it different sets and assert a genuine
+non-zero recall.
+
+CORRECTION (2026-09-24, fix round 1, IMPORTANT #3). `val` nodes from `--heldout` were read from
+the .npz but never counted, scored, or reported -- so `scripts/build_p2_split.py --frac-val 0.05`
+(its old default) silently withheld 5% of eligible nodes from every number in this driver's
+output, with no trace in the JSON. `n_val` is now recorded at the top level and a warning is
+printed when it is non-zero; `build_p2_split.py --frac-val` now defaults to 0.0 so nothing is
+withheld without an explicit flag.
 """
 from __future__ import annotations
 
@@ -31,6 +63,7 @@ import argparse
 import glob
 import hashlib
 import json
+import math
 import re
 import sys
 import time
@@ -44,7 +77,7 @@ sys.path.insert(0, str(_REPO))
 
 from taxembed.eval.baselines import majority_parent_rate, sibling_chance  # noqa: E402
 from taxembed.eval.linkpred import (  # noqa: E402
-    _poincare_distance, candidate_pool, linkpred_metrics, rank_of_true_parent, stratify,
+    candidate_pool, linkpred_metrics, rank_of_true_parent, stratify,
 )
 from taxembed.eval.p2_split import depth_from_closure  # noqa: E402
 from taxembed.eval.subtree import parent_from_closure  # noqa: E402
@@ -54,7 +87,30 @@ from taxembed.utils.training_pairs import TrainingPairs  # noqa: E402
 POOL_SIZE_BINS = [(2, 2), (3, 5), (6, 20), (21, 10**6)]
 DEPTH_BINS = [(11, 15), (16, 21), (22, 28)]
 
-RADIUS_OVERFLOW_BOUND = 100.0  # cosh/sinh overflow ~709.8; a real trained checkpoint measured 3.66
+# z_embeddings path: |z| is genuinely unbounded under --euclidean-param training (the radial
+# regulariser's gradient on ||z|| saturates); cosh/sinh overflow ~709.8, a real trained checkpoint
+# measured 3.66, so 100 is a real, meaningful bound on that path.
+RADIUS_OVERFLOW_BOUND = 100.0
+# ball_coordinates path: float32 ||x|| cannot approach 1.0 closer than ~1.19e-7, so >100 can never
+# fire there (fix round 1, IMPORTANT #1). The reachable failure mode is norm SATURATION -- ||x||
+# within a few ulp of the ball boundary, where arctanh loses precision.
+NORM_SATURATION_BOUND = 1.0 - 1e-6
+
+
+def _json_safe(obj):
+    """Recursively replace non-finite floats (NaN, +-inf) with None (fix round 1, MINOR #5).
+
+    With an empty held-out set, `linkpred_metrics` returns `float("nan")` for every metric, and
+    `json.dumps`'s default `allow_nan=True` would emit the bare `NaN` token -- not valid JSON
+    under a strict (RFC 8259) parser. `null` is the correct JSON representation of "no value".
+    """
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
 
 
 def md5(path: Path) -> str:
@@ -119,6 +175,32 @@ def _visible_basic_edges(parent: np.ndarray, held_out: np.ndarray, n_nodes: int)
     return parent[keep], idx[keep]
 
 
+def _vendrov_recall_core(visible_anc: np.ndarray, visible_desc: np.ndarray,
+                         queries: np.ndarray, true_parents: np.ndarray, n_nodes: int) -> float:
+    """Fraction of `queries` whose `(true_parents[i], queries[i])` pair is a visible direct edge,
+    via a vectorized pair-encode + `np.isin` -- semantically identical to the diagonal of
+    `baselines.vendrov_closure_rule(visible_anc, visible_desc, queries, true_parents)` but
+    O(n) instead of that function's O(n_queries * n_candidates) Python set matrix (unaffordable
+    at P2 scale: tens of thousands of held-out nodes).
+
+    Factored out of `vendrov_recall` (fix round 1, IMPORTANT #2) so a test can hand it a
+    visible-edge set that was NOT built by removing the queried nodes' own edges. Production
+    (`vendrov_recall` below) always does exactly that removal, which is what makes ITS answer
+    0.0 by construction on the real P2 split (see module docstring) -- a fixture passed to
+    `vendrov_recall` itself can therefore never exercise a genuine non-zero recall. This
+    lower-level function has no such coupling: `queries` and the edges removed to build
+    `visible_anc`/`visible_desc` are independent, so a hand-built fixture can give some queried
+    pairs that ARE visible, for real non-zero coverage of the encode+isin mechanism.
+    """
+    queries = np.asarray(queries, dtype=np.int64)
+    if len(queries) == 0:
+        return float("nan")
+    key = n_nodes + 1
+    visible_key = np.asarray(visible_anc, dtype=np.int64) * key + np.asarray(visible_desc, dtype=np.int64)
+    query_key = np.asarray(true_parents, dtype=np.int64) * key + queries
+    return float(np.isin(query_key, visible_key).mean())
+
+
 def vendrov_recall(parent: np.ndarray, held_out: np.ndarray, n_nodes: int) -> float:
     """Fraction of held-out nodes whose TRUE parent the Vendrov closure rule marks positive,
     i.e. the DIAGONAL of `baselines.vendrov_closure_rule(visible_anc, visible_desc,
@@ -132,10 +214,7 @@ def vendrov_recall(parent: np.ndarray, held_out: np.ndarray, n_nodes: int) -> fl
     if len(held_out) == 0:
         return float("nan")
     visible_anc, visible_desc = _visible_basic_edges(parent, held_out, n_nodes)
-    key = n_nodes + 1
-    visible_key = visible_anc.astype(np.int64) * key + visible_desc.astype(np.int64)
-    query_key = parent[held_out].astype(np.int64) * key + held_out
-    return float(np.isin(query_key, visible_key).mean())
+    return _vendrov_recall_core(visible_anc, visible_desc, held_out, parent[held_out], n_nodes)
 
 
 def main() -> None:
@@ -158,7 +237,15 @@ def main() -> None:
 
     heldout_data = np.load(args.heldout)
     held = np.asarray(heldout_data["test"], dtype=np.int64)
+    val = np.asarray(heldout_data["val"], dtype=np.int64) if "val" in heldout_data else np.array([], dtype=np.int64)
+    n_val = int(len(val))
     depth_held = depth[held]
+    if n_val:
+        print(f"WARNING: --heldout has {n_val:,} 'val' node(s) -- these are held out of training "
+              f"but NOT scored by this driver (val is reserved for threshold-tuning outside Task "
+              f"6's scope, per the ruling). They are excluded from every number below. If this is "
+              f"unintentional, rebuild the split with 'scripts/build_p2_split.py --frac-val 0.0'.",
+              flush=True)
 
     # Candidate pools depend only on tree structure, not on any checkpoint -- build once.
     candidates_list = [candidate_pool(parent, depth, node=int(v), strategy="grandparent_children")
@@ -176,6 +263,7 @@ def main() -> None:
         "heldout": str(args.heldout.resolve()),
         "n_nodes": n_nodes,
         "n_held": int(len(held)),
+        "n_val": n_val,
         "seed": args.seed,
         "primary_metric": args.metric,
         "pool_size_bins": [list(b) for b in POOL_SIZE_BINS],
@@ -219,11 +307,11 @@ def main() -> None:
                 cands = candidates_list[i]
                 ranks_cos[i] = rank_of_true_parent(emb, v, tp, cands, metric="cosine",
                                                    tie_seed=args.seed)
-                r_u = None if radii is None else radii[v]
-                r_v = None if radii is None else radii[cands]
-                ranks_poin[i] = rank_of_true_parent(emb, v, tp, cands, metric="poincare",
-                                                    tie_seed=args.seed, radii=radii)
-                _, cc = _poincare_distance(emb[v], emb[cands], r_u=r_u, r_v=r_v)
+                # return_clip=True recovers clip_count from THIS call instead of a second,
+                # redundant _poincare_distance call on the same pair (fix round 1, MINOR #4).
+                ranks_poin[i], cc = rank_of_true_parent(emb, v, tp, cands, metric="poincare",
+                                                        tie_seed=args.seed, radii=radii,
+                                                        return_clip=True)
                 clip_count_total += cc
 
             metrics_cosine = linkpred_metrics(ranks_cos, n_cand)
@@ -240,25 +328,41 @@ def main() -> None:
             }
 
             if radii is not None:
+                # Exact hyperbolic radius (|z| under the euclidean parametrization): genuinely
+                # unbounded, so a >100 threshold is meaningful here (fix round 1, IMPORTANT #1).
                 radius_source = "z_embeddings"
-                radii_for_stats = radii
+                radius_guard = "z_norm_gt_100"
+                max_radius = float(np.max(radii)) if len(radii) else float("nan")
+                n_norm_saturated = None
+                radius_overflow_risk = bool(max_radius > RADIUS_OVERFLOW_BOUND)
             else:
-                # No exact hyperbolic radius available: approximate it from the ball-coordinate
-                # point via r = 2*artanh(|x|), the inverse of the euclidean parametrization
-                # (x = tanh(|z|/2) z/|z|) -- mirrors scripts/score_recipe_checkpoints.py's
-                # fallback label. Needed because |x| itself is bounded in [0, 1) by construction
-                # and so can never trip the overflow guard below; the hyperbolic radius can.
+                # No exact hyperbolic radius available: `emb` here is float32 (load_checkpoint
+                # casts to float), and float32 cannot represent anything closer to 1.0 than
+                # ~1.19e-7 -- so r = 2*artanh(|x|) can never exceed ~17-21 on this path, and a
+                # >100 test would be structurally unreachable (fix round 1, IMPORTANT #1). The
+                # reachable failure mode instead is norm SATURATION: ||x|| landing at or within
+                # a few ulp of 1.0, where arctanh loses all precision. `max_radius` is still
+                # reported (informational, via the same formula scripts/score_recipe_checkpoints.py
+                # uses), but the GUARD is n_norm_saturated, not max_radius > threshold.
                 radius_source = "ball_coordinates"
+                radius_guard = "ball_norm_saturation"
                 norms = np.linalg.norm(emb.astype(np.float64), axis=1)
                 radii_for_stats = 2.0 * np.arctanh(np.clip(norms, 0.0, 1.0 - 1e-9))
+                max_radius = float(np.max(radii_for_stats)) if len(radii_for_stats) else float("nan")
+                n_norm_saturated = int(np.sum(norms >= NORM_SATURATION_BOUND))
+                radius_overflow_risk = n_norm_saturated > 0
 
-            max_radius = float(np.max(radii_for_stats)) if len(radii_for_stats) else float("nan")
-            radius_overflow_risk = bool(max_radius > RADIUS_OVERFLOW_BOUND)
             if radius_overflow_risk:
-                print(f"WARNING: {arm}@{epoch} max radius {max_radius:.2f} exceeds "
-                      f"{RADIUS_OVERFLOW_BOUND:.0f} -- cosh/sinh overflow risk. This is a "
-                      f"genuine discovery about a deeper tree, not a bug to silently tolerate.",
-                      flush=True)
+                if radius_guard == "z_norm_gt_100":
+                    print(f"WARNING: {arm}@{epoch} max radius {max_radius:.2f} exceeds "
+                          f"{RADIUS_OVERFLOW_BOUND:.0f} -- cosh/sinh overflow risk. This is a "
+                          f"genuine discovery about a deeper tree, not a bug to silently tolerate.",
+                          flush=True)
+                else:
+                    print(f"WARNING: {arm}@{epoch} {n_norm_saturated} node(s) NORM-SATURATED "
+                          f"(||x|| >= {NORM_SATURATION_BOUND}) -- arctanh precision loss risk at "
+                          f"the ball boundary (ball_coordinates path has no exact radius to fall "
+                          f"back on).", flush=True)
 
             row = {
                 "epoch": epoch,
@@ -271,7 +375,9 @@ def main() -> None:
                 "by_depth": by_depth,
                 "poincare_radius_source": radius_source,
                 "max_radius": max_radius,
+                "radius_guard": radius_guard,
                 "radius_overflow_risk": radius_overflow_risk,
+                "n_norm_saturated": n_norm_saturated,
                 "clip_count_total": int(clip_count_total),
             }
             rows.append(row)
@@ -285,7 +391,9 @@ def main() -> None:
 
     out = args.out
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(result, indent=2))
+    # allow_nan=False is a second, independent belt: if any non-finite float somehow escapes
+    # _json_safe, this raises instead of silently writing invalid JSON.
+    out.write_text(json.dumps(_json_safe(result), indent=2, allow_nan=False))
     print(f"wrote {out}  md5={md5(out)}", flush=True)
     n_checkpoints = sum(len(a["checkpoints"]) for a in result["arms"].values())
     print(f"scoring complete: {len(result['arms'])} arm(s), {n_checkpoints} checkpoint(s), "

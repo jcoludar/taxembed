@@ -30,6 +30,13 @@ remains as a fallback, but the floor is no longer silent: `_poincare_distance` n
 `(distances, clip_count)`, where `clip_count` is the number of pairs whose true (pre-floor)
 denominator was below 1e-12, so a caller can report the fallback's known blind spot instead of it
 passing unnoticed.
+
+CORRECTION (2026-09-24, fix round 1, MINOR #4). `scripts/score_p2_linkpred.py` was calling
+`rank_of_true_parent(metric="poincare")` (which computes `_poincare_distance` internally) and
+then calling `_poincare_distance` a SECOND time on the same pair, purely to recover
+`clip_count` -- doubling the Poincare cost per held node. `rank_of_true_parent` now takes an
+optional `return_clip=False` parameter; when True it returns `(rank, clip_count)` from the one
+computation it already does. Default behaviour (bare rank) is unchanged for existing callers.
 """
 
 from __future__ import annotations
@@ -108,7 +115,8 @@ def candidate_pool(parent: np.ndarray, depth: np.ndarray, node: int,
 
 def rank_of_true_parent(emb: np.ndarray, node: int, true_parent: int,
                         candidates: np.ndarray, metric: str = "poincare",
-                        tie_seed: int = 0, radii: np.ndarray | None = None) -> int:
+                        tie_seed: int = 0, radii: np.ndarray | None = None,
+                        return_clip: bool = False):
     """1-based rank of `true_parent` among `candidates`, nearest first.
 
     Ties are broken by seeded jitter rather than by array order: index order correlates with
@@ -117,24 +125,32 @@ def rank_of_true_parent(emb: np.ndarray, node: int, true_parent: int,
     `radii`, if given, is a per-node array of exact hyperbolic radii (e.g. `|z|` from the
     euclidean training parametrization -- see `scripts/score_recipe_checkpoints.py`). When
     supplied and `metric="poincare"`, ranking uses `_poincare_distance`'s exact radius-based
-    path, which does not degrade near the ball boundary. The ball-coordinate fallback's clip
-    count is computed but not propagated out of this function -- callers who need it should call
-    `_poincare_distance` directly.
+    path, which does not degrade near the ball boundary.
+
+    `return_clip` (fix round 1, MINOR #4): when True, returns `(rank, clip_count)` instead of
+    the bare rank, where `clip_count` is `_poincare_distance`'s own floor-hit count from the
+    SAME distance computation this function already performs -- so a caller that wants both the
+    rank and the clip count (e.g. `scripts/score_p2_linkpred.py`) does not need to call
+    `_poincare_distance` a second time purely to recover it. `clip_count` is always 0 for
+    `metric="cosine"`, since that path never touches `_poincare_distance` at all. Default False
+    preserves the old bare-rank return for existing callers.
     """
     candidates = np.asarray(candidates, dtype=np.int64)
     if true_parent not in set(candidates.tolist()):
         raise ValueError(f"true parent {true_parent} absent from candidate pool")
+    clip_count = 0
     if metric == "poincare":
         r_u = None if radii is None else radii[node]
         r_v = None if radii is None else radii[candidates]
-        d, _clip_count = _poincare_distance(emb[node], emb[candidates], r_u=r_u, r_v=r_v)
+        d, clip_count = _poincare_distance(emb[node], emb[candidates], r_u=r_u, r_v=r_v)
     else:
         d = _cosine_distance(emb[node], emb[candidates])
     rng = np.random.default_rng(tie_seed + int(node))
     d = d + rng.random(len(d)) * 1e-12
     order = np.argsort(d, kind="stable")
     position = int(np.flatnonzero(candidates[order] == true_parent)[0])
-    return position + 1
+    rank = position + 1
+    return (rank, clip_count) if return_clip else rank
 
 
 def linkpred_metrics(ranks: np.ndarray, n_candidates: np.ndarray) -> dict:

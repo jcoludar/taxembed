@@ -10,6 +10,12 @@ import torch
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts/score_p2_linkpred.py"
 
+sys.path.insert(0, str(REPO / "scripts"))
+from score_p2_linkpred import (  # noqa: E402
+    _vendrov_recall_core, _visible_basic_edges, vendrov_recall,
+)
+from taxembed.eval import baselines  # noqa: E402
+
 
 def test_scorer_runs_end_to_end_on_a_synthetic_tree(tmp_path):
     """A 3-level tree, an embedding that PERFECTLY encodes it, and one that is noise.
@@ -159,3 +165,234 @@ def test_scorer_numbers_are_right_perfect_arm_hits_1_scrambled_arm_lands_near_ch
     # scrambled embedding carries no structure, so it must not look anywhere near "learned".
     assert scrambled_metrics["mrr"] < 0.7
     assert abs(scrambled_metrics["hits_at_1"] - sibling_chance_mean) < 0.15
+
+
+def _write_small_tree(tmp_path, test=(3, 5), val=()):
+    """0 -> {1,2}; 1 -> {3,4}; 2 -> {5,6} -- the module's canonical small fixture tree, factored
+    out here so the radius-guard and val-handling tests below don't each re-derive it."""
+    parent = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
+    depth = np.array([0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
+    held = tmp_path / "heldout.npz"
+    np.savez(held, test=np.array(test, dtype=np.int64), val=np.array(val, dtype=np.int64))
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({
+        "clade": "synthetic", "band": [0, 99], "n_nodes": 7,
+        "parent": parent.tolist(), "depth": depth.tolist(),
+    }))
+    return manifest, held
+
+
+_SMALL_TREE_BALL_COORDS = torch.tensor([
+    [0.0, 0.0], [0.5, 0.0], [-0.5, 0.0],
+    [0.5, 0.01], [0.5, -0.01], [-0.5, 0.01], [-0.5, -0.01],
+])
+
+
+# --- Important 1 (fix round 1): the radius guard must match the checkpoint's actual path ---
+
+
+def test_radius_guard_fires_on_z_embeddings_path_when_a_z_norm_exceeds_100(tmp_path):
+    """|z| is genuinely unbounded on the z_embeddings path, so a synthetic checkpoint with one
+    node's |z| > 100 must trip radius_overflow_risk under the "z_norm_gt_100" rule."""
+    manifest, held = _write_small_tree(tmp_path)
+    z_over = torch.zeros(7, 2, dtype=torch.float64)
+    z_over[0] = torch.tensor([150.0, 0.0], dtype=torch.float64)  # one node's |z| = 150 > 100
+    ck = tmp_path / "zover_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "z_embeddings": z_over}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"zover={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    row = json.loads(out.read_text())["arms"]["zover"]["checkpoints"][0]
+    assert row["poincare_radius_source"] == "z_embeddings"
+    assert row["radius_guard"] == "z_norm_gt_100"
+    assert row["radius_overflow_risk"] is True
+    assert row["max_radius"] == pytest.approx(150.0)
+    assert row["n_norm_saturated"] is None
+    assert "exceeds" in rc.stdout
+
+
+def test_radius_guard_silent_on_z_embeddings_path_when_all_z_norms_are_small(tmp_path):
+    """The mirror case: every |z| comfortably under 100 must NOT trip the guard."""
+    manifest, held = _write_small_tree(tmp_path)
+    z_under = torch.full((7, 2), 1.0, dtype=torch.float64)  # |z| = sqrt(2) =~ 1.41
+    ck = tmp_path / "zunder_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "z_embeddings": z_under}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"zunder={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    row = json.loads(out.read_text())["arms"]["zunder"]["checkpoints"][0]
+    assert row["radius_guard"] == "z_norm_gt_100"
+    assert row["radius_overflow_risk"] is False
+
+
+def test_radius_guard_fires_on_ball_coordinates_path_when_a_norm_saturates(tmp_path):
+    """Without z_embeddings, radius must be derived from the (float32) ball-coordinate norm,
+    which can never reach the old >100 threshold (float32 cannot represent anything closer to 1.0
+    than ~1.19e-7). A synthetic checkpoint with one row at norm >= 1 - 1e-6 must instead trip
+    radius_overflow_risk under the "ball_norm_saturation" rule, with n_norm_saturated >= 1."""
+    manifest, held = _write_small_tree(tmp_path)
+    coords = _SMALL_TREE_BALL_COORDS.clone().double()
+    coords[0] = torch.tensor([1.0 - 1e-7, 0.0], dtype=torch.float64)  # norm ~0.9999999, saturated
+    ck = tmp_path / "ballsat_epoch1.pth"
+    torch.save({"embeddings": coords}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"ballsat={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    row = json.loads(out.read_text())["arms"]["ballsat"]["checkpoints"][0]
+    assert row["poincare_radius_source"] == "ball_coordinates"
+    assert row["radius_guard"] == "ball_norm_saturation"
+    assert row["radius_overflow_risk"] is True
+    assert row["n_norm_saturated"] >= 1
+    assert row["max_radius"] < 100.0  # the OLD threshold, confirmed structurally unreachable here
+    assert "saturat" in rc.stdout.lower()
+
+
+def test_radius_guard_silent_on_ball_coordinates_path_when_norms_are_comfortable(tmp_path):
+    """The mirror case: every ball-coordinate norm comfortably inside the ball must NOT trip the
+    saturation guard, and n_norm_saturated must be exactly 0."""
+    manifest, held = _write_small_tree(tmp_path)
+    ck = tmp_path / "ballsafe_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"ballsafe={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    row = json.loads(out.read_text())["arms"]["ballsafe"]["checkpoints"][0]
+    assert row["radius_guard"] == "ball_norm_saturation"
+    assert row["radius_overflow_risk"] is False
+    assert row["n_norm_saturated"] == 0
+
+
+# --- Important 2 (fix round 1): vendrov_recall coverage that could actually fail ---
+
+
+def test_vendrov_recall_core_finds_a_genuinely_visible_pair():
+    """`vendrov_recall` itself is tautologically 0.0 for ANY input on the real P2 split -- the
+    held_out array both removes edges from the visible graph and supplies the query, so every
+    query's own edge is guaranteed excluded by construction. No fixture through that function can
+    prove the encode+isin mechanism actually works. `_vendrov_recall_core` decouples "removed"
+    from "queried": here only node 4's edge is removed from the visible graph, so node 3's edge
+    (1, 3) is still visible and its query must correctly hit, giving a genuine, exactly-assertable
+    non-zero recall of 0.5 -- an implementation that unconditionally returns 0.0 fails this."""
+    # 0 -> {1, 2}; 1 -> {3, 4}
+    parent = np.array([0, 0, 0, 1, 1], dtype=np.int64)
+    n_nodes = 5
+    visible_anc, visible_desc = _visible_basic_edges(parent, held_out=np.array([4]), n_nodes=n_nodes)
+    queries = np.array([3, 4], dtype=np.int64)
+    true_parents = parent[queries]
+    recall = _vendrov_recall_core(visible_anc, visible_desc, queries, true_parents, n_nodes)
+    assert recall == 0.5
+
+    # cross-checked against the independent reference implementation on the SAME fixture, so
+    # this isn't just two copies of the same arithmetic agreeing with itself.
+    mat = baselines.vendrov_closure_rule(visible_anc, visible_desc, queries=queries,
+                                         candidates=true_parents)
+    assert float(np.diag(mat).mean()) == 0.5
+
+
+def test_vendrov_recall_agrees_with_the_reference_closure_rule():
+    """The scorer's vectorized `vendrov_recall` and the reference `baselines.vendrov_closure_rule`
+    (called with the full visible edge list, diagonal extracted) must agree exactly on the same
+    fixture -- this is what stops the two implementations of one rule from drifting apart. (Both
+    are expected to be 0.0 here, by construction on the real split -- see the module docstring --
+    but this test is not a hardcoded-0.0 check: it fails if the scorer's manual pair-encoding
+    diverges from the reference's independent set-membership check, e.g. a wrong `key` causing an
+    encoding collision.)"""
+    # matches the tree fixture used by the end-to-end CLI test above
+    parent = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
+    n_nodes = 7
+    held_out = np.array([3, 5], dtype=np.int64)
+
+    scorer_value = vendrov_recall(parent, held_out, n_nodes)
+
+    visible_anc, visible_desc = _visible_basic_edges(parent, held_out, n_nodes)
+    mat = baselines.vendrov_closure_rule(visible_anc, visible_desc, queries=held_out,
+                                         candidates=parent[held_out])
+    reference_value = float(np.diag(mat).mean())
+
+    assert scorer_value == reference_value == 0.0
+
+
+# --- Important 3 (fix round 1): 'val' must be counted, reported, and warned about ---
+
+
+def test_n_val_is_recorded_and_warned_when_nonzero(tmp_path):
+    manifest, held = _write_small_tree(tmp_path, test=(3,), val=(5,))
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    assert "1 'val' node" in rc.stdout  # a LOUD warning, not a silent drop
+    res = json.loads(out.read_text())
+    assert res["n_val"] == 1
+    assert res["n_held"] == 1
+
+
+def test_n_val_is_zero_and_silent_when_val_is_empty(tmp_path):
+    manifest, held = _write_small_tree(tmp_path, test=(3, 5), val=())
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    assert "'val' node" not in rc.stdout
+    res = json.loads(out.read_text())
+    assert res["n_val"] == 0
+
+
+# --- Minor 5 (fix round 1): NaN is not valid JSON -- emit null instead ---
+
+
+def test_empty_heldout_metrics_are_null_not_nan_in_strict_json(tmp_path):
+    """An empty held-out set makes every linkpred metric float('nan'); json.dumps's default
+    allow_nan=True would emit the bare NaN token, which a strict (RFC 8259) parser rejects."""
+    manifest, held = _write_small_tree(tmp_path, test=(), val=())
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    text = out.read_text()
+    assert "NaN" not in text  # the bare token a strict JSON parser rejects
+
+    def _reject_nonfinite(name):
+        raise ValueError(f"strict JSON parser encountered non-finite constant: {name}")
+
+    res = json.loads(text, parse_constant=_reject_nonfinite)  # raises if anything slipped through
+    assert res["baselines"]["sibling_chance_mean"] is None
+    assert res["arms"]["arm"]["checkpoints"][0]["metrics"]["mrr"] is None
