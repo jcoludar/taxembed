@@ -68,8 +68,15 @@ def main() -> int:
     drop_parent = parent_edge_mask(pairs, held_all)
 
     rng = np.random.default_rng(args.seed + 10_000)  # independent stream from the node split
+    held_mask = np.zeros(n, dtype=bool)
+    held_mask[held_all] = True
     deep = pairs.depth_diff >= 2
-    hide_deep = deep & (rng.random(len(pairs)) >= args.visibility)
+    is_heldout_row = held_mask[pairs.descendant_idx]
+    # Held-out nodes are leaves: they are never an ancestor, and their only depth_diff==1
+    # row is their own parent edge (always dropped above). Their depth_diff>=2 rows are
+    # therefore their ONLY possible source of a trained coordinate -- exempt those rows
+    # from visibility thinning so every held-out node keeps at least its ancestry closure.
+    hide_deep = deep & ~is_heldout_row & (rng.random(len(pairs)) >= args.visibility)
 
     keep = ~(drop_parent | hide_deep)
     train = pairs[keep]
@@ -98,6 +105,7 @@ def main() -> int:
         "n_pairs_train": int(len(train)),
         "n_pairs_removed_parent_edges": int(drop_parent.sum()),
         "n_pairs_removed_visibility": int(hide_deep.sum()),
+        "n_pairs_heldout_ancestry_kept": int((deep & is_heldout_row).sum()),
         "train_npz": train_name,
         "heldout_npz": held_name,
         "train_md5": md5(args.outdir / train_name),
