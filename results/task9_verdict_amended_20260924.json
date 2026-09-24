@@ -1,0 +1,319 @@
+{
+  "task": "plan v2 Task 9 -- Figure 4 recipe claim on the radius-free metric",
+  "preregistration": [
+    "results/recipe_angular_comparison.json :: preregistration_v2_20260922",
+    "results/recipe_angular_comparison.json :: preregistration_v2_amendment_1_20260922"
+  ],
+  "verdict": "READING_1_CANONICAL_BETTER",
+  "meaning": "Figure 4's claim HOLDS on learned angular structure, and the figure should be RE-PLOTTED on a learned metric because its current y-axis measures the planted axis.",
+  "attribution": "Any difference is attributed to the 4-factor package (effective batch, n_negatives, lr, lr schedule), never to the batch lever alone.",
+  "comparison": {
+    "arm_a": "canonical",
+    "arm_b": "prior",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "gates": {
+      "a": [
+        {
+          "arm": "canonical",
+          "seed": 0,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.9724588621637782,
+          "S_angle_jitter_sd": 0.0002941958418124038,
+          "level_auc": 0.9818970175418039,
+          "S_poincare": 0.9724583431333645,
+          "flag_poincare_above_angle": false,
+          "milestone_S_angle_max": 0.972819242281079,
+          "gate_a_rise": 0.9742771800088715,
+          "gate_a_threshold": 0.002941958418124038,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": 0.04196197840898641,
+          "gate_b_loss_jitter": 0.00020235104839845178,
+          "gate_b_pass": true,
+          "valid": true
+        },
+        {
+          "arm": "canonical",
+          "seed": 1,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.9729211452523174,
+          "S_angle_jitter_sd": 0.0002612549038534558,
+          "level_auc": 0.9835312869221642,
+          "S_poincare": 0.9729227023435587,
+          "flag_poincare_above_angle": true,
+          "milestone_S_angle_max": 0.9732111102434821,
+          "gate_a_rise": 0.9746690479712746,
+          "gate_a_threshold": 0.002612549038534558,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": 0.04016784372161997,
+          "gate_b_loss_jitter": 0.0002683022098676771,
+          "gate_b_pass": true,
+          "valid": true
+        },
+        {
+          "arm": "canonical",
+          "seed": 2,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.9723614574561259,
+          "S_angle_jitter_sd": 0.0003114767538393182,
+          "level_auc": 0.9831892107515328,
+          "S_poincare": 0.9723624955169532,
+          "flag_poincare_above_angle": true,
+          "milestone_S_angle_max": 0.9726903497283238,
+          "gate_a_rise": 0.9741482874561164,
+          "gate_a_threshold": 0.003114767538393182,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": 0.04072712302104886,
+          "gate_b_loss_jitter": 0.000172967739521494,
+          "gate_b_pass": true,
+          "valid": true
+        }
+      ],
+      "b": [
+        {
+          "arm": "prior",
+          "seed": 0,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.6183828882689227,
+          "S_angle_jitter_sd": 0.0021126539194160306,
+          "level_auc": 0.8512838724914372,
+          "S_poincare": 0.5123486079467507,
+          "flag_poincare_above_angle": false,
+          "milestone_S_angle_max": 0.93519991789037,
+          "gate_a_rise": 0.9366578556181626,
+          "gate_a_threshold": 0.021126539194160306,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": 0.0003803459496278805,
+          "gate_b_loss_jitter": 0.00026310673714877056,
+          "gate_b_pass": true,
+          "valid": true
+        },
+        {
+          "arm": "prior",
+          "seed": 1,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.6200904983302561,
+          "S_angle_jitter_sd": 0.003007206047341926,
+          "level_auc": 0.851410729548858,
+          "S_poincare": 0.5143704044185583,
+          "flag_poincare_above_angle": false,
+          "milestone_S_angle_max": 0.937430018568241,
+          "gate_a_rise": 0.9388879562960336,
+          "gate_a_threshold": 0.03007206047341926,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": 0.000534028029640865,
+          "gate_b_loss_jitter": 0.0002525904129217798,
+          "gate_b_pass": true,
+          "valid": true
+        },
+        {
+          "arm": "prior",
+          "seed": 2,
+          "n_roll": 5,
+          "n_milestones": 20,
+          "roll_epochs": [
+            196,
+            197,
+            198,
+            199,
+            200
+          ],
+          "S_angle": 0.6194737171885485,
+          "S_angle_jitter_sd": 0.002936883272873283,
+          "level_auc": 0.8513636739598252,
+          "S_poincare": 0.5080392714312809,
+          "flag_poincare_above_angle": false,
+          "milestone_S_angle_max": 0.9366592584037791,
+          "gate_a_rise": 0.9381171961315716,
+          "gate_a_threshold": 0.02936883272873283,
+          "gate_a_pass": true,
+          "gate_b_final_phase_epochs": [
+            130,
+            140,
+            150,
+            160,
+            170,
+            180,
+            190,
+            200
+          ],
+          "gate_b_loss_drop": -0.00013385686038702715,
+          "gate_b_loss_jitter": 0.0003347030174370054,
+          "gate_b_pass": true,
+          "valid": true
+        }
+      ],
+      "invalid_runs": []
+    },
+    "S_angle": {
+      "a": [
+        0.9724588621637782,
+        0.9729211452523174,
+        0.9723614574561259
+      ],
+      "b": [
+        0.6183828882689227,
+        0.6200904983302561,
+        0.6194737171885485
+      ],
+      "a_mean": 0.9725804882907405,
+      "b_mean": 0.6193157012625757,
+      "mean_diff_a_minus_b": 0.3532647870281648,
+      "all_a_above_all_b": true,
+      "all_b_above_all_a": false,
+      "ranges_overlap": false
+    },
+    "level_auc": {
+      "a": [
+        0.9818970175418039,
+        0.9835312869221642,
+        0.9831892107515328
+      ],
+      "b": [
+        0.8512838724914372,
+        0.851410729548858,
+        0.8513636739598252
+      ],
+      "all_a_above_all_b": true,
+      "all_b_above_all_a": false
+    },
+    "S_poincare": {
+      "a_mean": 0.9725811803312921,
+      "b_mean": 0.5115860945988634
+    },
+    "equivalence": {
+      "pooled_within_arm_seed_sd": 0.0006469610105751388,
+      "band": 0.01,
+      "within_band": false
+    },
+    "strata": {
+      "S_angle_by_band": {
+        "n_strata": 3,
+        "diffs": {
+          "deep": 0.2883302893495121,
+          "mid": 0.38867907109685074,
+          "shallow": 0.6284719458054887
+        },
+        "n_positive": 3,
+        "n_negative": 0,
+        "dropped_below_min_n": {}
+      },
+      "S_angle_by_clade": {
+        "n_strata": 3,
+        "diffs": {
+          "1419": 0.2247137134800119,
+          "233221": 0.39983342934074106,
+          "398899": 0.48556420169244785
+        },
+        "n_positive": 3,
+        "n_negative": 0,
+        "dropped_below_min_n": {}
+      }
+    },
+    "sign_consistent_positive": true,
+    "sign_consistent_negative": false,
+    "flags_poincare_above_angle": [
+      "canonical_s1",
+      "canonical_s2"
+    ],
+    "_a_wins": true,
+    "_b_wins": false,
+    "_equivalent": false,
+    "_uninformative": false
+  },
+  "amendment_2_applied": true,
+  "scored_from": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/results/seeds_20260924_084146.json"
+}

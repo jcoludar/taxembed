@@ -83,11 +83,14 @@ def main() -> None:
     ap.add_argument("--json", required=True, help="score_recipe_checkpoints.py output")
     ap.add_argument("--out", help="write the verdict JSON here")
     ap.add_argument("--seeds", default="0,1,2")
+    ap.add_argument("--amendment-2", action="store_true",
+                    help="apply preregistration_v2_amendment_2_20260924 (gate b: loss must not RISE)")
     args = ap.parse_args()
 
     result = json.loads(Path(args.json).read_text())
     seeds = tuple(int(x) for x in args.seeds.split(","))
-    verdict = (task9_verdict if args.task == "9" else task8_verdict)(result, seeds)
+    verdict = (task9_verdict if args.task == "9" else task8_verdict)(result, seeds, args.amendment_2)
+    verdict["amendment_2_applied"] = bool(args.amendment_2)
     verdict["scored_from"] = str(Path(args.json).resolve())
     _render(verdict)
     if args.out:

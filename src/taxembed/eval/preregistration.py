@@ -59,7 +59,7 @@ def run_value(result: dict, arm: str, seed: int) -> dict:
     }
 
 
-def validity_gate(result: dict, arm: str, seed: int) -> dict:
+def validity_gate(result: dict, arm: str, seed: int, amendment_2: bool = False) -> dict:
     """(a) training happened, on S_angle; (b) final-phase loss fell. Either failing => UNINFORMATIVE.
 
     (a) deliberately uses max over milestones, not the final value: a rise-then-collapse
@@ -82,7 +82,11 @@ def validity_gate(result: dict, arm: str, seed: int) -> dict:
     loss_jitter = float(np.std(roll_losses, ddof=1)) if len(roll_losses) > 1 else float("nan")
     if len(losses) >= 2 and np.isfinite(loss_jitter):
         loss_drop = losses[0] - losses[-1]
-        gate_b = bool(loss_drop > loss_jitter)
+        # amendment 2 (2026-09-24): the frozen rule required the loss to FALL, which a CONVERGED
+        # arm cannot do -- and converged vs never-trained are opposite situations with an identical
+        # measurement. The amended rule only requires that the loss did not materially RISE, so a
+        # diverging arm still fails. Gate (a) is what establishes that training happened.
+        gate_b = bool(loss_drop > -loss_jitter) if amendment_2 else bool(loss_drop > loss_jitter)
     else:
         loss_drop, gate_b = float("nan"), False
 
@@ -137,10 +141,10 @@ def _stratum_means(result: dict, arm: str, seeds, field: str) -> dict:
     }
 
 
-def compare_arms(result: dict, arm_a: str, arm_b: str, seeds=(0, 1, 2)) -> dict:
+def compare_arms(result: dict, arm_a: str, arm_b: str, seeds=(0, 1, 2), amendment_2: bool = False) -> dict:
     """The shared engine. `arm_a` is the arm a positive difference favours."""
-    gates_a = [validity_gate(result, arm_a, s) for s in seeds]
-    gates_b = [validity_gate(result, arm_b, s) for s in seeds]
+    gates_a = [validity_gate(result, arm_a, s, amendment_2) for s in seeds]
+    gates_b = [validity_gate(result, arm_b, s, amendment_2) for s in seeds]
     invalid = [f"{g['arm']}_s{g['seed']}" for g in gates_a + gates_b if not g["valid"]]
 
     a_s = np.array([g["S_angle"] for g in gates_a])
@@ -209,9 +213,9 @@ def compare_arms(result: dict, arm_a: str, arm_b: str, seeds=(0, 1, 2)) -> dict:
     }
 
 
-def task9_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
+def task9_verdict(result: dict, seeds=(0, 1, 2), amendment_2: bool = False) -> dict:
     """canonical vs prior -> pre-registered reading 1 / 2 / 3, MIXED, or UNINFORMATIVE."""
-    cmp = compare_arms(result, "canonical", "prior", seeds)
+    cmp = compare_arms(result, "canonical", "prior", seeds, amendment_2)
     if cmp["_uninformative"]:
         verdict, meaning = "UNINFORMATIVE", (
             "A validity gate failed; the contrast is not read in either direction. "
@@ -243,9 +247,9 @@ def task9_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
     }
 
 
-def task8_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
+def task8_verdict(result: dict, seeds=(0, 1, 2), amendment_2: bool = False) -> dict:
     """fixed vs unfixed sampler -> MATERIAL / ROBUST / MIXED, or UNINFORMATIVE."""
-    cmp = compare_arms(result, "fixed", "unfixed", seeds)
+    cmp = compare_arms(result, "fixed", "unfixed", seeds, amendment_2)
     material = cmp["_a_wins"] or cmp["_b_wins"]
     if cmp["_uninformative"]:
         verdict, meaning = "UNINFORMATIVE", (

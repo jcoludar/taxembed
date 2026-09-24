@@ -95,11 +95,52 @@ class TestValidityGate:
         assert not g["gate_a_pass"]
         assert not g["valid"]
 
-    def test_a_flat_final_phase_loss_fails_gate_b(self):
+    def test_a_flat_final_phase_loss_fails_gate_b_under_the_FROZEN_rule(self):
         res = _result({("canonical", 0): {"s_angle": 0.90, "loss_start": 4.0, "loss_end": 4.0}})
         g = validity_gate(res, "canonical", 0)
         assert not g["gate_b_pass"]
         assert not g["valid"]
+
+    def test_a_CONVERGED_arm_passes_gate_b_under_amendment_2(self):
+        """🧨 The defect amendment 2 fixes, and the reason the original suite could not catch it.
+
+        A converged arm and an arm that never trained produce the SAME flat final-phase loss.
+        The frozen rule failed both; gate (a) is what actually distinguishes them. The earlier
+        version of this test asserted only that flat loss FAILS — encoding the defect as correct
+        behaviour and then verifying it.
+        """
+        res = _result({("canonical", 0): {"s_angle": 0.90, "loss_start": 4.0, "loss_end": 4.0}})
+        g = validity_gate(res, "canonical", 0, amendment_2=True)
+        assert g["gate_b_pass"]
+        assert g["gate_a_pass"]        # structure rose: this arm demonstrably trained
+        assert g["valid"]
+
+    def test_a_DIVERGING_arm_still_fails_gate_b_under_amendment_2(self):
+        """Amendment 2 must not make gate (b) vacuous: a rising loss is still a failure."""
+        res = _result({("canonical", 0): {"s_angle": 0.90, "loss_start": 4.0, "loss_end": 4.5}})
+        g = validity_gate(res, "canonical", 0, amendment_2=True)
+        assert not g["gate_b_pass"]
+        assert not g["valid"]
+
+    def test_amendment_2_does_not_reopen_the_echinodermata_hole(self):
+        """The failure the gates exist for: an arm whose loss fell but which learned nothing.
+
+        It always passed gate (b); gate (a) is what excludes it. Amendment 2 touches only (b),
+        so this must still be UNINFORMATIVE.
+        """
+        specs = {}
+        for seed in (0, 1, 2):
+            specs[("canonical", seed)] = {"s_angle": 0.90 + seed * 1e-4}
+            specs[("prior", seed)] = {"s_angle": 0.60 + seed * 1e-4}
+        # prior_s1 never acquired structure: it sits at the init null and wanders at its own
+        # jitter scale. NOT pinned to exactly 0.0 — a perfectly constant arm has zero jitter, so
+        # gate (a)'s 10x-jitter threshold collapses to zero and any rise clears it. Real runs
+        # always jitter; a fixture that does not is testing a degenerate case.
+        specs[("prior", 1)] = {"s_angle": -0.0015, "rise": False}
+        res = _result(specs)
+        v = task9_verdict(res, amendment_2=True)
+        assert v["verdict"] == "UNINFORMATIVE"
+        assert "prior_s1" in v["comparison"]["gates"]["invalid_runs"]
 
     def test_gate_a_admits_rise_then_collapse(self):
         """Monotonicity is explicitly NOT required: max over milestones is what counts."""

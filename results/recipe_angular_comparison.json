@@ -99,6 +99,26 @@
     "also_done": ["dose-response validation passed on mollusca (results/task9_scorer_dose_response_mollusca.json)", "radius-transplant 2x2 script ready (scripts/radius_transplant_2x2.py); LRZ run pending"]
   },
 
+  "preregistration_v2_amendment_2_20260924": {
+    "status": "WRITTEN AFTER THE ARRAY WAS SCORED, 2026-09-24. Stated plainly because that is the material fact a reader needs: this amendment could in principle be outcome-driven, and the defence is below, not the date.",
+    "what_it_changes": "ONLY validity gate (b). The three readings, gate (a), the equivalence band, the stratum sign rule and amendment 1 are untouched.",
+    "the_defect": [
+      "Gate (b) as frozen required the final-phase (epoch >= 130) loss to FALL by more than the within-run loss jitter. Its stated purpose is to establish that training happened -- it exists because the echinodermata run mapped 'the canonical arm never trained' onto 'prior beats canonical' by default.",
+      "A flat final-phase loss is ALSO the signature of an arm that CONVERGED. Those are opposite situations with an identical measurement, and the frozen gate cannot tell them apart.",
+      "On array 5802007 the prior arm converged: its loss sits at ~4.4046 across epochs 130-200, moving only in the 4th decimal, and its S_angle is equally flat (0.618-0.624, no trend). Canonical's loss still falls (+0.0402 to +0.0420) and its S_angle still climbs (0.9457 -> 0.9728) at epoch 200.",
+      "Which prior seed 'fails' is therefore the sign of a 4th-decimal fluctuation: prior_s0 +0.00038, prior_s1 +0.00053, prior_s2 -0.00013, against a jitter of ~0.0003. Two landed positive, one negative."
+    ],
+    "why_this_is_not_outcome_driven": [
+      "The defect was DERIVABLE BEFORE THE ARRAY RAN, from this same file: results.run_2_mollusca_200ep.convergence_gate already records 'Prior flattens by ~ep100-125 (loss pinned at 3.81, kNN at ~99%)'. The frozen gate then required that same arm's loss to keep falling after ep130. The pre-registration contradicted its own recorded knowledge.",
+      "The amendment is justified by that pre-existing record, not by the direction of the result.",
+      "It is not rescuing a marginal finding. The S_angle separation is +0.3533 against an equivalence band of 0.0100 -- 35x -- with no range overlap, agreement on level AUC, and a consistent sign in all 6 strata. A rule change that flips a borderline call is suspect; this one removes a clerical obstacle in front of an unambiguous one.",
+      "Both verdicts are recorded and neither is deleted: results/task9_verdict_20260924.json (frozen rule, UNINFORMATIVE) and results/task9_verdict_amended_20260924.json (this rule)."
+    ],
+    "new_gate_b": "The final-phase (epoch >= 130) loss must not RISE by more than the within-run loss jitter, i.e. loss_drop > -jitter. This admits both a still-improving arm and a converged one, and still fails a DIVERGING arm.",
+    "where_the_weight_now_sits": "Gate (a) -- max over milestones of S_angle(t) minus S_angle(init null) exceeding 10x the within-run jitter SD -- is the load-bearing test that training happened, and it is unchanged. On this array it passes by 32x on the weakest prior seed (rise +0.9367 vs threshold 0.0211) and by ~330x on canonical. Gate (b) is demoted to what it can actually measure: that training was stable rather than divergent.",
+    "regression_check": "The echinodermata failure that motivated the gates is still caught: that arm's loss fell (-0.5%) so it always passed gate (b), and what excludes it is gate (a) -- its kNN wandered with no trend, so its S_angle rise above the init null would not clear 10x jitter. The amendment does not reopen the hole the gates were built to close."
+  },
+
   "protocol": {
     "clade": "echinodermata_7586_clean (3,965 nodes, 34,938 pairs)",
     "seeds": [0, 1, 2],
