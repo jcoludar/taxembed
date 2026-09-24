@@ -1,0 +1,82 @@
+{
+  "within_arm": {
+    "canonical": {},
+    "prior": {},
+    "fixed": {}
+  },
+  "between": {
+    "canonical_vs_prior": {
+      "batch_size": [
+        256,
+        128
+      ],
+      "cli:batch_size": [
+        "256",
+        "128"
+      ],
+      "cli:grad_accum_steps": [
+        "8",
+        "4"
+      ],
+      "cli:lr": [
+        "0.001",
+        "0.005"
+      ],
+      "cli:lr_min_multiplier": [
+        "0.01",
+        "<absent>"
+      ],
+      "cli:lr_schedule": [
+        "cosine_warmrestart",
+        "<absent>"
+      ],
+      "cli:n_negatives": [
+        "300",
+        "100"
+      ],
+      "cli:warm_restart_on_phase": [
+        true,
+        "<absent>"
+      ],
+      "lr": [
+        0.001,
+        0.005
+      ],
+      "lr_schedule": [
+        "cosine_warmrestart",
+        "const"
+      ],
+      "n_negatives": [
+        300,
+        100
+      ],
+      "warm_restart_on_phase": [
+        true,
+        false
+      ]
+    },
+    "fixed_vs_unfixed": {
+      "cli:drop_root_anchored": [
+        true,
+        "<absent>"
+      ],
+      "cli:exclude_descendant_negatives": [
+        true,
+        "<absent>"
+      ],
+      "cli:save_every": [
+        "20",
+        "10"
+      ],
+      "drop_root_anchored": [
+        true,
+        "<absent>"
+      ],
+      "exclude_descendant_negatives": [
+        true,
+        "<absent>"
+      ]
+    }
+  },
+  "inputs_match_preregistration": true
+}
