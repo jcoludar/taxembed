@@ -624,12 +624,18 @@ class TestP2Amendment1:
         assert amended["by_arm_verdict"]["vis00"]["below_chance_level"]
 
     def test_default_call_still_reproduces_the_original_frozen_reading(self):
-        """amendment_1 defaults to False: a bare `p2_verdict(res)` call must be identical to
-        `p2_verdict(res, amendment_1=False)`, and the pre-amendment fixtures must still return
-        their pre-amendment verdicts -- the amendment must not silently rewrite history."""
+        """A bare `p2_verdict(res)` call must still reproduce the pre-amendment_1 verdicts on the
+        pre-amendment_1 fixtures -- the amendment must not silently rewrite history.
+
+        (fix round 2, 2026-09-24: this test used to also assert
+        `p2_verdict(res) == p2_verdict(res, amendment_1=False)`. Since `amendment_1` already
+        defaults to False, that compared two calls with IDENTICAL effective arguments -- it could
+        not fail for any implementation of `p2_verdict`'s logic, correct or not, and so carried no
+        regression signal. The assertions kept below already do the real job: they pin the
+        default call's verdict against known fixtures, which a change to the actual reading WOULD
+        break.)"""
         res_generalises = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50,
                                               randomdag_final=0.10, sibling_chance=0.05)
-        assert p2_verdict(res_generalises) == p2_verdict(res_generalises, amendment_1=False)
         assert p2_verdict(res_generalises)["verdict"] == "GENERALISES"
         assert p2_verdict(res_generalises)["amendment_1_applied"] is False
 
@@ -650,6 +656,101 @@ class TestP2Amendment1:
                    == pytest.approx(amended["by_arm_verdict"][name]["margin_above_chance"]))
             assert frozen["by_arm_verdict"][name]["above_chance_margin"] == (
                 amended["by_arm_verdict"][name]["above_chance_margin"])
+
+
+## ------------------------------------------------------------------------------------------
+## p2_amendment_2_20260924 -- USER DESIGN decision: run RandomDAG at BOTH visibilities, so every
+## real arm (vis00, vis50) has a matched control trained the same way (randomdag_vis00,
+## randomdag_vis50). 12 arms, not 9. vis00 is read ONLY against randomdag_vis00, vis50 ONLY
+## against randomdag_vis50 -- never cross-matched.
+
+def _p2_twelve_arm_result(vis00_final, vis50_final, randomdag_vis00_final, randomdag_vis50_final,
+                          sibling_chance=0.05):
+    groups = {}
+    for name, final, base_seed in (
+        ("vis00", vis00_final, 100), ("vis50", vis50_final, 200),
+        ("randomdag_vis00", randomdag_vis00_final, 300),
+        ("randomdag_vis50", randomdag_vis50_final, 400),
+    ):
+        for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
+            groups[f"{name}_s{seed}"] = ckpts
+    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+
+
+class TestP2Amendment2:
+    def test_matched_controls_read_each_real_arm_against_its_own_visibility(self):
+        """The 12-arm reading with matched controls produces the expected verdict on a synthetic
+        fixture: both real arms clear their own chance floor and their own matched (weak)
+        control, so the overall reading is GENERALISES, exactly as the 9-arm design would give
+        for the same numbers."""
+        res = _p2_twelve_arm_result(vis00_final=0.55, vis50_final=0.50,
+                                    randomdag_vis00_final=0.10, randomdag_vis50_final=0.10,
+                                    sibling_chance=0.05)
+        v = p2_verdict(res, amendment_2=True)
+        assert v["amendment_2_applied"] is True
+        assert v["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
+        assert set(v["controls"]) == {"randomdag_vis00", "randomdag_vis50"}
+        assert not v["controls"]["randomdag_vis00"]["invalid_runs"]
+        assert not v["controls"]["randomdag_vis50"]["invalid_runs"]
+        assert "control" not in v
+
+    def test_amendment_2_default_false_reproduces_the_original_nine_arm_reading(self):
+        """amendment_2 defaults to False: the 9-arm reading (one shared control) must be produced
+        unchanged, on the pre-amendment_2 fixtures -- the new flag must not rewrite the old one's
+        behaviour."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        default = p2_verdict(res)
+        explicit_false = p2_verdict(res, amendment_2=False)
+        assert default["verdict"] == explicit_false["verdict"] == "GENERALISES"
+        assert default["amendment_2_applied"] is False
+        assert "controls" not in default
+        assert default["control"]["invalid_runs"] == []
+
+    def test_cross_matching_the_controls_changes_the_verdict(self):
+        """Load-bearing: if the matched pairing were decorative, swapping which control's data
+        sits under which label would leave the verdict unchanged. Here `randomdag_vis00` is a
+        WEAK control (final MRR 0.10, far below vis50) and `randomdag_vis50` is a STRONG one
+        (final MRR 0.499, seed ranges overlapping vis50's own 0.50) -- read against its correctly
+        matched (strong, overlapping) control, vis50 must NOT clear the all-seeds-above condition
+        (MEMORISES); read against the other (weak) one, it clears it easily (GENERALISES). The
+        pairing being load-bearing means swapping the two controls' underlying data between their
+        labels must change vis50's verdict."""
+        matched_source = _p2_twelve_arm_result(
+            vis00_final=0.55, vis50_final=0.50,
+            randomdag_vis00_final=0.10, randomdag_vis50_final=0.499, sibling_chance=0.05)
+        v_matched = p2_verdict(matched_source, amendment_2=True)
+        assert v_matched["by_arm_verdict"]["vis50"]["verdict"] == "MEMORISES", (
+            "fixture must reproduce the close-control MEMORISES reading for this test to mean "
+            "anything")
+
+        # cross-matched: swap the two RandomDAG arms' checkpoint data between their labels, so
+        # `randomdag_vis50` (still matched to vis50 by NAME) now carries the WEAK data and
+        # `randomdag_vis00` carries the STRONG data -- the wrong pairing, by construction.
+        cross = json.loads(json.dumps(matched_source))
+        for s in (0, 1, 2):
+            key_a, key_b = f"randomdag_vis00_s{s}", f"randomdag_vis50_s{s}"
+            cross["arms"][key_a], cross["arms"][key_b] = cross["arms"][key_b], cross["arms"][key_a]
+        v_cross = p2_verdict(cross, amendment_2=True)
+
+        assert v_cross["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
+        assert (v_matched["by_arm_verdict"]["vis50"]["verdict"]
+               != v_cross["by_arm_verdict"]["vis50"]["verdict"])
+
+    def test_uninformative_when_a_single_control_seed_fails_a_gate(self):
+        """UNINFORMATIVE must beat every other reading even under the 12-arm design, including a
+        failure confined to ONE of the two matched controls."""
+        res = _p2_twelve_arm_result(vis00_final=0.55, vis50_final=0.50,
+                                    randomdag_vis00_final=0.10, randomdag_vis50_final=0.10,
+                                    sibling_chance=0.05)
+        res["arms"]["randomdag_vis50_s1"]["checkpoints"] = [
+            c for c in res["arms"]["randomdag_vis50_s1"]["checkpoints"] if c["epoch"] != 200]
+        v = p2_verdict(res, amendment_2=True)
+        assert v["verdict"] == "UNINFORMATIVE"
+        assert "randomdag_vis50_s1" in v["meaning"]
+        assert "by_arm_verdict" not in v
 
 
 class TestP2PreregistrationArtifact:
@@ -707,3 +808,26 @@ class TestP2PreregistrationArtifact:
         blob = json.dumps(prereg["p2_amendment_1_20260924"])
         assert "5.403" in blob
         assert "normalized_rank" in blob
+
+    def test_amendment_2_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_2_20260924" in prereg
+        status = prereg["p2_amendment_2_20260924"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "before any p2 outcome data" in status
+        assert "user design" in status
+        assert "2026-09-24" in prereg["p2_amendment_2_20260924"]["status"]
+
+    def test_amendment_2_declares_twelve_arms_with_matched_never_crossed_controls(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_2_20260924"])
+        assert "randomdag_vis00" in blob and "randomdag_vis50" in blob
+        assert "12" in blob
+        assert "never" in blob.lower() and "cross" in blob.lower()
+
+    def test_amendment_1_and_2_blocks_leave_each_other_and_the_frozen_block_untouched(self, prereg):
+        """Rule 7 of the task: amendment_2 is additive only. declared_confounds and the readings
+        set are the frozen block's own invariants (checked identically by the amendment_1 tests
+        above); re-asserting them here guards against amendment_2 having edited the frozen block
+        or amendment_1 in place instead of adding a new top-level key."""
+        assert len(prereg["declared_confounds"]) == 4
+        assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+        assert "5.403" in json.dumps(prereg["p2_amendment_1_20260924"])

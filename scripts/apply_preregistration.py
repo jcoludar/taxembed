@@ -83,12 +83,20 @@ def _render(v: dict) -> None:
 def _render_p2(v: dict) -> None:
     print(f"\n=== {v['task']} ===")
     print(f"pre-registration: {'; '.join(v['preregistration'])}")
+    randomdag_chance = v["randomdag_sibling_chance_mean"]
+    if isinstance(randomdag_chance, dict):
+        chance_str = ", ".join(f"{name} {val:.4f}" for name, val in randomdag_chance.items())
+    else:
+        chance_str = f"{randomdag_chance:.4f}"
     print(f"\nsibling_chance_mean (real tree) {v['sibling_chance_mean']:.4f}   "
-          f"(RandomDAG) {v['randomdag_sibling_chance_mean']:.4f}")
+          f"(RandomDAG) {chance_str}")
 
+    # amendment_2 (2026-09-24): "controls" (plural, one per matched RandomDAG arm) replaces the
+    # single "control" key -- fall back to the old shape so this renders either output unchanged.
+    controls = v.get("controls", {"randomdag": v.get("control")})
     print(f"\nvalidity gates (a) learning (b) floor (c) completion -- "
           f"any failing => UNINFORMATIVE, no direction read")
-    for group_name, g in {**v["groups"], "randomdag": v["control"]}.items():
+    for group_name, g in {**v["groups"], **controls}.items():
         for gate in g["gates"]:
             mark = "PASS" if gate["valid"] else "FAIL"
             print(f"  [{mark}] {gate['arm']}  per_run_value {gate['per_run_value']:.4f}  "
@@ -129,9 +137,12 @@ def main() -> None:
     ap.add_argument("--out", help="write the verdict JSON here")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--amendment-2", action="store_true",
-                    help="tasks 8/9 only: apply preregistration_v2_amendment_2_20260924 "
-                         "(gate b: loss must not RISE). P2 has no loss gate at all -- this flag "
-                         "is a no-op for --task p2.")
+                    help="tasks 8/9: apply preregistration_v2_amendment_2_20260924 (gate b: loss "
+                         "must not RISE). --task p2: apply p2_amendment_2_20260924 instead -- the "
+                         "12-arm matched-control design (vis00 vs randomdag_vis00, vis50 vs "
+                         "randomdag_vis50, never crossed; USER DESIGN decision, not an "
+                         "outcome-driven revision). Same flag, task-specific meaning, mirroring "
+                         "how --amendment-1 is p2-only.")
     ap.add_argument("--amendment-1", action="store_true",
                     help="--task p2 only: apply p2_amendment_1_20260924 (RandomDAG's rewiring "
                          "measurably inflates its own chance floor ~5.4x, so the cross-tree "
@@ -143,7 +154,8 @@ def main() -> None:
     seeds = tuple(int(x) for x in args.seeds.split(","))
 
     if args.task == "p2":
-        verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1)
+        verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1,
+                             amendment_2=args.amendment_2)
         render = _render_p2
     else:
         verdict = (task9_verdict if args.task == "9" else task8_verdict)(

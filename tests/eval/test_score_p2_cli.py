@@ -316,7 +316,16 @@ def test_vendrov_recall_agrees_with_the_reference_closure_rule():
     are expected to be 0.0 here, by construction on the real split -- see the module docstring --
     but this test is not a hardcoded-0.0 check: it fails if the scorer's manual pair-encoding
     diverges from the reference's independent set-membership check, e.g. a wrong `key` causing an
-    encoding collision.)"""
+    encoding collision.)
+
+    NOTE: on the real P2 split, `vendrov_recall` is tautologically 0.0 for ANY input -- the
+    held_out array both removes edges from the visible graph and supplies the query, so every
+    query's own edge is guaranteed excluded by construction (see the module docstring). This test
+    only proves the two implementations AGREE with each other, both at 0.0; it is NOT the test
+    that proves the underlying encode+isin mechanism actually works on a genuinely non-zero case --
+    that is `test_vendrov_recall_core_finds_a_genuinely_visible_pair` above, which decouples
+    "removed" from "queried" to get an exactly-assertable non-zero recall of 0.5. Do not read this
+    test as a differential proof by itself; read it alongside that one."""
     # matches the tree fixture used by the end-to-end CLI test above
     parent = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
     n_nodes = 7

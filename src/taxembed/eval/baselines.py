@@ -13,8 +13,6 @@ from collections import Counter
 
 import numpy as np
 
-from taxembed.eval.subtree import euler_intervals, is_descendant
-
 
 def vendrov_closure_rule(visible_ancestor, visible_descendant, queries, candidates) -> np.ndarray:
     """(queries x candidates) bool: is candidate an ancestor of query in the VISIBLE graph?"""

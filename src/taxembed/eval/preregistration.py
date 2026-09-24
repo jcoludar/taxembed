@@ -277,7 +277,11 @@ P2_FLOOR_SD_MULTIPLE = 2          # "above sibling_chance_mean by >= 2x pooled w
 P2_EQUIV_FLOOR = 0.01             # equivalence-vs-RandomDAG band floor, mirrors EQUIV_FLOOR above
 P2_MIN_STRATUM_N = 500
 P2_DATA_ARMS = ("vis00", "vis50")
-P2_CONTROL_ARM = "randomdag"
+P2_CONTROL_ARM = "randomdag"                     # amendment_2=False (default): one shared control
+P2_MATCHED_CONTROL = {                            # amendment_2=True (p2_amendment_2_20260924):
+    "vis00": "randomdag_vis00",                   # each real arm reads against its OWN
+    "vis50": "randomdag_vis50",                   # visibility-matched control -- never crossed.
+}
 
 
 def _p2_checkpoints(result: dict, arm_seed_key: str) -> list[dict]:
@@ -310,9 +314,20 @@ def _p2_normalized_rank(ckpt: dict) -> float:
     CROSS-TREE comparison (an arm vs the RandomDAG control) must use instead of raw MRR. MRR
     remains the metric for WITHIN-tree comparisons (an arm vs its own sibling_chance_mean; vis00
     vs vis50), which this function does not touch.
+
+    Falls back to NaN when the field is absent (fix round 2, 2026-09-24): `p2_run_value` computes
+    this for EVERY checkpoint unconditionally, regardless of whether the caller ever asked for an
+    amended (cross-tree) reading. Before this fix a JSON lacking `normalized_rank` (e.g. one scored
+    before this field existed) raised KeyError even on the plain `amendment_1=False,
+    amendment_2=False` frozen path, which never reads it -- coupling the frozen reading's validity
+    to a field it does not use. NaN propagates harmlessly into the roll-window mean/SD (both become
+    NaN) unless and until an amended reading actually consumes it, at which point a NaN comparison
+    is uniformly False -- silent-safe rather than a crash, but still visibly wrong if someone reads
+    an amended verdict off data that was never scored for it.
     """
     block = ckpt.get("metrics_cosine", ckpt["metrics"])
-    return float(block["normalized_rank"])
+    nr = block.get("normalized_rank")
+    return float(nr) if nr is not None else float("nan")
 
 
 def p2_run_value(result: dict, arm_seed_key: str) -> dict:
@@ -439,8 +454,18 @@ def _p2_depth_means(result: dict, group: str, seeds, field: str = "mrr") -> dict
 
 
 def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
-                    sibling_chance_mean: float, amendment_1: bool = False) -> dict:
+                    sibling_chance_mean: float, amendment_1: bool = False,
+                    control_group: str = P2_CONTROL_ARM) -> dict:
     """GENERALISES / MEMORISES / MIXED for one real-tree arm against sibling chance + RandomDAG.
+
+    `control_group` (2026-09-24, `p2_amendment_2_20260924` in the pre-registration JSON): the name
+    of the RandomDAG arm `control` was built from -- defaults to the single shared `P2_CONTROL_ARM`
+    ("randomdag", the frozen 9-arm design), but under amendment_2 the caller passes the CALLER's own
+    visibility-matched control ("randomdag_vis00" for `name="vis00"`, "randomdag_vis50" for
+    `name="vis50"`) so the depth-stratum comparison below reads that arm's own control, never the
+    other real arm's. `control` (the group stats dict) must already be `p2_group_stats`'d for
+    whichever group `control_group` names -- this parameter only controls which arm's checkpoints
+    `_p2_depth_means` re-reads for the per-depth-stratum sign check.
 
     `amendment_1` (2026-09-24, `p2_amendment_1_20260924` in the pre-registration JSON):
     `randomdag.randomize_parents` preserves each node's DEPTH exactly but not its FAN-OUT --
@@ -477,7 +502,7 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
         equivalent_to_control = bool(ranges_overlap or abs(mean_diff) < equiv_band)
 
         depth = _p2_depth_means(result, name, seeds, field="mrr")
-        depth_control = _p2_depth_means(result, P2_CONTROL_ARM, seeds, field="mrr")
+        depth_control = _p2_depth_means(result, control_group, seeds, field="mrr")
         shared = sorted(set(depth["means"]) & set(depth_control["means"]))
         diffs = {k: depth["means"][k] - depth_control["means"][k] for k in shared}
         sign_consistent = bool(diffs) and all(v > 0 for v in diffs.values())
@@ -526,7 +551,7 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     equivalent_to_control_nr = bool(ranges_overlap_nr or abs(mean_diff_nr) < equiv_band_nr)
 
     depth_nr = _p2_depth_means(result, name, seeds, field="normalized_rank")
-    depth_control_nr = _p2_depth_means(result, P2_CONTROL_ARM, seeds, field="normalized_rank")
+    depth_control_nr = _p2_depth_means(result, control_group, seeds, field="normalized_rank")
     shared_nr = sorted(set(depth_nr["means"]) & set(depth_control_nr["means"]))
     diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k] for k in shared_nr}
     sign_consistent_nr = bool(diffs_nr) and all(v < 0 for v in diffs_nr.values())
@@ -564,16 +589,47 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     }
 
 
-def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False) -> dict:
+def _p2_single_shared_control(result: dict, seeds) -> dict:
+    """amendment_2=False (default, the frozen 9-arm design): ONE RandomDAG control, read by
+    BOTH vis00 and vis50 -- exactly the original `p2_verdict` body, unchanged, so the default
+    call path stays byte-identical to before amendment_2 existed."""
+    randomdag_baselines = result.get("baselines_randomdag", result["baselines"])
+    randomdag_chance = float(randomdag_baselines["sibling_chance_mean"])
+    control = p2_group_stats(result, P2_CONTROL_ARM, seeds, randomdag_chance)
+    return {P2_CONTROL_ARM: control}, {g: P2_CONTROL_ARM for g in P2_DATA_ARMS}
+
+
+def _p2_matched_controls(result: dict, seeds) -> dict:
+    """amendment_2=True (`p2_amendment_2_20260924`): one p2_group_stats per matched RandomDAG
+    control (randomdag_vis00, randomdag_vis50) -- vis00 is read ONLY against randomdag_vis00,
+    vis50 ONLY against randomdag_vis50, never crossed (rule_1 of the amendment).
+
+    Each control's own sibling_chance_mean is read from a dedicated `baselines_<control_name>`
+    block when the scorer output provides one, else the shared `baselines_randomdag` block, else
+    the shared `baselines` block -- the same three-step fallback amendment_1 established for the
+    single control, applied per matched pair here since there are now two controls (rule_3).
+    """
+    controls = {}
+    for control_name in sorted(set(P2_MATCHED_CONTROL.values())):
+        baselines_key = f"baselines_{control_name}"
+        control_baselines = result.get(
+            baselines_key, result.get("baselines_randomdag", result["baselines"]))
+        control_chance = float(control_baselines["sibling_chance_mean"])
+        controls[control_name] = p2_group_stats(result, control_name, seeds, control_chance)
+    return controls, dict(P2_MATCHED_CONTROL)
+
+
+def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
+               amendment_2: bool = False) -> dict:
     """vis00/vis50 vs sibling chance and RandomDAG -> GENERALISES / MEMORISES / MIXED /
     UNINFORMATIVE, per results/p2_heldout_preregistration.json.
 
-    UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including RandomDAG) fails
-    gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is read. Otherwise
-    each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading (`by_arm_verdict`); the
-    top-level `verdict` is that shared reading if both arms agree, else MIXED. The validity gates
-    themselves (a/b/c) are untouched by `amendment_1` -- they are within-tree facts about a run,
-    never a cross-tree comparison.
+    UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including every RandomDAG
+    control) fails gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is
+    read. Otherwise each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading
+    (`by_arm_verdict`); the top-level `verdict` is that shared reading if both arms agree, else
+    MIXED. The validity gates themselves (a/b/c) are untouched by `amendment_1`/`amendment_2` --
+    they are within-tree facts about a run, never a cross-tree comparison.
 
     `amendment_1` (2026-09-24, `p2_amendment_1_20260924`): default False reproduces the ORIGINAL
     2026-09-24 freeze reading unchanged (raw MRR compared head-to-head against RandomDAG). True
@@ -581,15 +637,29 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False) -> dict
     (~5.4x on mollusca_6447_clean seed 0), so the cross-tree comparison uses normalized_rank
     (chance = 0.5 for every pool size) instead. See `_p2_arm_reading` and the JSON amendment
     block for the full derivation. Both readings are always computable from the same result.
+
+    `amendment_2` (2026-09-24, `p2_amendment_2_20260924`, USER DESIGN decision -- the arm structure
+    changed from 9 arms to 12, not an outcome-driven revision): default False reproduces the
+    ORIGINAL 9-arm reading unchanged -- ONE shared RandomDAG control (`P2_CONTROL_ARM`, "randomdag")
+    read against BOTH vis00 and vis50, exactly as before this flag existed. True switches to the
+    12-arm matched-control design: vis00 is read only against `randomdag_vis00`, vis50 only against
+    `randomdag_vis50` -- each real arm against a control trained at its OWN visibility, so the
+    visibility knob never leaks into the real-vs-scrambled contrast. `amendment_1` and
+    `amendment_2` are independent and combine freely (e.g. `amendment_2=True` with
+    `amendment_1=True` reads each matched pair on normalized_rank). See `_p2_matched_controls` and
+    the JSON amendment block for the full derivation.
     """
     sibling_chance_mean = float(result["baselines"]["sibling_chance_mean"])
-    randomdag_baselines = result.get("baselines_randomdag", result["baselines"])
-    randomdag_chance = float(randomdag_baselines["sibling_chance_mean"])
-
-    control = p2_group_stats(result, P2_CONTROL_ARM, seeds, randomdag_chance)
     groups = {g: p2_group_stats(result, g, seeds, sibling_chance_mean) for g in P2_DATA_ARMS}
 
-    invalid = list(control["invalid_runs"])
+    if amendment_2:
+        controls, control_for_arm = _p2_matched_controls(result, seeds)
+    else:
+        controls, control_for_arm = _p2_single_shared_control(result, seeds)
+
+    invalid = []
+    for c in controls.values():
+        invalid += c["invalid_runs"]
     for g in groups.values():
         invalid += g["invalid_runs"]
 
@@ -598,10 +668,18 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False) -> dict
         "preregistration": ["results/p2_heldout_preregistration.json"],
         "seeds": list(seeds),
         "amendment_1_applied": bool(amendment_1),
+        "amendment_2_applied": bool(amendment_2),
         "sibling_chance_mean": sibling_chance_mean,
-        "randomdag_sibling_chance_mean": randomdag_chance,
-        "control": control, "groups": groups,
+        "groups": groups,
     }
+    if amendment_2:
+        base["controls"] = controls
+        base["randomdag_sibling_chance_mean"] = {
+            name: c["gates"][0]["sibling_chance_mean"] for name, c in controls.items()}
+    else:
+        base["control"] = controls[P2_CONTROL_ARM]
+        base["randomdag_sibling_chance_mean"] = (
+            controls[P2_CONTROL_ARM]["gates"][0]["sibling_chance_mean"])
 
     if invalid:
         base["verdict"] = "UNINFORMATIVE"
@@ -609,8 +687,9 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False) -> dict
                            f"Invalid runs: {', '.join(invalid)}")
         return base
 
-    by_arm = {name: _p2_arm_reading(result, name, seeds, groups[name], control,
-                                    sibling_chance_mean, amendment_1=amendment_1)
+    by_arm = {name: _p2_arm_reading(result, name, seeds, groups[name], controls[control_for_arm[name]],
+                                    sibling_chance_mean, amendment_1=amendment_1,
+                                    control_group=control_for_arm[name])
              for name in P2_DATA_ARMS}
     verdicts = {v["verdict"] for v in by_arm.values()}
     if len(verdicts) == 1:

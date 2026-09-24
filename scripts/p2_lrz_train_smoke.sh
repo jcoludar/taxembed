@@ -31,11 +31,12 @@ export MKL_THREADING_LAYER=GNU
 #     couple of epochs without error, and the run reports the seed it was given
 #
 # Pre-registration: results/p2_heldout_preregistration.json, including its
-# p2_amendment_1_20260924 block. READING RULE (this smoke does not exercise it, and must not be
-# read as if it did): cross-tree comparisons (an arm vs RandomDAG) use normalized_rank -- chance
-# is 0.5 for ANY pool size; within-tree comparisons (vis00 vs vis50, an arm vs its own
-# baselines.sibling_chance_mean) use MRR. This run's own tiny checkpoint is not scored and
-# contributes nothing to p2_verdict; it exists only to prove the pipeline runs.
+# p2_amendment_1_20260924 and p2_amendment_2_20260924 blocks. READING RULE (this smoke does not
+# exercise it, and must not be read as if it did): cross-tree comparisons (an arm vs its MATCHED
+# RandomDAG control -- vis00 vs randomdag_vis00, vis50 vs randomdag_vis50, never crossed) use
+# normalized_rank -- chance is 0.5 for ANY pool size; within-tree comparisons (vis00 vs vis50, an
+# arm vs its own baselines.sibling_chance_mean) use MRR. This run's own tiny checkpoint is not
+# scored and contributes nothing to p2_verdict; it exists only to prove the pipeline runs.
 # =============================================================================
 
 echo "=== TaxEmbed P2 Task 8 train SMOKE (CPU) ==="
@@ -111,5 +112,5 @@ if ! grep -q '"seed": 0' /app/artifacts/tags/smoke_p2_train/run.json; then
     exit 1
 fi
 
-echo "=== SMOKE PASSED -- safe to submit p2_lrz_train.sh (after confirming Task 2's vis00/vis50 splits, scripts/build_p2_randomdag_split.py's randomdag split, and the metazoa mapping TSV are all present under /data/p2_splits) ==="
+echo "=== SMOKE PASSED -- safe to submit p2_lrz_train.sh (after confirming Task 2's vis00/vis50 splits, scripts/build_p2_randomdag_split.py's MATCHED randomdag_vis00 AND randomdag_vis50 splits -- run the builder once per --visibility, same --seed -- and the metazoa mapping TSV are all present under /data/p2_splits) ==="
 ls -la /app/artifacts/tags/smoke_p2_train/

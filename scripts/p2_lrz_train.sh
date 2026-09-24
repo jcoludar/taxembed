@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=1-00:00:00
-#SBATCH --array=0-8
+#SBATCH --array=0-11
 #SBATCH --output=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/logs/p2_train_%A_%a.out
 #SBATCH --error=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/logs/p2_train_%A_%a.err
 #SBATCH --container-image=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/pytorch-2.4.0-cuda12.1.sqsh
@@ -17,45 +17,58 @@ set -euo pipefail
 export MKL_THREADING_LAYER=GNU
 
 # =============================================================================
-# Plan v1 Task 8 -- train the P2 held-out-link-prediction array: 9 tasks = 3 arms x seeds 0/1/2.
+# Plan v1 Task 8 -- train the P2 held-out-link-prediction array: 12 tasks = 4 arms x seeds 0/1/2.
 # One run per array task, so each gets its own walltime and they queue independently instead of
 # chaining into one multi-day job that dies at the walltime boundary (same shape as Task 9's
 # task9_lrz_recipe_contrast.sh).
 #
-# ARMS (USER-approved 2026-09-24, the third arm added after the brief was first written):
-#     0-2  vis00_s{0,1,2}       Task 2 visibility=0%  split, REAL metazoa_33208_clean closure
-#     3-5  vis50_s{0,1,2}       Task 2 visibility=50% split, REAL metazoa_33208_clean closure
-#     6-8  randomdag_s{0,1,2}   scripts/build_p2_randomdag_split.py split, RANDOMISED closure
-#          (src/taxembed/eval/randomdag.py::randomize_parents+closure_from_parent) -- depth
-#          preserved exactly, fan-out NOT preserved (p2_amendment_1_20260924: mean chance-floor
-#          ratio randomised/real measured 5.403 on mollusca_6447_clean). Holds out parent edges
-#          from the RANDOMISED tree and will be SCORED against the RANDOMISED parents.
+# ARMS (p2_amendment_2_20260924, USER DESIGN decision 2026-09-24: the RandomDAG control now runs
+# at BOTH visibilities, not one -- a control is only clean against an arm trained the same way, so
+# a single vis00-only RandomDAG was a fair control for vis00 but a CONFOUNDED one for vis50, where
+# the comparison mixed scrambling with the visibility knob. 12 arms, not 9):
+#     0-2   vis00_s{0,1,2}             Task 2 visibility=0%  split, REAL metazoa_33208_clean closure
+#     3-5   vis50_s{0,1,2}             Task 2 visibility=50% split, REAL metazoa_33208_clean closure
+#     6-8   randomdag_vis00_s{0,1,2}   scripts/build_p2_randomdag_split.py --visibility 0.0,
+#           RANDOMISED closure (src/taxembed/eval/randomdag.py::randomize_parents+
+#           closure_from_parent) -- depth preserved exactly, fan-out NOT preserved
+#           (p2_amendment_1_20260924: mean chance-floor ratio randomised/real measured 5.403 on
+#           mollusca_6447_clean). Holds out parent edges from the RANDOMISED tree and is SCORED
+#           against the RANDOMISED parents. Matched control for vis00.
+#     9-11  randomdag_vis50_s{0,1,2}   scripts/build_p2_randomdag_split.py --visibility 0.5, the
+#           SAME seed and therefore the SAME randomised closure and the SAME held-out node set as
+#           randomdag_vis00 (randomize_parents and select_holdout depend only on seed, never
+#           visibility) -- only the TRAIN split's visibility thinning differs, mirroring exactly
+#           how vis00 and vis50 differ on the real tree. Matched control for vis50.
+# Cross-tree reading is PAIRED and NEVER cross-matched: vis00 is read only against
+# randomdag_vis00, vis50 only against randomdag_vis50 (p2_amendment_2_20260924 rule_1).
 #
-# ALL THREE ARMS train the SAME "canonical" recipe that Task 9 showed learning throughout
+# ALL FOUR ARMS train the SAME "canonical" recipe that Task 9 showed learning throughout
 # (S_angle 0.892->0.933 while loss rose 3.90->4.02): batch 256 x grad-accum 8 (effective 2048),
 # 300 negatives, lr 0.001 with cosine_warmrestart + warm-restart-on-phase, softmax loss,
-# euclidean parametrization. P2 is not a recipe contrast -- one recipe, three data conditions.
+# euclidean parametrization. P2 is not a recipe contrast -- one recipe, four data conditions.
 #
 # INPUTS. Task 2's split .npz files (vis00/vis50) and scripts/build_p2_randomdag_split.py's
-# output (randomdag) must be uploaded to /data/p2_splits on LRZ BEFORE this array is submitted,
-# alongside the metazoa mapping TSV; the P2 eval modules (src/taxembed/eval/{p2_split,randomdag,
-# linkpred,baselines,preregistration}.py) and scripts/{build_p2_split,build_p2_randomdag_split,
+# output (randomdag_vis00, randomdag_vis50 -- run the builder twice, once per --visibility) must
+# be uploaded to /data/p2_splits on LRZ BEFORE this array is submitted, alongside the metazoa
+# mapping TSV; the P2 eval modules (src/taxembed/eval/{p2_split,randomdag,linkpred,baselines,
+# preregistration}.py) and scripts/{build_p2_split,build_p2_randomdag_split,
 # score_p2_linkpred}.py must be synced into the mounted src/ tree. Submit p2_lrz_train_smoke.sh
 # first and READ its log (Rule 16) -- do not submit this array on smoke exit 0 alone.
 #
 # Pre-registration: results/p2_heldout_preregistration.json, including its
-# p2_amendment_1_20260924 block. READING RULE: cross-tree comparisons (an arm vs RandomDAG) use
-# normalized_rank -- chance is 0.5 for ANY pool size, unlike raw MRR which RandomDAG's collapsed
-# fan-out makes an easier task on. Within-tree comparisons (vis00 vs vis50; an arm vs its own
-# baselines.sibling_chance_mean) use MRR. Do not read scripts/score_p2_linkpred.py output by hand
-# off this array's checkpoints -- go through src/taxembed/eval/preregistration.py::p2_verdict.
+# p2_amendment_1_20260924 and p2_amendment_2_20260924 blocks. READING RULE: cross-tree comparisons
+# (an arm vs its MATCHED RandomDAG control) use normalized_rank -- chance is 0.5 for ANY pool
+# size, unlike raw MRR which RandomDAG's collapsed fan-out makes an easier task on. Within-tree
+# comparisons (vis00 vs vis50; an arm vs its own baselines.sibling_chance_mean) use MRR. Do not
+# read scripts/score_p2_linkpred.py output by hand off this array's checkpoints -- go through
+# src/taxembed/eval/preregistration.py::p2_verdict(..., amendment_2=True).
 # =============================================================================
 
 MAP=/data/taxonomy_edges_metazoa_33208_clean.mapping.tsv
 SPLITDIR=/data/p2_splits
 EPOCHS="${P2_EPOCHS:-200}"
 
-# Array index -> (arm, seed), per the Task 8 brief's amendment (9 elements, not 6).
+# Array index -> (arm, seed), per p2_amendment_2_20260924 (12 elements, not 9).
 IDX="${SLURM_ARRAY_TASK_ID}"
 if [ "${IDX}" -lt 3 ]; then
     ARM=vis00
@@ -63,9 +76,12 @@ if [ "${IDX}" -lt 3 ]; then
 elif [ "${IDX}" -lt 6 ]; then
     ARM=vis50
     SEED="$((IDX-3))"
-else
-    ARM=randomdag
+elif [ "${IDX}" -lt 9 ]; then
+    ARM=randomdag_vis00
     SEED="$((IDX-6))"
+else
+    ARM=randomdag_vis50
+    SEED="$((IDX-9))"
 fi
 TAG="p2_${ARM}_s${SEED}"
 
@@ -76,8 +92,11 @@ case "${ARM}" in
     vis50)
         TRAIN="${SPLITDIR}/p2_metazoa_33208_clean_vis50_seed${SEED}_train.npz"
         ;;
-    randomdag)
+    randomdag_vis00)
         TRAIN="${SPLITDIR}/p2_metazoa_33208_clean_randomdag_vis00_seed${SEED}_train.npz"
+        ;;
+    randomdag_vis50)
+        TRAIN="${SPLITDIR}/p2_metazoa_33208_clean_randomdag_vis50_seed${SEED}_train.npz"
         ;;
 esac
 

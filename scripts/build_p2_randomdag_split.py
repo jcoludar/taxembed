@@ -24,12 +24,23 @@ RandomDAG's chance floor is NOT the same as the real tree's (rewiring collapses 
 output must read `normalized_rank`, never raw MRR -- see `scripts/score_p2_linkpred.py` and
 `src/taxembed/eval/preregistration.py::p2_verdict(..., amendment_1=True)`.
 
---visibility defaults to 0.0 (matches the vis00 arm): the array has only ONE RandomDAG split per
-seed (no vis00/vis50 split for this arm, per the 9-element array), and 0.0 is the split every
-held-out node's own ancestry survives at both real-tree settings.
+--visibility (2026-09-24, p2_amendment_2_20260924, USER DESIGN decision -- 12 arms, not 9): this
+script is now invoked TWICE per seed, once at --visibility 0.0 and once at --visibility 0.5,
+building the two MATCHED controls randomdag_vis00 / randomdag_vis50 -- one per real arm, so vis00
+is read against a control trained the same way (0% visibility) and vis50 against a control trained
+the same way (50% visibility), never a control confounded with the OTHER arm's visibility setting.
+Both calls for a given seed share the SAME randomised closure (`randomize_parents` depends only on
+`--seed`, never `--visibility`) and the SAME held-out node set (`select_holdout`, likewise
+seed-only) -- only the TRAIN split's visibility thinning differs between the two calls, exactly
+mirroring how the real-tree vis00/vis50 pair differs. The default remains 0.0 for backward
+compatibility with a single-visibility (frozen 9-arm) invocation.
 
-Usage (single absolute-path invocation, per CLAUDE.md shell hygiene):
-  <python> scripts/build_p2_randomdag_split.py --npz <real_closure.npz> --outdir <dir> --seed 0
+Usage (single absolute-path invocation, per CLAUDE.md shell hygiene) -- run once per visibility,
+same --seed both times, to build a matched pair:
+  <python> scripts/build_p2_randomdag_split.py --npz <real_closure.npz> --outdir <dir> --seed 0 \\
+      --visibility 0.0
+  <python> scripts/build_p2_randomdag_split.py --npz <real_closure.npz> --outdir <dir> --seed 0 \\
+      --visibility 0.5
 """
 
 from __future__ import annotations
@@ -61,7 +72,9 @@ def main() -> int:
                          "seed, one fully reproducible run")
     ap.add_argument("--visibility", type=float, default=0.0,
                     help="fraction of depth_diff>=2 closure rows visible in training; default "
-                         "0.0 (see module docstring)")
+                         "0.0. Run this script once at 0.0 and once at 0.5 (same --seed both "
+                         "times) to build the matched randomdag_vis00/randomdag_vis50 pair "
+                         "(p2_amendment_2_20260924) -- see module docstring")
     ap.add_argument("--frac-test", type=float, default=0.10)
     ap.add_argument("--frac-val", type=float, default=0.0,
                     help="see build_p2_split.py --frac-val: default 0.0, nothing withheld "
