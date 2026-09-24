@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from taxembed.eval.linkpred import linkpred_metrics
 from taxembed.eval.preregistration import (
     compare_arms, p2_validity_gate, p2_verdict, task8_verdict, task9_verdict, validity_gate,
 )
@@ -521,6 +522,136 @@ class TestP2Verdict:
         assert any(a.startswith("randomdag_") for a in v["control"]["invalid_runs"])
 
 
+## ------------------------------------------------------------------------------------------
+## p2_amendment_1_20260924 -- RandomDAG's rewiring measurably inflates its own chance floor
+## (~5.4x, helpers/p2_randomdag_changes_the_chance_floor.py, mollusca seed 0), so a CROSS-TREE
+## comparison (an arm vs RandomDAG) must use normalized_rank (chance=0.5 for every pool size),
+## never raw MRR. Below, `mrr` and `normalized_rank` are set INDEPENDENTLY per checkpoint (unlike
+## `_p2_ckpt` above, which couples them as `1.0 - mrr`) so a fixture can express "RandomDAG's raw
+## MRR is higher only because its task is easier, while its normalized_rank shows it is still at
+## chance" -- the exact shape of the defect.
+
+def _p2_decoupled_ckpt(epoch, mrr, nr, loss=4.0):
+    m = {"n": 500, "mean_rank": 3.0, "mrr": mrr, "hits_at_1": mrr,
+         "hits_at_10": min(1.0, 3 * mrr), "normalized_rank": nr}
+    depth = {k: {"n": 2000, "mrr": mrr, "normalized_rank": nr}
+             for k in ("11-15", "16-21", "22-28")}
+    return {
+        "epoch": epoch, "trainer": {"loss": loss},
+        "metrics": m, "metrics_cosine": m, "metrics_poincare": m,
+        "by_depth": {"cosine": depth, "poincare": {}},
+    }
+
+
+def _p2_decoupled_series(mrr_final, nr_final, mrr_init=0.02, nr_init=0.95,
+                         jitter_mrr=0.004, jitter_nr=0.01, rng_seed=0, plateau_from_epoch=180):
+    """Ramps mrr and normalized_rank INDEPENDENTLY from their own init toward their own final
+    value, then holds flat (plus jitter) from `plateau_from_epoch` -- same shape as `_p2_healthy`
+    above, decoupled so the two metrics can disagree, as the amendment's defect requires."""
+    rng = np.random.default_rng(rng_seed)
+    pre = [e for e in P2_EPOCHS if e < plateau_from_epoch]
+    out = []
+    for ep in P2_EPOCHS:
+        if ep >= plateau_from_epoch:
+            mrr = mrr_final + rng.normal(0.0, jitter_mrr)
+            nr = nr_final + rng.normal(0.0, jitter_nr)
+        else:
+            frac = pre.index(ep) / len(pre)
+            mrr = mrr_init + (mrr_final - mrr_init) * frac
+            nr = nr_init + (nr_final - nr_init) * frac
+        out.append(_p2_decoupled_ckpt(ep, float(np.clip(mrr, 1e-6, 1.0)),
+                                      float(np.clip(nr, 1e-6, 1.0))))
+    return out
+
+
+def _p2_decoupled_result(vis00, vis50, randomdag, sibling_chance, randomdag_chance,
+                         seed_offset_mrr=0.03, seed_offset_nr=0.01):
+    """vis00/vis50/randomdag are each (mrr_final, nr_final) pairs. Seeds 0/1/2 spread the MRR
+    UP (so ranges can be made to overlap the control's, as the frozen rule's `ranges_overlap`
+    needs to land on MEMORISES) and spread normalized_rank DOWN i.e. better (so amendment_1's
+    all-below-all condition is comfortably clean, not a coin flip on which seed lands where)."""
+    groups = {}
+    for name, (mrr_final, nr_final), base_seed in (
+        ("vis00", vis00, 100), ("vis50", vis50, 200), ("randomdag", randomdag, 300),
+    ):
+        for i, s in enumerate((0, 1, 2)):
+            groups[f"{name}_s{s}"] = _p2_decoupled_series(
+                mrr_final=mrr_final + i * seed_offset_mrr,
+                nr_final=max(1e-6, nr_final - i * seed_offset_nr),
+                rng_seed=base_seed + s)
+    return {
+        "baselines": {"sibling_chance_mean": sibling_chance},
+        "baselines_randomdag": {"sibling_chance_mean": randomdag_chance},
+        "arms": {k: {"checkpoints": v} for k, v in groups.items()},
+    }
+
+
+class TestNormalizedRankChanceLevel:
+    """The amendment's central premise: normalized_rank's chance level is 0.5 for EVERY pool
+    size, unlike raw MRR (chance ~ 1/pool, pool-size-dependent). If this were false, chance-
+    normalising the cross-tree comparison would not fix anything."""
+
+    @pytest.mark.parametrize("pool", [2, 500])
+    def test_random_ranks_average_to_one_half_regardless_of_pool_size(self, pool):
+        rng = np.random.default_rng(20260924)
+        n_queries = 20000
+        ranks = rng.integers(1, pool + 1, size=n_queries)      # uniform on 1..pool inclusive
+        n_candidates = np.full(n_queries, pool, dtype=np.int64)
+        m = linkpred_metrics(ranks, n_candidates)
+        assert m["normalized_rank"] == pytest.approx(0.5, abs=0.02)
+
+
+class TestP2Amendment1:
+    def test_amendment_1_prevents_a_false_memorises_when_randomdag_is_an_easier_task(self):
+        """THE test amendment_1 exists for. RandomDAG's raw MRR (~0.40) is HIGHER than vis00's
+        (~0.38) -- an easier task scoring better on the confounded metric, ranges overlapping --
+        while vis00's normalized_rank (~0.21, well under 0.5) is far BETTER than RandomDAG's
+        (~0.54, at/above chance). Under the FROZEN rule (raw MRR, amendment_1=False) this reads
+        MEMORISES: this test must fail if the amendment is reverted."""
+        res = _p2_decoupled_result(
+            vis00=(0.38, 0.21), vis50=(0.39, 0.19), randomdag=(0.40, 0.54),
+            sibling_chance=0.05, randomdag_chance=0.27)   # ~5.4x, the measured ratio
+
+        frozen = p2_verdict(res, amendment_1=False)
+        assert frozen["by_arm_verdict"]["vis00"]["verdict"] == "MEMORISES", (
+            "fixture must reproduce the defect on the frozen rule for this test to mean anything")
+
+        amended = p2_verdict(res, amendment_1=True)
+        assert amended["by_arm_verdict"]["vis00"]["verdict"] != "MEMORISES"
+        assert amended["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        assert amended["by_arm_verdict"]["vis00"]["cross_tree_metric"] == "normalized_rank"
+        assert amended["by_arm_verdict"]["vis00"]["below_control_all_seeds"]
+        assert amended["by_arm_verdict"]["vis00"]["below_chance_level"]
+
+    def test_default_call_still_reproduces_the_original_frozen_reading(self):
+        """amendment_1 defaults to False: a bare `p2_verdict(res)` call must be identical to
+        `p2_verdict(res, amendment_1=False)`, and the pre-amendment fixtures must still return
+        their pre-amendment verdicts -- the amendment must not silently rewrite history."""
+        res_generalises = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50,
+                                              randomdag_final=0.10, sibling_chance=0.05)
+        assert p2_verdict(res_generalises) == p2_verdict(res_generalises, amendment_1=False)
+        assert p2_verdict(res_generalises)["verdict"] == "GENERALISES"
+        assert p2_verdict(res_generalises)["amendment_1_applied"] is False
+
+        res_memorises = _p2_nine_arm_result(vis00_final=0.11, vis50_final=0.115,
+                                            randomdag_final=0.11, sibling_chance=0.05)
+        assert p2_verdict(res_memorises, amendment_1=False)["verdict"] == "MEMORISES"
+
+    def test_own_floor_margin_is_untouched_by_the_amendment(self):
+        """The own-tree MRR-vs-own-sibling_chance_mean margin (rule_2: within-tree, unaffected)
+        must be numerically IDENTICAL whether or not amendment_1 is applied."""
+        res = _p2_decoupled_result(
+            vis00=(0.38, 0.21), vis50=(0.39, 0.19), randomdag=(0.40, 0.54),
+            sibling_chance=0.05, randomdag_chance=0.27)
+        frozen = p2_verdict(res, amendment_1=False)
+        amended = p2_verdict(res, amendment_1=True)
+        for name in ("vis00", "vis50"):
+            assert (frozen["by_arm_verdict"][name]["margin_above_chance"]
+                   == pytest.approx(amended["by_arm_verdict"][name]["margin_above_chance"]))
+            assert frozen["by_arm_verdict"][name]["above_chance_margin"] == (
+                amended["by_arm_verdict"][name]["above_chance_margin"])
+
+
 class TestP2PreregistrationArtifact:
     """The frozen JSON itself must state what Ruling 1 requires, not just this session's prose."""
 
@@ -558,3 +689,21 @@ class TestP2PreregistrationArtifact:
     def test_primary_metric_is_cosine_with_the_planted_radius_reasoning(self, prereg):
         assert "cosine" in prereg["metrics"]["primary"].lower()
         assert "planted" in prereg["metrics"]["primary_reason"].lower()
+
+    def test_frozen_block_is_untouched_by_the_amendment(self, prereg):
+        """p2_amendment_1_20260924 must be an ADDED top-level key, never an edit of the frozen
+        block -- declared_confounds stays at its originally-frozen count of 4."""
+        assert len(prereg["declared_confounds"]) == 4
+        assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+
+    def test_amendment_1_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_1_20260924" in prereg
+        status = prereg["p2_amendment_1_20260924"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "before any p2 outcome data" in status
+        assert "2026-09-24" in prereg["p2_amendment_1_20260924"]["status"]
+
+    def test_amendment_1_records_the_measured_chance_floor_ratio(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_1_20260924"])
+        assert "5.403" in blob
+        assert "normalized_rank" in blob

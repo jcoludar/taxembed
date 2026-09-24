@@ -99,15 +99,21 @@ def _render_p2(v: dict) -> None:
 
     if v["verdict"] != "UNINFORMATIVE":
         for name, r in v["by_arm_verdict"].items():
-            print(f"\n{name}: {r['verdict']}")
-            print(f"  margin above chance {r['margin_above_chance']:+.4f} "
+            print(f"\n{name}: {r['verdict']}  (cross-tree metric: {r['cross_tree_metric']})")
+            print(f"  margin above OWN chance {r['margin_above_chance']:+.4f} "
                   f"vs threshold {r['margin_threshold']:.4f} "
                   f"({'ok' if r['above_chance_margin'] else 'FAILED'})")
-            print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
-                  f"equivalent to RandomDAG: {r['equivalent_to_control']}")
+            if r["amendment_1_applied"]:
+                print(f"  below every RandomDAG seed (normalized_rank): "
+                      f"{r['below_control_all_seeds']}   "
+                      f"below chance level 0.5: {r['below_chance_level']}   "
+                      f"equivalent to RandomDAG: {r['equivalent_to_control']}")
+            else:
+                print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
+                      f"equivalent to RandomDAG: {r['equivalent_to_control']}")
             d = r["depth_strata"]
-            print(f"  depth strata ({name} - randomdag): {d['n_strata']} strata, "
-                  f"sign consistent {r['sign_consistent']}")
+            print(f"  depth strata ({name} - randomdag, on {r['cross_tree_metric']}): "
+                  f"{d['n_strata']} strata, sign consistent {r['sign_consistent']}")
             if d["dropped_below_min_n"]:
                 print(f"    dropped below n>=500: {d['dropped_below_min_n']}")
 
@@ -126,13 +132,18 @@ def main() -> None:
                     help="tasks 8/9 only: apply preregistration_v2_amendment_2_20260924 "
                          "(gate b: loss must not RISE). P2 has no loss gate at all -- this flag "
                          "is a no-op for --task p2.")
+    ap.add_argument("--amendment-1", action="store_true",
+                    help="--task p2 only: apply p2_amendment_1_20260924 (RandomDAG's rewiring "
+                         "measurably inflates its own chance floor ~5.4x, so the cross-tree "
+                         "comparison uses normalized_rank, chance=0.5 for every pool size, "
+                         "instead of raw MRR). No-op for --task 8/9.")
     args = ap.parse_args()
 
     result = json.loads(Path(args.json).read_text())
     seeds = tuple(int(x) for x in args.seeds.split(","))
 
     if args.task == "p2":
-        verdict = p2_verdict(result, seeds)
+        verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1)
         render = _render_p2
     else:
         verdict = (task9_verdict if args.task == "9" else task8_verdict)(

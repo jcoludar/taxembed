@@ -298,6 +298,23 @@ def _p2_mrr(ckpt: dict) -> float:
     return float(block["mrr"])
 
 
+def _p2_normalized_rank(ckpt: dict) -> float:
+    """The primary (cosine) `normalized_rank` for one checkpoint -- `(rank-1)/(pool-1)`.
+
+    amendment_1_20260924 (see the JSON's `p2_amendment_1_20260924` block): RandomDAG's rewiring
+    preserves each node's DEPTH but not its FAN-OUT, so its own `sibling_chance_mean` measured
+    ~5.4x higher than the real tree's on mollusca_6447_clean seed 0
+    (helpers/p2_randomdag_changes_the_chance_floor.py) -- RandomDAG is a different-difficulty
+    task, not merely a scrambled one. `normalized_rank`'s chance level is exactly 0.5 for EVERY
+    pool size (uniform rank on 1..pool under a random ranking), so it is the quantity every
+    CROSS-TREE comparison (an arm vs the RandomDAG control) must use instead of raw MRR. MRR
+    remains the metric for WITHIN-tree comparisons (an arm vs its own sibling_chance_mean; vis00
+    vs vis50), which this function does not touch.
+    """
+    block = ckpt.get("metrics_cosine", ckpt["metrics"])
+    return float(block["normalized_rank"])
+
+
 def p2_run_value(result: dict, arm_seed_key: str) -> dict:
     """One run's MRR trajectory, its per-run value, and its within-run jitter.
 
@@ -315,7 +332,9 @@ def p2_run_value(result: dict, arm_seed_key: str) -> dict:
         raise ValueError(f"{arm_seed_key}: no checkpoints scored")
     epochs = [int(c["epoch"]) for c in ckpts]
     mrrs = np.array([_p2_mrr(c) for c in ckpts], dtype=float)
+    nrs = np.array([_p2_normalized_rank(c) for c in ckpts], dtype=float)
     roll = mrrs[-P2_ROLL_WINDOW:]
+    roll_nr = nrs[-P2_ROLL_WINDOW:]
     return {
         "arm": arm_seed_key,
         "n_checkpoints": len(ckpts),
@@ -325,6 +344,11 @@ def p2_run_value(result: dict, arm_seed_key: str) -> dict:
         "mrr_max": float(mrrs.max()),
         "per_run_value": float(roll.mean()),
         "jitter_sd": float(roll.std(ddof=1)) if len(roll) > 1 else float("nan"),
+        # amendment_1_20260924: the cross-tree (arm vs RandomDAG) equivalent of the fields
+        # above, computed on normalized_rank instead of MRR -- see `_p2_normalized_rank`.
+        "normalized_rank_series": nrs.tolist(),
+        "per_run_value_normalized_rank": float(roll_nr.mean()),
+        "normalized_rank_jitter_sd": float(roll_nr.std(ddof=1)) if len(roll_nr) > 1 else float("nan"),
         "final_epoch_present": bool(P2_FINAL_EPOCH in epochs),
     }
 
@@ -359,20 +383,35 @@ def p2_validity_gate(result: dict, arm_seed_key: str, sibling_chance_mean: float
 
 
 def p2_group_stats(result: dict, group: str, seeds, sibling_chance_mean: float) -> dict:
-    """Gates + per-run values for one arm's seeds (e.g. group='vis00' -> vis00_s0/_s1/_s2)."""
+    """Gates + per-run values for one arm's seeds (e.g. group='vis00' -> vis00_s0/_s1/_s2).
+
+    Carries BOTH the MRR aggregates (unchanged, used for the own-tree floor margin and for the
+    pre-amendment_1 reading) and the normalized_rank aggregates (amendment_1_20260924, used for
+    the cross-tree-vs-RandomDAG reading) -- so both `_p2_arm_reading` branches can be computed
+    from the same `p2_group_stats` call without re-scanning the checkpoints.
+    """
     gates = [p2_validity_gate(result, f"{group}_s{s}", sibling_chance_mean) for s in seeds]
     invalid = [g["arm"] for g in gates if not g["valid"]]
     vals = np.array([g["per_run_value"] for g in gates], dtype=float)
+    vals_nr = np.array([g["per_run_value_normalized_rank"] for g in gates], dtype=float)
     return {
         "group": group, "seeds": list(seeds), "gates": gates, "invalid_runs": invalid,
         "per_run_values": vals.tolist(),
         "mean": float(vals.mean()), "min": float(vals.min()), "max": float(vals.max()),
         "pooled_within_arm_seed_sd": float(vals.std(ddof=1)) if len(vals) > 1 else float("nan"),
+        "per_run_values_normalized_rank": vals_nr.tolist(),
+        "mean_normalized_rank": float(vals_nr.mean()),
+        "min_normalized_rank": float(vals_nr.min()),
+        "max_normalized_rank": float(vals_nr.max()),
+        "pooled_within_arm_seed_sd_normalized_rank": (
+            float(vals_nr.std(ddof=1)) if len(vals_nr) > 1 else float("nan")),
     }
 
 
-def _p2_depth_means(result: dict, group: str, seeds) -> dict:
-    """Per-depth-stratum mean MRR at the FINAL (epoch 200) checkpoint, averaged over seeds.
+def _p2_depth_means(result: dict, group: str, seeds, field: str = "mrr") -> dict:
+    """Per-depth-stratum mean of `field` ('mrr', the pre-amendment_1 default; or
+    'normalized_rank', amendment_1_20260924's cross-tree field) at the FINAL (epoch 200)
+    checkpoint, averaged over seeds.
 
     Strata whose mean `n` (averaged over seeds) is below `P2_MIN_STRATUM_N` are dropped and
     reported, never silently skipped -- mirrors `_stratum_means` above.
@@ -385,9 +424,9 @@ def _p2_depth_means(result: dict, group: str, seeds) -> dict:
         if final is None:
             continue
         for stratum, d in final.get("by_depth", {}).get("cosine", {}).items():
-            if d is None or d.get("mrr") is None:
+            if d is None or d.get(field) is None:
                 continue
-            per_stratum.setdefault(stratum, []).append(float(d["mrr"]))
+            per_stratum.setdefault(stratum, []).append(float(d[field]))
             ns.setdefault(stratum, []).append(int(d.get("n", 0)))
     means, dropped = {}, {}
     for stratum, vals in per_stratum.items():
@@ -400,63 +439,148 @@ def _p2_depth_means(result: dict, group: str, seeds) -> dict:
 
 
 def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
-                    sibling_chance_mean: float) -> dict:
-    """GENERALISES / MEMORISES / MIXED for one real-tree arm against sibling chance + RandomDAG."""
+                    sibling_chance_mean: float, amendment_1: bool = False) -> dict:
+    """GENERALISES / MEMORISES / MIXED for one real-tree arm against sibling chance + RandomDAG.
+
+    `amendment_1` (2026-09-24, `p2_amendment_1_20260924` in the pre-registration JSON):
+    `randomdag.randomize_parents` preserves each node's DEPTH exactly but not its FAN-OUT --
+    measured on mollusca_6447_clean seed 0 (helpers/p2_randomdag_changes_the_chance_floor.py),
+    mean sibling_chance is 5.403x HIGHER on the randomised tree than the real one, so RandomDAG
+    is a different-difficulty (easier) task, not merely a scrambled one. Raw MRR is therefore NOT
+    comparable across the arm and the RandomDAG control; a false MEMORISES verdict is the direct
+    consequence, since the easier control can out-score a genuinely-generalising real arm on raw
+    MRR almost regardless of what the model learned.
+
+    `amendment_1=False` (default) reproduces the ORIGINAL 2026-09-24 freeze reading, unchanged,
+    comparing raw MRR head-to-head against RandomDAG's raw MRR -- kept reachable so the frozen
+    reading remains reproducible (never silently rewritten). `amendment_1=True` instead compares
+    normalized_rank -- pool-size (and so fan-out) invariant, chance level exactly 0.5 for every
+    pool size -- for every CROSS-TREE quantity (the arm vs RandomDAG); the arm's own MRR-vs-its-
+    own-sibling_chance_mean margin is WITHIN-tree and is unchanged by the flag either way.
+    """
+    # own-tree margin: an arm's own MRR vs its own sibling_chance_mean -- unaffected by the
+    # RandomDAG fan-out defect either way, since RandomDAG never enters this comparison.
     margin = group["min"] - sibling_chance_mean
     pooled_sd = group["pooled_within_arm_seed_sd"]
     threshold = P2_FLOOR_SD_MULTIPLE * pooled_sd if np.isfinite(pooled_sd) else float("nan")
     above_chance_margin = bool(np.isfinite(threshold) and margin >= threshold)
-    above_control_all_seeds = bool(group["min"] > control["max"])
 
-    ranges_overlap = bool(group["min"] <= control["max"] and control["min"] <= group["max"])
-    g_var = np.var(group["per_run_values"], ddof=1) if len(group["per_run_values"]) > 1 else 0.0
-    c_var = np.var(control["per_run_values"], ddof=1) if len(control["per_run_values"]) > 1 else 0.0
-    pooled_vs_control = float(np.sqrt(np.mean([g_var, c_var])))
-    equiv_band = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control)
-    mean_diff = group["mean"] - control["mean"]
-    equivalent_to_control = bool(ranges_overlap or abs(mean_diff) < equiv_band)
+    if not amendment_1:
+        above_control_all_seeds = bool(group["min"] > control["max"])
 
-    depth = _p2_depth_means(result, name, seeds)
-    depth_control = _p2_depth_means(result, P2_CONTROL_ARM, seeds)
-    shared = sorted(set(depth["means"]) & set(depth_control["means"]))
-    diffs = {k: depth["means"][k] - depth_control["means"][k] for k in shared}
-    sign_consistent = bool(diffs) and all(v > 0 for v in diffs.values())
+        ranges_overlap = bool(group["min"] <= control["max"] and control["min"] <= group["max"])
+        g_var = np.var(group["per_run_values"], ddof=1) if len(group["per_run_values"]) > 1 else 0.0
+        c_var = np.var(control["per_run_values"], ddof=1) if len(control["per_run_values"]) > 1 else 0.0
+        pooled_vs_control = float(np.sqrt(np.mean([g_var, c_var])))
+        equiv_band = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control)
+        mean_diff = group["mean"] - control["mean"]
+        equivalent_to_control = bool(ranges_overlap or abs(mean_diff) < equiv_band)
 
-    if above_chance_margin and above_control_all_seeds and sign_consistent:
+        depth = _p2_depth_means(result, name, seeds, field="mrr")
+        depth_control = _p2_depth_means(result, P2_CONTROL_ARM, seeds, field="mrr")
+        shared = sorted(set(depth["means"]) & set(depth_control["means"]))
+        diffs = {k: depth["means"][k] - depth_control["means"][k] for k in shared}
+        sign_consistent = bool(diffs) and all(v > 0 for v in diffs.values())
+
+        if above_chance_margin and above_control_all_seeds and sign_consistent:
+            verdict, meaning = "GENERALISES", (
+                "MRR clears sibling chance by the declared margin, beats every RandomDAG seed, "
+                "and the sign holds in every depth stratum with n>=500: the model predicts "
+                "relations it never saw. This is the answer to the overfitting challenge.")
+        elif (not above_chance_margin) or equivalent_to_control:
+            verdict, meaning = "MEMORISES", (
+                "MRR is not meaningfully separated from sibling chance, or is statistically "
+                "indistinguishable from the RandomDAG control. The structure is in-sample only; "
+                "the manuscript must say so.")
+        else:
+            verdict, meaning = "MIXED", ("Sign flips across depth strata; report per stratum, "
+                                         "no aggregate claim.")
+
+        return {
+            "arm": name, "verdict": verdict, "meaning": meaning,
+            "amendment_1_applied": False, "cross_tree_metric": "mrr",
+            "margin_above_chance": float(margin), "margin_threshold": float(threshold),
+            "above_chance_margin": above_chance_margin,
+            "above_control_all_seeds": above_control_all_seeds,
+            "equivalent_to_control": equivalent_to_control,
+            "mean_diff_vs_control": float(mean_diff), "equivalence_band_vs_control": equiv_band,
+            "depth_strata": {"diffs": diffs, "n_strata": len(shared),
+                             "dropped_below_min_n": {**depth["dropped_below_min_n"],
+                                                      **depth_control["dropped_below_min_n"]}},
+            "sign_consistent": sign_consistent,
+        }
+
+    # amendment_1=True: the cross-tree comparison, on normalized_rank. Lower is better; chance
+    # is exactly 0.5 for every pool size, so it needs no per-arm floor the way MRR does.
+    g_nr = np.asarray(group["per_run_values_normalized_rank"], dtype=float)
+    c_nr = np.asarray(control["per_run_values_normalized_rank"], dtype=float)
+    below_control_all_seeds = bool(g_nr.max() < c_nr.min())      # mirrors above_control_all_seeds
+    below_chance_level = bool(g_nr.max() < 0.5)                  # weakest (highest) seed still <0.5
+
+    ranges_overlap_nr = bool(g_nr.min() <= c_nr.max() and c_nr.min() <= g_nr.max())
+    g_var_nr = float(np.var(g_nr, ddof=1)) if len(g_nr) > 1 else 0.0
+    c_var_nr = float(np.var(c_nr, ddof=1)) if len(c_nr) > 1 else 0.0
+    pooled_vs_control_nr = float(np.sqrt(np.mean([g_var_nr, c_var_nr])))
+    equiv_band_nr = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)
+    mean_diff_nr = float(g_nr.mean() - c_nr.mean())
+    equivalent_to_control_nr = bool(ranges_overlap_nr or abs(mean_diff_nr) < equiv_band_nr)
+
+    depth_nr = _p2_depth_means(result, name, seeds, field="normalized_rank")
+    depth_control_nr = _p2_depth_means(result, P2_CONTROL_ARM, seeds, field="normalized_rank")
+    shared_nr = sorted(set(depth_nr["means"]) & set(depth_control_nr["means"]))
+    diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k] for k in shared_nr}
+    sign_consistent_nr = bool(diffs_nr) and all(v < 0 for v in diffs_nr.values())
+
+    if above_chance_margin and below_control_all_seeds and below_chance_level and sign_consistent_nr:
         verdict, meaning = "GENERALISES", (
-            "MRR clears sibling chance by the declared margin, beats every RandomDAG seed, and "
-            "the sign holds in every depth stratum with n>=500: the model predicts relations it "
-            "never saw. This is the answer to the overfitting challenge.")
-    elif (not above_chance_margin) or equivalent_to_control:
+            "MRR clears its own sibling chance by the declared margin, AND normalized_rank sits "
+            "below every RandomDAG seed's normalized_rank AND below the pool-size-invariant "
+            "chance level of 0.5, AND the sign holds in every depth stratum with n>=500: the "
+            "model predicts relations it never saw, read on a metric RandomDAG's inflated own "
+            "chance floor cannot confound. amendment_1_20260924.")
+    elif (not above_chance_margin) or equivalent_to_control_nr:
         verdict, meaning = "MEMORISES", (
-            "MRR is not meaningfully separated from sibling chance, or is statistically "
-            "indistinguishable from the RandomDAG control. The structure is in-sample only; the "
-            "manuscript must say so.")
+            "MRR is not meaningfully separated from its own sibling chance, or normalized_rank "
+            "is statistically indistinguishable from the RandomDAG control's normalized_rank. "
+            "The structure is in-sample only; the manuscript must say so. amendment_1_20260924.")
     else:
-        verdict, meaning = "MIXED", "Sign flips across depth strata; report per stratum, no aggregate claim."
+        verdict, meaning = "MIXED", ("Sign of (arm - RandomDAG) normalized_rank flips across "
+                                     "depth strata; report per stratum, no aggregate claim. "
+                                     "amendment_1_20260924.")
 
     return {
         "arm": name, "verdict": verdict, "meaning": meaning,
+        "amendment_1_applied": True, "cross_tree_metric": "normalized_rank",
         "margin_above_chance": float(margin), "margin_threshold": float(threshold),
         "above_chance_margin": above_chance_margin,
-        "above_control_all_seeds": above_control_all_seeds,
-        "equivalent_to_control": equivalent_to_control,
-        "mean_diff_vs_control": float(mean_diff), "equivalence_band_vs_control": equiv_band,
-        "depth_strata": {"diffs": diffs, "n_strata": len(shared),
-                         "dropped_below_min_n": {**depth["dropped_below_min_n"],
-                                                  **depth_control["dropped_below_min_n"]}},
-        "sign_consistent": sign_consistent,
+        "below_control_all_seeds": below_control_all_seeds,
+        "below_chance_level": below_chance_level,
+        "equivalent_to_control": equivalent_to_control_nr,
+        "mean_diff_vs_control": mean_diff_nr, "equivalence_band_vs_control": equiv_band_nr,
+        "depth_strata": {"diffs": diffs_nr, "n_strata": len(shared_nr),
+                         "dropped_below_min_n": {**depth_nr["dropped_below_min_n"],
+                                                  **depth_control_nr["dropped_below_min_n"]}},
+        "sign_consistent": sign_consistent_nr,
     }
 
 
-def p2_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
+def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False) -> dict:
     """vis00/vis50 vs sibling chance and RandomDAG -> GENERALISES / MEMORISES / MIXED /
     UNINFORMATIVE, per results/p2_heldout_preregistration.json.
 
     UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including RandomDAG) fails
     gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is read. Otherwise
     each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading (`by_arm_verdict`); the
-    top-level `verdict` is that shared reading if both arms agree, else MIXED.
+    top-level `verdict` is that shared reading if both arms agree, else MIXED. The validity gates
+    themselves (a/b/c) are untouched by `amendment_1` -- they are within-tree facts about a run,
+    never a cross-tree comparison.
+
+    `amendment_1` (2026-09-24, `p2_amendment_1_20260924`): default False reproduces the ORIGINAL
+    2026-09-24 freeze reading unchanged (raw MRR compared head-to-head against RandomDAG). True
+    applies the amended reading -- RandomDAG's rewiring measurably inflates its own chance floor
+    (~5.4x on mollusca_6447_clean seed 0), so the cross-tree comparison uses normalized_rank
+    (chance = 0.5 for every pool size) instead. See `_p2_arm_reading` and the JSON amendment
+    block for the full derivation. Both readings are always computable from the same result.
     """
     sibling_chance_mean = float(result["baselines"]["sibling_chance_mean"])
     randomdag_baselines = result.get("baselines_randomdag", result["baselines"])
@@ -473,6 +597,7 @@ def p2_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
         "task": "P2 -- held-out link prediction, real taxonomy vs RandomDAG",
         "preregistration": ["results/p2_heldout_preregistration.json"],
         "seeds": list(seeds),
+        "amendment_1_applied": bool(amendment_1),
         "sibling_chance_mean": sibling_chance_mean,
         "randomdag_sibling_chance_mean": randomdag_chance,
         "control": control, "groups": groups,
@@ -485,7 +610,7 @@ def p2_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
         return base
 
     by_arm = {name: _p2_arm_reading(result, name, seeds, groups[name], control,
-                                    sibling_chance_mean)
+                                    sibling_chance_mean, amendment_1=amendment_1)
              for name in P2_DATA_ARMS}
     verdicts = {v["verdict"] for v in by_arm.values()}
     if len(verdicts) == 1:
