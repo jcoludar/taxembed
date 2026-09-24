@@ -75,7 +75,9 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "src"))
 sys.path.insert(0, str(_REPO))
 
-from taxembed.eval.baselines import majority_parent_rate, sibling_chance  # noqa: E402
+from taxembed.eval.baselines import (  # noqa: E402
+    chance_mrr_mean, degree_prior_metrics, majority_parent_rate, sibling_chance,
+)
 from taxembed.eval.linkpred import (  # noqa: E402
     candidate_pool, linkpred_metrics, rank_of_true_parent, stratify,
 )
@@ -144,16 +146,27 @@ def load_checkpoint(path: str) -> tuple[np.ndarray, dict, np.ndarray | None]:
     return emb.detach().float().numpy(), meta, radii
 
 
-def load_parent_depth(manifest: dict) -> tuple[np.ndarray, np.ndarray, int]:
+def load_parent_depth(manifest: dict,
+                      closure_override: Path | None = None) -> tuple[np.ndarray, np.ndarray, int]:
     """Manifest supplies `parent`/`depth` directly (the CLI test's simpler fixture form), or
     else they are rebuilt from `source_npz` via TrainingPairs + parent_from_closure +
-    depth_from_closure -- the production manifest shape build_p2_split.py writes."""
+    depth_from_closure -- the production manifest shape build_p2_split.py writes.
+
+    `closure_override` (C5, 2026-09-24, `p2_amendment_3_20260924`): `build_p2_split.py` records
+    `manifest["source_npz"]` as an ABSOLUTE macOS build-time path (e.g.
+    `/Users/jcoludar/.../data/taxopy/.../..._transitive.npz`), which does not exist inside the LRZ
+    container -- opening it there raises `FileNotFoundError` only after the queue wait (Rule 16).
+    When given, `closure_override` is used INSTEAD of `manifest["source_npz"]`, so the caller
+    (`scripts/p2_lrz_score.sh`, via `--closure`) can point at the container-mounted path without
+    editing the manifest. Never used when the manifest already supplies `parent`/`depth` directly.
+    """
     if "parent" in manifest and "depth" in manifest:
         parent = np.asarray(manifest["parent"], dtype=np.int64)
         depth = np.asarray(manifest["depth"], dtype=np.int64)
         n_nodes = int(manifest.get("n_nodes", len(parent)))
         return parent, depth, n_nodes
-    pairs = TrainingPairs.load(Path(manifest["source_npz"]))
+    npz_path = Path(closure_override) if closure_override is not None else Path(manifest["source_npz"])
+    pairs = TrainingPairs.load(npz_path)
     n_nodes = pairs.n_nodes
     parent = parent_from_closure(pairs.ancestor_idx, pairs.descendant_idx, pairs.depth_diff, n_nodes)
     depth = depth_from_closure(pairs.descendant_idx, pairs.descendant_depth,
@@ -229,11 +242,31 @@ def main() -> None:
     ap.add_argument("--max-checkpoints", type=int, default=None,
                     help="score only the first N per arm (smoke runs)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--closure", type=Path, default=None,
+                    help="C5: override manifest['source_npz'], which is an absolute macOS "
+                         "build-time path that does not exist inside the LRZ container. Ignored "
+                         "when the manifest already supplies parent/depth directly.")
+    ap.add_argument("--baselines-key", default="baselines",
+                    help="C4: top-level key this invocation's baselines block is written under. "
+                         "Default 'baselines' (the real vis00/vis50 pair). Pass "
+                         "'baselines_randomdag_vis00' / 'baselines_randomdag_vis50' for the "
+                         "matched-control invocations so the merged JSON carries each control's "
+                         "OWN floor under the key p2_verdict(..., amendment_2=True) reads, "
+                         "instead of every invocation silently writing the same 'baselines' key "
+                         "and the merge step handing every control the real tree's floor.")
     args = ap.parse_args()
 
     t0 = time.time()
     manifest = json.loads(args.manifest.read_text())
-    parent, depth, n_nodes = load_parent_depth(manifest)
+    if args.closure is not None and not args.closure.exists():
+        raise SystemExit(f"--closure {args.closure} does not exist")
+    parent, depth, n_nodes = load_parent_depth(manifest, args.closure)
+    if args.closure is not None:
+        closure_path_used: str | None = str(args.closure.resolve())
+    elif "source_npz" in manifest:
+        closure_path_used = str(Path(manifest["source_npz"]))
+    else:
+        closure_path_used = None
 
     heldout_data = np.load(args.heldout)
     held = np.asarray(heldout_data["test"], dtype=np.int64)
@@ -257,10 +290,29 @@ def main() -> None:
           f"pool sizes {n_cand.min() if len(n_cand) else 0}-{n_cand.max() if len(n_cand) else 0}; "
           f"setup {time.time() - t0:.1f}s", flush=True)
 
+    sibling_chance_mean = (float(np.mean(sibling_chance(parent, held)))
+                           if len(held) else float("nan"))
+    # C1 (degree prior) and C2 (chance_mrr_mean) both depend only on tree structure and the
+    # held-out node set, never on any checkpoint -- computed once per invocation, mirroring
+    # sibling_chance_mean/vendrov_recall/majority_parent_rate above.
+    degree_prior = (degree_prior_metrics(parent, held, candidates_list, true_parents, n_cand)
+                    if len(held) else {"n": 0, "n_scored": 0, "n_trivial": 0,
+                                        "mean_rank": float("nan"), "mrr": float("nan"),
+                                        "hits_at_1": float("nan"), "hits_at_10": float("nan"),
+                                        "normalized_rank": float("nan")})
+    baselines_block = {
+        "sibling_chance_mean": sibling_chance_mean,
+        "chance_hits_at_1_mean": sibling_chance_mean,  # C2: same quantity, second explicit name
+        "chance_mrr_mean": (chance_mrr_mean(n_cand) if len(held) else float("nan")),
+        "vendrov_recall": vendrov_recall(parent, held, n_nodes),
+        "majority_parent_rate": majority_parent_rate(parent, held),
+        "degree_prior": degree_prior,
+    }
     result: dict = {
         "design": "docs/plans/2026-09-24-taxembed-p2-heldout-evaluation.md#Task-6",
         "manifest": str(args.manifest.resolve()),
         "heldout": str(args.heldout.resolve()),
+        "closure_path_used": closure_path_used,
         "n_nodes": n_nodes,
         "n_held": int(len(held)),
         "n_val": n_val,
@@ -268,18 +320,15 @@ def main() -> None:
         "primary_metric": args.metric,
         "pool_size_bins": [list(b) for b in POOL_SIZE_BINS],
         "depth_bins": [list(b) for b in DEPTH_BINS],
-        "baselines": {
-            "sibling_chance_mean": (float(np.mean(sibling_chance(parent, held)))
-                                    if len(held) else float("nan")),
-            "vendrov_recall": vendrov_recall(parent, held, n_nodes),
-            "majority_parent_rate": majority_parent_rate(parent, held),
-        },
+        args.baselines_key: baselines_block,
         "arms": {},
     }
-    print(f"[baselines] sibling_chance_mean {result['baselines']['sibling_chance_mean']:.4f} "
-          f"| vendrov_recall {result['baselines']['vendrov_recall']:.4f} (expect 0.0 by "
-          f"construction) | majority_parent_rate {result['baselines']['majority_parent_rate']:.4f}",
-          flush=True)
+    print(f"[{args.baselines_key}] sibling_chance_mean {sibling_chance_mean:.4f} | "
+          f"chance_mrr_mean {baselines_block['chance_mrr_mean']:.4f} | vendrov_recall "
+          f"{baselines_block['vendrov_recall']:.4f} (expect 0.0 by construction) | "
+          f"majority_parent_rate {baselines_block['majority_parent_rate']:.4f} | "
+          f"degree_prior mrr {degree_prior['mrr']:.4f} hits@1 {degree_prior['hits_at_1']:.4f} "
+          f"normalized_rank {degree_prior['normalized_rank']:.4f}", flush=True)
 
     for spec in args.checkpoints:
         arm, pattern = spec.split("=", 1)
@@ -318,9 +367,19 @@ def main() -> None:
             metrics_poincare = linkpred_metrics(ranks_poin, n_cand)
             primary_metrics = metrics_cosine if args.metric == "cosine" else metrics_poincare
 
+            # I2: assert_full_coverage=True -- after C3's k=1 exclusion, every SCORED query
+            # (pool size >= 2) must land in exactly one bin; POOL_SIZE_BINS starting at (2, 2) is
+            # now a deliberate exclusion of k=1, not a gap, and a scored query landing in no bin
+            # would be a real bug in the bin edges, not something to silently under-count.
+            # DEPTH_BINS is NOT asserted here: it covers the production depth band [11, 28] only,
+            # and small synthetic test trees (this module's own CLI tests) legitimately have
+            # held-out nodes at shallower depths outside that band -- a coverage gap there is
+            # expected on non-production data, not a bug.
             by_pool_size = {
-                "cosine": stratify(ranks_cos, n_cand, n_cand, bins=POOL_SIZE_BINS),
-                "poincare": stratify(ranks_poin, n_cand, n_cand, bins=POOL_SIZE_BINS),
+                "cosine": stratify(ranks_cos, n_cand, n_cand, bins=POOL_SIZE_BINS,
+                                   assert_full_coverage=True),
+                "poincare": stratify(ranks_poin, n_cand, n_cand, bins=POOL_SIZE_BINS,
+                                     assert_full_coverage=True),
             }
             by_depth = {
                 "cosine": stratify(ranks_cos, n_cand, depth_held, bins=DEPTH_BINS),

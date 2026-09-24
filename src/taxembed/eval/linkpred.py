@@ -154,36 +154,78 @@ def rank_of_true_parent(emb: np.ndarray, node: int, true_parent: int,
 
 
 def linkpred_metrics(ranks: np.ndarray, n_candidates: np.ndarray) -> dict:
-    """MR, MRR, Hits@1, Hits@10 and a pool-size-normalized rank."""
+    """MR, MRR, Hits@1, Hits@10 and a pool-size-normalized rank -- computed on the SCORED subset
+    only (pool size >= 2).
+
+    CORRECTION (2026-09-24, C3, amendment `p2_amendment_3_20260924`). At pool size k=1 there is
+    exactly one candidate, which is therefore always the true parent: rank=1, and
+    `normalized_rank = (rank-1)/max(k-1,1) = 0` for EVERY implementation, unconditionally -- the
+    best possible value, handed out for free, never a draw. Measured on the real metazoa split
+    (seed 0): 3.42% of held-out queries have pool size 1, vs 27.07% on the RandomDAG control (whose
+    rewiring collapses fan-out) -- so a free win is handed out roughly 8x more often to the control
+    than to the real tree, which is exactly backwards for a control that is supposed to be a fair
+    floor. It also drags the real tree's own chance level for normalized_rank away from the clean
+    0.5 the amendment's derivation otherwise gets by excluding k=1 (0.5 holds for EVERY k>=2).
+    `n_trivial` (pool size 1, excluded) and `n_scored` (pool size >= 2, what every metric below is
+    computed over) are now both reported, so a caller can always see how many queries were dropped
+    and why -- never a silent shrink.
+    """
     ranks = np.asarray(ranks, dtype=np.float64)
     n_candidates = np.asarray(n_candidates, dtype=np.float64)
-    if len(ranks) == 0:
-        return {"n": 0, "mean_rank": float("nan"), "mrr": float("nan"),
-                "hits_at_1": float("nan"), "hits_at_10": float("nan"),
+    n_total = int(len(ranks))
+    if n_total == 0:
+        return {"n": 0, "n_scored": 0, "n_trivial": 0, "mean_rank": float("nan"),
+                "mrr": float("nan"), "hits_at_1": float("nan"), "hits_at_10": float("nan"),
+                "normalized_rank": float("nan")}
+    trivial = n_candidates <= 1.0
+    r = ranks[~trivial]
+    nc = n_candidates[~trivial]
+    n_trivial = int(trivial.sum())
+    n_scored = n_total - n_trivial
+    if n_scored == 0:
+        return {"n": n_total, "n_scored": 0, "n_trivial": n_trivial, "mean_rank": float("nan"),
+                "mrr": float("nan"), "hits_at_1": float("nan"), "hits_at_10": float("nan"),
                 "normalized_rank": float("nan")}
     # (rank - 1) / (pool - 1) is 0 for a perfect call and 1 for the worst possible one.
-    denom = np.clip(n_candidates - 1.0, 1.0, None)
+    denom = np.clip(nc - 1.0, 1.0, None)
     return {
-        "n": int(len(ranks)),
-        "mean_rank": float(ranks.mean()),
-        "mrr": float((1.0 / ranks).mean()),
-        "hits_at_1": float((ranks <= 1).mean()),
-        "hits_at_10": float((ranks <= 10).mean()),
-        "normalized_rank": float(((ranks - 1.0) / denom).mean()),
+        "n": n_total, "n_scored": n_scored, "n_trivial": n_trivial,
+        "mean_rank": float(r.mean()),
+        "mrr": float((1.0 / r).mean()),
+        "hits_at_1": float((r <= 1).mean()),
+        "hits_at_10": float((r <= 10).mean()),
+        "normalized_rank": float(((r - 1.0) / denom).mean()),
     }
 
 
-def stratify(ranks, n_candidates, key, bins) -> dict:
+def stratify(ranks, n_candidates, key, bins, assert_full_coverage: bool = False) -> dict:
     """Metrics per inclusive [lo, hi] bin of `key` (e.g. candidate-pool size, node depth).
 
     `n_candidates` is the REAL per-query candidate-pool size, sliced alongside `ranks` and `key` --
     not synthesized from the bin bounds. Ruled correction 2026-09-24: see module docstring.
+
+    `assert_full_coverage` (2026-09-24, I2): when True, raises if any query with pool size >= 2
+    (the SCORED set after the C3 k=1 exclusion -- `linkpred_metrics` above) falls in none of
+    `bins`. `POOL_SIZE_BINS` starting at (2, 2) used to silently drop every k=1 query with no trace
+    (measured 719 scored vs 740 total on a real run) -- now that k=1 is deliberately excluded
+    EVERYWHERE (not just here), a scored query landing in no bin is a genuine gap in `bins`, not an
+    expected exclusion, and must fail loudly rather than silently under-count a stratum.
     """
     ranks = np.asarray(ranks)
     n_candidates = np.asarray(n_candidates)
     key = np.asarray(key)
     out = {}
+    covered = np.zeros(len(ranks), dtype=bool)
     for lo, hi in bins:
         sel = (key >= lo) & (key <= hi)
+        covered |= sel
         out[f"{lo}-{hi}"] = linkpred_metrics(ranks[sel], n_candidates[sel])
+    if assert_full_coverage:
+        scored = np.asarray(n_candidates, dtype=np.float64) > 1.0
+        gap = scored & ~covered
+        if np.any(gap):
+            n_gap = int(gap.sum())
+            raise ValueError(
+                f"{n_gap} scored quer{'y' if n_gap == 1 else 'ies'} (pool size >= 2) fall inside "
+                f"no bin of {bins} -- bins do not partition the scored set")
     return out

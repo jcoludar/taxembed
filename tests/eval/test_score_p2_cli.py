@@ -15,6 +15,8 @@ from score_p2_linkpred import (  # noqa: E402
     _vendrov_recall_core, _visible_basic_edges, vendrov_recall,
 )
 from taxembed.eval import baselines  # noqa: E402
+from taxembed.eval.preregistration import merge_p2_scorer_outputs, p2_verdict  # noqa: E402
+from taxembed.eval.randomdag import closure_from_parent  # noqa: E402
 
 
 def test_scorer_runs_end_to_end_on_a_synthetic_tree(tmp_path):
@@ -405,3 +407,141 @@ def test_empty_heldout_metrics_are_null_not_nan_in_strict_json(tmp_path):
     res = json.loads(text, parse_constant=_reject_nonfinite)  # raises if anything slipped through
     assert res["baselines"]["sibling_chance_mean"] is None
     assert res["arms"]["arm"]["checkpoints"][0]["metrics"]["mrr"] is None
+
+
+# --- C1/C2 (review finding, 2026-09-24, p2_amendment_3_20260924): the scorer must emit the
+# degree_prior and chance_mrr_mean/chance_hits_at_1_mean baselines alongside sibling_chance_mean.
+
+
+def test_baselines_include_degree_prior_and_chance_mrr_mean(tmp_path):
+    manifest, held = _write_small_tree(tmp_path)   # held=(3, 5), both pool size 2
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode == 0, rc.stderr
+    baselines = json.loads(out.read_text())["baselines"]
+    assert "degree_prior" in baselines
+    assert set(("mrr", "hits_at_1", "normalized_rank")) <= set(baselines["degree_prior"])
+    assert "chance_mrr_mean" in baselines
+    assert "chance_hits_at_1_mean" in baselines
+    # both held nodes have pool size 2 (chance = H_2/2 = 0.75), which is ABOVE the hits@1 chance
+    # rate (1/2 = 0.5) -- the C2 gap, reproduced on real scorer output, not just a unit fixture.
+    assert baselines["chance_mrr_mean"] == pytest.approx(0.75)
+    assert baselines["chance_hits_at_1_mean"] == pytest.approx(0.5)
+    assert baselines["chance_mrr_mean"] > baselines["chance_hits_at_1_mean"]
+
+
+# --- C5 (review finding, 2026-09-24): --closure overrides manifest['source_npz'], which
+# build_p2_split.py records as an absolute macOS build-time path absent inside the LRZ container.
+
+
+def test_closure_override_replaces_a_dead_manifest_source_npz(tmp_path):
+    """LESION CHECK. manifest['source_npz'] points at a path that does NOT exist (mirroring the
+    real defect: an absolute macOS path, absent inside the container). Without --closure this
+    must fail; WITH --closure pointing at a real closure file elsewhere, scoring must succeed and
+    record which path it actually used."""
+    parent = np.array([0, 0, 0, 1, 1, 2, 2], dtype=np.int64)
+    depth = np.array([0, 1, 1, 2, 2, 2, 2], dtype=np.int64)
+    pairs = closure_from_parent(parent, depth)
+    real_closure = tmp_path / "real_closure.npz"
+    pairs.save(real_closure)
+
+    held = tmp_path / "heldout.npz"
+    np.savez(held, test=np.array([3, 5], dtype=np.int64), val=np.array([], dtype=np.int64))
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({
+        "clade": "synthetic", "band": [0, 99],
+        "source_npz": str(tmp_path / "DOES_NOT_EXIST_macos_build_time_path.npz"),
+    }))
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+    out = tmp_path / "scores.json"
+
+    rc_missing = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc_missing.returncode != 0, "must fail without --closure: source_npz does not exist"
+
+    rc_ok = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--closure", str(real_closure), "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc_ok.returncode == 0, rc_ok.stderr
+    res = json.loads(out.read_text())
+    assert res["closure_path_used"] == str(real_closure.resolve())
+    assert res["arms"]["arm"]["checkpoints"][0]["metrics"]["mrr"] == 1.0
+
+
+def test_missing_closure_argument_fails_fast_with_a_clear_message(tmp_path):
+    """HEALTHY / control direction: --closure pointing at a file that does not exist must fail
+    IMMEDIATELY with a clear message -- proving a pre-flight check catches it, not a deep
+    traceback three frames into TrainingPairs.load."""
+    manifest, held = _write_small_tree(tmp_path)
+    ck = tmp_path / "ck_epoch1.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS}, ck)
+    out = tmp_path / "scores.json"
+    rc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--closure", str(tmp_path / "nope.npz"), "--checkpoints", f"arm={ck}", "--out", str(out)],
+        capture_output=True, text=True,
+    )
+    assert rc.returncode != 0
+    assert "does not exist" in rc.stderr
+    assert "Traceback" not in rc.stderr
+
+
+# --- C4 (review finding, 2026-09-24): scorer output -> merge_p2_scorer_outputs -> p2_verdict,
+# end to end, against a REAL score_p2_linkpred.py subprocess (not a hand-authored fixture) --
+# "a verifier you wrote shares your blind spot", so this replays the real scorer's own output
+# shape through the parser exactly as helpers/check_p2_prereg_parses_real_scorer_output.py does.
+
+
+def test_scorer_output_flows_through_merge_and_the_verdict_engine_end_to_end(tmp_path):
+    manifest, held = _write_small_tree(tmp_path, test=(3, 5))
+    ck = tmp_path / "ck_epoch200.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "epoch": 200}, ck)
+
+    real_out = tmp_path / "real.json"
+    rc_real = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"vis00_s0_ms={ck}", "--checkpoints", f"vis00_s0_roll={ck}",
+         "--checkpoints", f"vis50_s0_ms={ck}", "--checkpoints", f"vis50_s0_roll={ck}",
+         "--out", str(real_out)],
+        capture_output=True, text=True,
+    )
+    assert rc_real.returncode == 0, rc_real.stderr
+
+    control_out = tmp_path / "control.json"
+    rc_control = subprocess.run(
+        [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+         "--checkpoints", f"randomdag_s0_ms={ck}", "--checkpoints", f"randomdag_s0_roll={ck}",
+         "--baselines-key", "baselines_randomdag", "--out", str(control_out)],
+        capture_output=True, text=True,
+    )
+    assert rc_control.returncode == 0, rc_control.stderr
+
+    real_result = json.loads(real_out.read_text())
+    control_result = json.loads(control_out.read_text())
+    assert "baselines" in real_result
+    assert "baselines_randomdag" in control_result
+    assert "baselines" not in control_result   # C4 #3: never the plain key for a control run
+
+    merged = merge_p2_scorer_outputs([real_result, control_result])
+    assert {"vis00_s0_ms", "vis00_s0_roll", "vis50_s0_ms", "vis50_s0_roll",
+           "randomdag_s0_ms", "randomdag_s0_roll"} <= set(merged["arms"])
+
+    v = p2_verdict(merged, seeds=(0,))
+    assert v["verdict"] in {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+    # the control's OWN measured floor (from control_result) is what the engine actually used --
+    # never silently falling back to the real tree's baselines block (C4 #3's whole point).
+    assert v["randomdag_sibling_chance_mean"] == pytest.approx(
+        control_result["baselines_randomdag"]["sibling_chance_mean"])

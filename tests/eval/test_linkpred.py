@@ -280,3 +280,85 @@ def test_return_clip_is_zero_on_the_cosine_path():
         emb, node=3, true_parent=1, candidates=np.array([1, 2]), metric="cosine", return_clip=True
     )
     assert clip_count == 0
+
+
+# --- C3 (review finding, 2026-09-24, p2_amendment_3_20260924): pool-size-1 queries are a free
+# win (rank=1, normalized_rank=0 unconditionally) and must be excluded from every ranking metric.
+
+
+def test_pool_size_one_queries_are_excluded_from_every_metric():
+    """LESION CHECK. Two trivial (pool size 1, therefore rank=1 unconditionally) queries plus one
+    genuine (pool size 10, rank=4) query. Reverting C3 (counting k=1 queries) drags mrr/hits_at_1/
+    normalized_rank toward the two free perfect scores; the fixed behaviour must equal the
+    metrics computed on the single real query ALONE."""
+    ranks = np.array([1, 1, 4])
+    n_candidates = np.array([1, 1, 10])
+    m = linkpred_metrics(ranks, n_candidates)
+    only_real = linkpred_metrics(np.array([4]), np.array([10]))
+    assert m["n"] == 3
+    assert m["n_trivial"] == 2
+    assert m["n_scored"] == 1
+    assert m["mrr"] == pytest.approx(only_real["mrr"]) == pytest.approx(0.25)
+    assert m["hits_at_1"] == pytest.approx(only_real["hits_at_1"]) == pytest.approx(0.0)
+    assert m["normalized_rank"] == pytest.approx(only_real["normalized_rank"]) == pytest.approx(1 / 3)
+    # the un-fixed (lesioned) computation this replaces: including the two free k=1 wins would
+    # have given mrr = (1 + 1 + 0.25) / 3 = 0.75, not 0.25 -- a completely different number.
+    assert m["mrr"] != pytest.approx((1 + 1 + 0.25) / 3)
+
+
+def test_pool_size_two_queries_are_not_treated_as_trivial():
+    """HEALTHY CASE. Pool size 2 is the smallest NON-trivial pool -- it must be counted normally,
+    not swept up by an overly broad exclusion (k <= 1, not k <= 2)."""
+    ranks = np.array([1, 2])
+    n_candidates = np.array([2, 2])
+    m = linkpred_metrics(ranks, n_candidates)
+    assert m["n_trivial"] == 0
+    assert m["n_scored"] == 2
+    assert m["mrr"] == pytest.approx((1.0 + 0.5) / 2)
+
+
+def test_metrics_are_all_nan_when_every_query_is_trivial():
+    """Edge case: an input made ENTIRELY of pool-size-1 queries must not divide by zero -- n_scored
+    is 0 and every ranking metric is NaN, not a fabricated 'perfect' 1.0."""
+    m = linkpred_metrics(np.array([1, 1, 1]), np.array([1, 1, 1]))
+    assert m["n"] == 3
+    assert m["n_trivial"] == 3
+    assert m["n_scored"] == 0
+    assert np.isnan(m["mrr"])
+    assert np.isnan(m["normalized_rank"])
+
+
+# --- I2 (review finding, 2026-09-24): stratify() must never let a scored query silently fall
+# outside every bin -- POOL_SIZE_BINS starting at (2, 2) is now a deliberate k=1 exclusion, and a
+# genuine gap must raise instead of quietly under-counting.
+
+
+def test_stratify_raises_when_a_scored_query_falls_outside_every_bin():
+    """LESION CHECK. Pool size 50 has no home in bins=[(2, 2)] -- a real gap, not the k=1
+    exclusion -- and assert_full_coverage=True must raise rather than silently drop it."""
+    ranks = np.array([1, 3])
+    n_candidates = np.array([2, 50])
+    key = np.array([2, 50])
+    with pytest.raises(ValueError, match="fall inside no bin"):
+        stratify(ranks, n_candidates, key, bins=[(2, 2)], assert_full_coverage=True)
+
+
+def test_stratify_stays_silent_when_bins_fully_cover_the_scored_set():
+    """HEALTHY CASE. The same pool-size-50 query IS covered once the bin list is complete."""
+    ranks = np.array([1, 3])
+    n_candidates = np.array([2, 50])
+    key = np.array([2, 50])
+    out = stratify(ranks, n_candidates, key, bins=[(2, 2), (3, 100)], assert_full_coverage=True)
+    assert out["2-2"]["n"] == 1
+    assert out["3-100"]["n"] == 1
+
+
+def test_stratify_full_coverage_does_not_count_trivial_pool_size_one_queries_as_a_gap():
+    """A pool-size-1 query outside every bin is an INTENTIONAL C3 exclusion, not the I2 gap --
+    assert_full_coverage=True must not raise over it."""
+    ranks = np.array([1, 1])
+    n_candidates = np.array([1, 5])
+    key = np.array([1, 5])
+    # bins cover pool size 5 but deliberately NOT pool size 1
+    out = stratify(ranks, n_candidates, key, bins=[(3, 10)], assert_full_coverage=True)
+    assert out["3-10"]["n"] == 1

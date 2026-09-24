@@ -48,8 +48,12 @@ export MKL_THREADING_LAYER=GNU
 # vis00 vs randomdag_vis00, vis50 vs randomdag_vis50, never crossed) use normalized_rank -- chance
 # is 0.5 for ANY pool size, which is what makes it comparable across vis00/vis50's real pools and
 # RandomDAG's collapsed-fan-out pools; within-tree comparisons (vis00 vs vis50; an arm vs its own
-# baselines.sibling_chance_mean) use MRR. Go through
-# src/taxembed/eval/preregistration.py::p2_verdict(result, seeds, amendment_1=True, amendment_2=True).
+# baselines.chance_mrr_mean, and, per p2_amendment_3_20260924, its own baselines.degree_prior) use
+# MRR. This job writes 9 SEPARATE JSON files (never one combined file) -- score with
+# scripts/apply_preregistration.py --task p2 --json <all 9 OUT_FILES> --amendment-1 --amendment-2,
+# which merges them (taxembed.eval.preregistration.merge_p2_scorer_outputs) before scoring. Go
+# through p2_verdict(result, seeds, amendment_1=True, amendment_2=True); never read a verdict off
+# these JSON files by hand.
 # =============================================================================
 
 SPLITDIR=/data/p2_splits
@@ -57,6 +61,10 @@ TAGS=/app/artifacts/tags
 OUTDIR=/app/artifacts/p2_scoring
 STAMP="$(date +%Y%m%d_%H%M%S)"
 SEEDS=(0 1 2)
+# C5 (2026-09-24, p2_amendment_3_20260924): build_p2_split.py's manifest records
+# manifest["source_npz"] as the absolute macOS build-time path -- it does not exist inside this
+# container. --closure overrides it explicitly with the container-mounted path instead.
+REAL_CLOSURE=/data/taxopy/metazoa_33208_clean/taxonomy_edges_metazoa_33208_clean_transitive.npz
 
 echo "=== TaxEmbed P2 Task 8 scoring -- 12-run array ==="
 echo "Job: ${SLURM_JOB_ID:-?}, Host: $(hostname)"
@@ -77,7 +85,10 @@ for s in "${SEEDS[@]}"; do
     # -------- real-tree pair: vis00 + vis50, same seed, same manifest/heldout --------
     REAL_MANIFEST="${SPLITDIR}/p2_metazoa_33208_clean_vis00_seed${s}_manifest.json"
     REAL_HELDOUT="${SPLITDIR}/p2_metazoa_33208_clean_seed${s}_heldout.npz"
-    for f in "${REAL_MANIFEST}" "${REAL_HELDOUT}"; do
+    # C5: pre-flight the closure too, not just the manifest and heldout -- a missing closure
+    # would otherwise only surface as FileNotFoundError deep inside score_p2_linkpred.py, after
+    # everything else already passed.
+    for f in "${REAL_MANIFEST}" "${REAL_HELDOUT}" "${REAL_CLOSURE}"; do
         if [ ! -f "${f}" ]; then
             echo "ERROR: missing ${f}" >&2
             exit 1
@@ -104,6 +115,7 @@ for s in "${SEEDS[@]}"; do
     python /app/scripts/score_p2_linkpred.py \
         --manifest "${REAL_MANIFEST}" \
         --heldout "${REAL_HELDOUT}" \
+        --closure "${REAL_CLOSURE}" \
         "${REAL_FLAGS[@]}" \
         --metric cosine \
         --seed 0 \
@@ -113,10 +125,16 @@ for s in "${SEEDS[@]}"; do
     # -------- RandomDAG: TWO matched controls, each its own visibility-tagged manifest, never
     # the real-tree pair and never each other's manifest (p2_amendment_2_20260924) --------
     RAND_HELDOUT="${SPLITDIR}/p2_metazoa_33208_clean_randomdag_seed${s}_heldout.npz"
-    if [ ! -f "${RAND_HELDOUT}" ]; then
-        echo "ERROR: missing ${RAND_HELDOUT}" >&2
-        exit 1
-    fi
+    # C5: the randomised closure build_p2_randomdag_split.py writes -- SHARED by randomdag_vis00
+    # and randomdag_vis50 at this seed (only the TRAIN split's visibility thinning differs
+    # between them; the closure itself depends only on --seed, not --visibility).
+    RAND_CLOSURE="${SPLITDIR}/taxonomy_edges_metazoa_33208_clean_randomdag_seed${s}_transitive.npz"
+    for f in "${RAND_HELDOUT}" "${RAND_CLOSURE}"; do
+        if [ ! -f "${f}" ]; then
+            echo "ERROR: missing ${f}" >&2
+            exit 1
+        fi
+    done
 
     for rand_arm in randomdag_vis00 randomdag_vis50; do
         RAND_MANIFEST="${SPLITDIR}/p2_metazoa_33208_clean_${rand_arm}_seed${s}_manifest.json"
@@ -134,14 +152,21 @@ for s in "${SEEDS[@]}"; do
             fi
         done
 
+        # C4 #3: --baselines-key writes this control's OWN floor under the key
+        # p2_verdict(..., amendment_2=True) reads (baselines_randomdag_vis00 /
+        # baselines_randomdag_vis50) instead of every invocation writing the same plain
+        # "baselines" key and the engine's fallback silently handing this control the REAL
+        # tree's floor.
         OUT_RAND="${OUTDIR}/p2_${rand_arm}_s${s}_${STAMP}.json"
         python /app/scripts/score_p2_linkpred.py \
             --manifest "${RAND_MANIFEST}" \
             --heldout "${RAND_HELDOUT}" \
+            --closure "${RAND_CLOSURE}" \
             --checkpoints "${rand_arm}_s${s}_ms=${dir}/${tag}_milestone_epoch*.pth" \
             --checkpoints "${rand_arm}_s${s}_roll=${dir}/${tag}_epoch*.pth" \
             --metric cosine \
             --seed 0 \
+            --baselines-key "baselines_${rand_arm}" \
             --out "${OUT_RAND}"
         OUT_FILES+=("${OUT_RAND}")
     done

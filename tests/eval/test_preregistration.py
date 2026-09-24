@@ -14,7 +14,8 @@ import pytest
 
 from taxembed.eval.linkpred import linkpred_metrics
 from taxembed.eval.preregistration import (
-    compare_arms, p2_validity_gate, p2_verdict, task8_verdict, task9_verdict, validity_gate,
+    P2_ROLL_WINDOW, compare_arms, merge_p2_scorer_outputs, p2_group_stats, p2_run_value,
+    p2_validity_gate, p2_verdict, task8_verdict, task9_verdict, validity_gate,
 )
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -323,12 +324,57 @@ def _p2_series(mrrs, epochs=None, losses=None, depths=None):
     return [_p2_ckpt(e, m, l, d) for e, m, l, d in zip(epochs, mrrs, losses, depths)]
 
 
-def _p2_result(groups: dict, sibling_chance_mean=0.20, randomdag_chance=None):
-    """groups: {arm_seed_key: [ckpt, ...]}"""
-    out = {"baselines": {"sibling_chance_mean": sibling_chance_mean},
-          "arms": {k: {"checkpoints": v} for k, v in groups.items()}}
+# C1/C2 default: a WEAK training-free baseline, comfortably below every existing fixture's
+# healthy final MRR (>= 0.10) -- so it is a no-op for old fixtures unless a test overrides it to
+# specifically exercise the new degree-prior clause (TestP2DegreePriorClause below).
+_DEFAULT_DEGREE_PRIOR = {"mrr": 0.03, "hits_at_1": 0.02, "hits_at_10": 0.06,
+                         "normalized_rank": 0.45, "n": 500, "n_scored": 500, "n_trivial": 0}
+
+
+def _p2_fanout_arms(groups: dict) -> dict:
+    """{arm_seed_key: [ckpt, ...]} -> {f'{key}_ms': {...}, f'{key}_roll': {...}}.
+
+    C4 #1 (2026-09-24, `p2_amendment_3_20260924`): production (`scripts/p2_lrz_score.sh`) splits
+    each run into TWO registered checkpoint groups, `*_ms` (milestones, epoch 10..200) and `*_roll`
+    (rolling checkpoints nearest epoch 200) -- mirrors Task 9's `_roll_key`/`_ms_key` convention.
+    Every P2 fixture builder below still describes ONE trajectory per arm+seed (unchanged); this
+    is the single place that fans it out into the two suffixed keys the engine now reads
+    (`_p2_roll_key`/`_p2_ms_key`), so no individual builder needed to change its own logic.
+    """
+    arms = {}
+    for key, ckpts in groups.items():
+        arms[f"{key}_ms"] = {"checkpoints": ckpts}
+        arms[f"{key}_roll"] = {"checkpoints": ckpts[-P2_ROLL_WINDOW:]}
+    return arms
+
+
+def _p2_baselines(sibling_chance_mean, chance_mrr_mean=None, degree_prior=None) -> dict:
+    """One baselines block, with the C1/C2 defaults described above `_DEFAULT_DEGREE_PRIOR`.
+
+    `chance_mrr_mean` defaults to `sibling_chance_mean` itself (2026-09-24): a caller not
+    exercising the C1/C2 distinction gets gate (b) behaving EXACTLY as before this fix (`per_run_
+    value > sibling_chance_mean`, since the two values are then numerically identical) -- the
+    default is a no-op, not a silent behaviour change, for every pre-existing fixture.
+    """
+    return {
+        "sibling_chance_mean": sibling_chance_mean,
+        "chance_mrr_mean": chance_mrr_mean if chance_mrr_mean is not None else sibling_chance_mean,
+        "degree_prior": degree_prior if degree_prior is not None else dict(_DEFAULT_DEGREE_PRIOR),
+    }
+
+
+def _p2_result(groups: dict, sibling_chance_mean=0.20, randomdag_chance=None,
+              chance_mrr_mean=None, degree_prior=None,
+              randomdag_chance_mrr_mean=None, randomdag_degree_prior=None):
+    """groups: {arm_seed_key: [ckpt, ...]} -- ONE trajectory per arm+seed, as before; fanned out
+    into `_ms`/`_roll` by `_p2_fanout_arms` (C4 #1) and given the C1/C2 baseline defaults above."""
+    out = {
+        "baselines": _p2_baselines(sibling_chance_mean, chance_mrr_mean, degree_prior),
+        "arms": _p2_fanout_arms(groups),
+    }
     if randomdag_chance is not None:
-        out["baselines_randomdag"] = {"sibling_chance_mean": randomdag_chance}
+        out["baselines_randomdag"] = _p2_baselines(
+            randomdag_chance, randomdag_chance_mrr_mean, randomdag_degree_prior)
     return out
 
 
@@ -379,11 +425,17 @@ def _p2_nine_arm_result(vis00_final, vis50_final, randomdag_final, sibling_chanc
 
 
 class TestP2ValidityGate:
+    """`p2_validity_gate(result, arm, seed, sibling_chance_mean, chance_mrr_mean)` (2026-09-24,
+    C4 #1: `arm_seed_key` split into `arm, seed`; I3: gate (a)'s anchor is now `chance_mrr_mean`,
+    not the run's own epoch-10 value, so every test below passes it explicitly, chosen per test
+    to reproduce the ORIGINAL intent (a self-referential anchor close to the fixture's own level
+    for the gate-a-focused tests; a low external anchor for the gate-b-focused/healthy-run tests)."""
+
     def test_gate_a_fires_on_a_dead_arm_with_realistic_jitter(self):
         """🛑 The Task 9 fixture bug, guarded against here: jitter must NOT be pinned to 0.0."""
         mrrs = _p2_dead(level=0.05, jitter=0.01, rng_seed=1)
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.02, chance_mrr_mean=0.05)
         assert g["jitter_sd"] > 0.0, "fixture must genuinely jitter, not sit at exactly one value"
         assert not g["gate_a_pass"]
         assert not g["valid"]
@@ -393,7 +445,7 @@ class TestP2ValidityGate:
         not failure to train, and must not fail gate (a)."""
         mrrs = [0.05, 0.30, 0.55, 0.70, 0.702, 0.699, 0.701, 0.698, 0.700]
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.02, chance_mrr_mean=0.02)
         assert g["gate_a_pass"]
         assert g["valid"]
 
@@ -402,17 +454,17 @@ class TestP2ValidityGate:
         let a trivial rise clear a threshold that collapsed to zero."""
         mrrs = [0.05, 0.05, 0.05, 0.06, 0.05, 0.05, 0.05, 0.05, 0.05]   # spike OUTSIDE the roll
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.02, chance_mrr_mean=0.05)
         assert g["jitter_sd"] == 0.0
         assert g["gate_a_rise"] > 0.0                  # there IS a rise
         assert not g["gate_a_pass"]                    # but it must not pass on that alone
         assert not g["valid"]
 
-    def test_gate_b_fires_when_mrr_sits_at_sibling_chance(self):
+    def test_gate_b_fires_when_mrr_sits_at_chance_mrr_mean(self):
         mrrs = _p2_healthy(final_mrr=0.20, init_mrr=0.05, rng_seed=2)
         chance = float(np.mean(mrrs[-5:]))              # per_run_value lands EXACTLY at chance
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=chance)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.05, chance_mrr_mean=chance)
         assert g["per_run_value"] == pytest.approx(chance)
         assert not g["gate_b_pass"]
         assert not g["valid"]
@@ -420,21 +472,21 @@ class TestP2ValidityGate:
     def test_gate_b_stays_silent_when_clearly_above_chance(self):
         mrrs = _p2_healthy(final_mrr=0.60, init_mrr=0.05, rng_seed=2)
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.20)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.20, chance_mrr_mean=0.20)
         assert g["gate_b_pass"]
 
     def test_gate_c_fires_when_the_final_checkpoint_is_missing(self):
         mrrs = _p2_healthy(final_mrr=0.60, rng_seed=2)
         ckpts = [c for c in _p2_series(mrrs) if c["epoch"] != 200]
         res = _p2_result({"vis00_s0": ckpts})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.05, chance_mrr_mean=0.05)
         assert not g["gate_c_pass"]
         assert not g["valid"]
 
     def test_gate_c_stays_silent_when_the_final_checkpoint_is_present(self):
         mrrs = _p2_healthy(final_mrr=0.60, rng_seed=2)
         res = _p2_result({"vis00_s0": _p2_series(mrrs)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.05, chance_mrr_mean=0.05)
         assert g["gate_c_pass"]
 
     def test_a_rising_training_loss_alone_does_NOT_invalidate_a_run(self):
@@ -445,7 +497,7 @@ class TestP2ValidityGate:
         n = len(mrrs)
         rising_loss = [3.90 + (4.02 - 3.90) * (i / (n - 1)) for i in range(n)]
         res = _p2_result({"vis00_s0": _p2_series(mrrs, losses=rising_loss)})
-        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.05, chance_mrr_mean=0.05)
         assert g["gate_a_pass"] and g["gate_b_pass"] and g["gate_c_pass"]
         assert g["valid"]
         # and the rising loss is nowhere in the gate's own reasoning:
@@ -476,8 +528,9 @@ class TestP2Verdict:
         including a failure on the RandomDAG control, not only on a data arm."""
         res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
                                   sibling_chance=0.05)
-        res["arms"]["randomdag_s1"]["checkpoints"] = [
-            c for c in res["arms"]["randomdag_s1"]["checkpoints"] if c["epoch"] != 200]
+        # gate (c) reads the milestone (`_ms`) trajectory (C4 #1) -- remove epoch 200 from there.
+        res["arms"]["randomdag_s1_ms"]["checkpoints"] = [
+            c for c in res["arms"]["randomdag_s1_ms"]["checkpoints"] if c["epoch"] != 200]
         v = p2_verdict(res)
         assert v["verdict"] == "UNINFORMATIVE"
         assert "randomdag_s1" in v["control"]["invalid_runs"]
@@ -489,7 +542,8 @@ class TestP2Verdict:
         res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
                                   sibling_chance=0.05)
         for s in (0, 1, 2):
-            ckpts = res["arms"][f"vis00_s{s}"]["checkpoints"]
+            # `_p2_depth_means` reads the epoch-200 checkpoint off the `_ms` trajectory (C4 #1).
+            ckpts = res["arms"][f"vis00_s{s}_ms"]["checkpoints"]
             final = next(c for c in ckpts if c["epoch"] == 200)
             # below EVERY randomdag seed's own "22-28" value (~0.10-0.11) in this stratum only
             final["by_depth"]["cosine"]["22-28"] = {"n": 800, "mrr": 0.02}
@@ -503,7 +557,7 @@ class TestP2Verdict:
         res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
                                   sibling_chance=0.05)
         for s in (0, 1, 2):
-            ckpts = res["arms"][f"vis00_s{s}"]["checkpoints"]
+            ckpts = res["arms"][f"vis00_s{s}_ms"]["checkpoints"]
             final = next(c for c in ckpts if c["epoch"] == 200)
             final["by_depth"]["cosine"]["22-28"] = {"n": 12, "mrr": -5.0}   # would flip the sign
         v = p2_verdict(res)
@@ -516,7 +570,11 @@ class TestP2Verdict:
         differ from the real-tree arms' -- `baselines_randomdag` must be read when present."""
         res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
                                   sibling_chance=0.05)
-        res["baselines_randomdag"] = {"sibling_chance_mean": 0.30}   # randomdag now AT its floor
+        # randomdag now AT its floor -- chance_mrr_mean/degree_prior are REQUIRED keys (C1/C2:
+        # p2_group_stats reads them directly, no silent fallback), so a hand-authored override
+        # must supply them too, not just sibling_chance_mean.
+        res["baselines_randomdag"] = {"sibling_chance_mean": 0.30, "chance_mrr_mean": 0.30,
+                                      "degree_prior": dict(_DEFAULT_DEGREE_PRIOR)}
         v = p2_verdict(res)
         assert v["verdict"] == "UNINFORMATIVE"
         assert any(a.startswith("randomdag_") for a in v["control"]["invalid_runs"])
@@ -580,9 +638,9 @@ def _p2_decoupled_result(vis00, vis50, randomdag, sibling_chance, randomdag_chan
                 nr_final=max(1e-6, nr_final - i * seed_offset_nr),
                 rng_seed=base_seed + s)
     return {
-        "baselines": {"sibling_chance_mean": sibling_chance},
-        "baselines_randomdag": {"sibling_chance_mean": randomdag_chance},
-        "arms": {k: {"checkpoints": v} for k, v in groups.items()},
+        "baselines": _p2_baselines(sibling_chance),
+        "baselines_randomdag": _p2_baselines(randomdag_chance),
+        "arms": _p2_fanout_arms(groups),
     }
 
 
@@ -731,8 +789,10 @@ class TestP2Amendment2:
         # `randomdag_vis00` carries the STRONG data -- the wrong pairing, by construction.
         cross = json.loads(json.dumps(matched_source))
         for s in (0, 1, 2):
-            key_a, key_b = f"randomdag_vis00_s{s}", f"randomdag_vis50_s{s}"
-            cross["arms"][key_a], cross["arms"][key_b] = cross["arms"][key_b], cross["arms"][key_a]
+            for suffix in ("_ms", "_roll"):     # C4 #1: swap BOTH registered checkpoint groups
+                key_a = f"randomdag_vis00_s{s}{suffix}"
+                key_b = f"randomdag_vis50_s{s}{suffix}"
+                cross["arms"][key_a], cross["arms"][key_b] = cross["arms"][key_b], cross["arms"][key_a]
         v_cross = p2_verdict(cross, amendment_2=True)
 
         assert v_cross["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
@@ -745,8 +805,8 @@ class TestP2Amendment2:
         res = _p2_twelve_arm_result(vis00_final=0.55, vis50_final=0.50,
                                     randomdag_vis00_final=0.10, randomdag_vis50_final=0.10,
                                     sibling_chance=0.05)
-        res["arms"]["randomdag_vis50_s1"]["checkpoints"] = [
-            c for c in res["arms"]["randomdag_vis50_s1"]["checkpoints"] if c["epoch"] != 200]
+        res["arms"]["randomdag_vis50_s1_ms"]["checkpoints"] = [
+            c for c in res["arms"]["randomdag_vis50_s1_ms"]["checkpoints"] if c["epoch"] != 200]
         v = p2_verdict(res, amendment_2=True)
         assert v["verdict"] == "UNINFORMATIVE"
         assert "randomdag_vis50_s1" in v["meaning"]
@@ -831,3 +891,208 @@ class TestP2PreregistrationArtifact:
         assert len(prereg["declared_confounds"]) == 4
         assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
         assert "5.403" in json.dumps(prereg["p2_amendment_1_20260924"])
+
+
+## ------------------------------------------------------------------------------------------
+## p2_amendment_3_20260924 review-finding fixes: C1 (degree prior), C2 (chance_mrr_mean anchor),
+## I3 (gate (a)'s anchor), C4 (merge_p2_scorer_outputs). Each class below fires on the lesion
+## (the exact old behaviour the fix replaces) and stays silent on the healthy/control case.
+
+
+class TestP2DegreePriorClause:
+    """C1: GENERALISES must require beating the training-free degree prior, not merely chance."""
+
+    def test_a_strong_degree_prior_blocks_generalises(self):
+        """LESION CHECK. The SAME fixture the pre-C1 suite already reads as GENERALISES -- but
+        with the degree prior's OWN MRR set above the arms' MRR, so a model doing no better than
+        the prior must NOT read GENERALISES. Reverting the C1 clause (dropping `above_degree_
+        prior` from the verdict condition) makes this test fail."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        res["baselines"]["degree_prior"] = {"mrr": 0.60, "hits_at_1": 0.5, "hits_at_10": 0.8,
+                                            "normalized_rank": 0.1, "n": 500}
+        v = p2_verdict(res)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "MEMORISES"
+        assert v["by_arm_verdict"]["vis00"]["above_degree_prior"] is False
+
+    def test_a_weak_degree_prior_does_not_block_generalises(self):
+        """HEALTHY CASE. The default weak degree prior (well below the arms' MRR) must not
+        interfere with an otherwise-clean GENERALISES reading."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        v = p2_verdict(res)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["above_degree_prior"] is True
+
+    def test_amendment_1_normalized_rank_branch_also_requires_beating_the_degree_prior(self):
+        """The SAME clause applies to the amendment_1 (normalized_rank, cross-tree) reading --
+        C1 is not specific to raw MRR."""
+        res = _p2_decoupled_result(
+            vis00=(0.38, 0.21), vis50=(0.39, 0.19), randomdag=(0.40, 0.54),
+            sibling_chance=0.05, randomdag_chance=0.27)
+        res["baselines"]["degree_prior"] = {"mrr": 0.03, "hits_at_1": 0.02, "hits_at_10": 0.06,
+                                            "normalized_rank": 0.05,  # BELOW vis00's own ~0.21
+                                            "n": 500}
+        v = p2_verdict(res, amendment_1=True)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] != "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["below_degree_prior"] is False
+
+
+class TestP2ChanceMRRGateAnchor:
+    """C2: gate (b) must compare against chance_mrr_mean (= mean(H_k/k), the correct chance
+    level for MRR), not sibling_chance_mean (= mean(1/k), the chance level for hits@1)."""
+
+    def test_gate_b_fails_a_run_between_the_two_chance_rates(self):
+        """LESION CHECK. per_run_value (~0.15) clears the OLD anchor (sibling_chance_mean=0.10)
+        but sits BELOW the correct one (chance_mrr_mean=0.25). Reverting C2 (gate (b) reading
+        sibling_chance_mean again) makes gate_b wrongly PASS this run."""
+        mrrs = _p2_healthy(final_mrr=0.15, init_mrr=0.05, jitter=0.001, rng_seed=3)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.10, chance_mrr_mean=0.25)
+        assert g["per_run_value"] > 0.10          # clears the OLD (wrong) anchor
+        assert g["per_run_value"] < 0.25          # but not the CORRECT one
+        assert not g["gate_b_pass"]
+
+    def test_gate_b_passes_a_run_above_both_chance_rates(self):
+        """HEALTHY CASE: a run comfortably above BOTH chance rates passes regardless of which
+        one gates it -- proving the fix doesn't just tighten every gate indiscriminately."""
+        mrrs = _p2_healthy(final_mrr=0.60, init_mrr=0.05, jitter=0.001, rng_seed=3)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.10, chance_mrr_mean=0.25)
+        assert g["gate_b_pass"]
+
+
+class TestP2GateAAnchorIsChanceMRR:
+    """I3: gate (a)'s rise is anchored on chance_mrr_mean, not the run's own epoch-10 value --
+    epoch 10 already reflects SOME training and is not a genuine 'untrained' baseline."""
+
+    def test_a_warm_started_run_passes_gate_a_only_once_anchored_on_chance(self):
+        """LESION CHECK. Every milestone checkpoint sits close together (0.50-0.55) -- a
+        'warm-started' trajectory with almost no rise from ITS OWN epoch-10 value, which would
+        give only a small rise under the OLD (epoch-10) anchor despite the model clearly
+        performing far above chance throughout."""
+        mrrs = [0.50, 0.51, 0.515, 0.52, 0.525, 0.53, 0.535, 0.54, 0.55]
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.05, chance_mrr_mean=0.05)
+        old_style_rise = max(mrrs) - mrrs[0]              # the OLD (epoch-10) anchor's rise
+        assert g["gate_a_rise"] > old_style_rise * 5       # the NEW anchor gives a far bigger one
+        assert g["gate_a_pass"]
+
+    def test_a_run_with_no_rise_above_chance_still_fails_gate_a(self):
+        """HEALTHY / control direction: a run that never separates from chance_mrr_mean at all
+        must still fail gate (a) even under the new anchor -- the anchor changed, not the logic
+        that a genuine lack of rise fails it."""
+        mrrs = _p2_dead(level=0.05, jitter=0.005, rng_seed=7)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00", 0, sibling_chance_mean=0.02, chance_mrr_mean=0.05)
+        assert not g["gate_a_pass"]
+
+
+class TestMergeP2ScorerOutputs:
+    """C4 #2/#3: `scripts/p2_lrz_score.sh` writes 9 SEPARATE JSON files; `merge_p2_scorer_
+    outputs` combines them into the single dict `p2_verdict` expects, keeping each control's OWN
+    baselines key distinct (never falling back to the real tree's floor for a control that has
+    one of its own)."""
+
+    def test_merge_combines_disjoint_arms_from_multiple_files(self):
+        a = {"baselines": {"sibling_chance_mean": 0.1}, "arms": {"vis00_s0_ms": {"checkpoints": []}}}
+        b = {"baselines": {"sibling_chance_mean": 0.1}, "arms": {"vis50_s0_ms": {"checkpoints": []}}}
+        merged = merge_p2_scorer_outputs([a, b])
+        assert set(merged["arms"]) == {"vis00_s0_ms", "vis50_s0_ms"}
+
+    def test_merge_raises_on_a_duplicate_arm_key(self):
+        """LESION CHECK. Two files claiming the SAME arm+seed+kind key must never silently drop
+        one -- that would mean a real run vanishes from the merged verdict without a trace."""
+        a = {"baselines": {}, "arms": {"vis00_s0_ms": {"checkpoints": [1]}}}
+        b = {"baselines": {}, "arms": {"vis00_s0_ms": {"checkpoints": [2]}}}
+        with pytest.raises(ValueError, match="duplicate arm key"):
+            merge_p2_scorer_outputs([a, b])
+
+    def test_merge_keeps_each_controls_own_baselines_key_distinct(self):
+        """C4 #3, LESION CHECK direction if reverted: a real-tree file and a matched-control
+        file, each carrying its OWN baselines key (as `--baselines-key` now writes), must both
+        survive the merge distinctly -- never collapsing the control onto the real tree's floor."""
+        real = {"baselines": {"sibling_chance_mean": 0.05}, "arms": {"vis00_s0_ms": {}}}
+        control = {"baselines_randomdag_vis00": {"sibling_chance_mean": 0.30},
+                  "arms": {"randomdag_vis00_s0_ms": {}}}
+        merged = merge_p2_scorer_outputs([real, control])
+        assert merged["baselines"]["sibling_chance_mean"] == 0.05
+        assert merged["baselines_randomdag_vis00"]["sibling_chance_mean"] == 0.30
+
+    def test_merge_records_a_disagreement_instead_of_silently_picking_one(self):
+        """HEALTHY CASE: two files' baselines blocks under the SAME key disagreeing (e.g. two
+        seeds' own splits) does not raise, but is recorded, not silently overwritten or averaged."""
+        a = {"baselines": {"sibling_chance_mean": 0.05}, "arms": {}}
+        b = {"baselines": {"sibling_chance_mean": 0.06}, "arms": {}}
+        merged = merge_p2_scorer_outputs([a, b])
+        assert merged["baselines"]["sibling_chance_mean"] == 0.05      # first (seed 0) wins
+        assert merged["_baselines_disagreements"]["baselines"] == [{"sibling_chance_mean": 0.06}]
+
+    def test_merged_output_feeds_p2_verdict_without_a_keyerror(self):
+        """End-to-end: build a merged result from SEPARATE per-file baselines blocks (mirroring
+        scripts/p2_lrz_score.sh's real-pair-file + matched-control-file split), and confirm
+        p2_verdict reads it straight through -- the exact shape C4 exists to make loadable."""
+        real = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                   sibling_chance=0.05)
+        real_only = {"baselines": real["baselines"],
+                    "arms": {k: v for k, v in real["arms"].items()
+                             if not k.startswith("randomdag")}}
+        control_only = {"baselines_randomdag": real["baselines"],
+                       "arms": {k: v for k, v in real["arms"].items()
+                                if k.startswith("randomdag")}}
+        merged = merge_p2_scorer_outputs([real_only, control_only])
+        v = p2_verdict(merged)
+        assert v["verdict"] in {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+
+
+class TestP2Amendment3Artifact:
+    """The frozen JSON's p2_amendment_3_20260924 block must state what the task requires, not
+    just this session's prose -- mirrors TestP2PreregistrationArtifact's pattern for amendments
+    1/2."""
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_3_20260924" in prereg
+        status = prereg["p2_amendment_3_20260924"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "before any p2 outcome data" in status
+        assert "review finding" in status
+        assert "2026-09-24" in prereg["p2_amendment_3_20260924"]["status"]
+
+    def test_states_amendment_1_rule_1_was_wrong_at_k_equals_one(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_3_20260924"]["c3_pool_size_one_exclusion"])
+        assert "rule_1" in blob
+        assert "0.5" in blob
+        assert "k=1" in blob or "pool-size-1" in blob or "pool size 1" in blob
+
+    def test_states_gate_b_compared_mrr_to_a_hits_at_1_chance_rate(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_3_20260924"]["c2_chance_mrr_mean"]).lower()
+        assert "hits@1" in blob or "hits_at_1" in blob
+        assert "chance_mrr_mean" in blob
+
+    def test_states_the_degree_prior_is_a_declared_baseline_the_arm_must_beat(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_3_20260924"]["c1_degree_prior_baseline"]).lower()
+        assert "degree_prior" in blob
+        assert "generalises" in blob
+        assert "memorises" in blob
+
+    def test_states_metrics_poincare_is_not_independent_corroboration(self, prereg):
+        block = prereg["p2_amendment_3_20260924"]["metrics_poincare_is_not_independent_corroboration"]
+        blob = json.dumps(block).lower()
+        assert "not independent corroboration" in blob or "not merely correlated" in blob
+        assert "monoton" in blob
+        # honesty: this session made no training run, so it must say so, not imply otherwise.
+        assert "not on a real trained checkpoint" in blob or "no training run" in blob
+
+    def test_frozen_block_and_earlier_amendments_are_untouched(self, prereg):
+        """Additive-only: re-check the frozen block's own invariants (mirrors the equivalent
+        amendment_1/amendment_2 tests) to guard against amendment_3 having edited anything in
+        place instead of adding a new top-level key."""
+        assert len(prereg["declared_confounds"]) == 4
+        assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+        assert "5.403" in json.dumps(prereg["p2_amendment_1_20260924"])
+        assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])

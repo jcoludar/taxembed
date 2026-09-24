@@ -2,7 +2,12 @@
 
   <python> scripts/apply_preregistration.py --task 9 --json <seeds_*.json> --out <verdict.json>
   <python> scripts/apply_preregistration.py --task 8 --json <task8_seeds_*.json> --out <verdict.json>
-  <python> scripts/apply_preregistration.py --task p2 --json <p2_scores_*.json> --out <verdict.json>
+  <python> scripts/apply_preregistration.py --task p2 --json <p2_real_s0.json> <p2_randomdag_vis00_s0.json> ... \
+      --amendment-1 --amendment-2 --out <verdict.json>
+      # --task p2 accepts ONE OR MORE --json paths (scripts/p2_lrz_score.sh writes 9 separate
+      # files, never one combined file) and merges them via
+      # taxembed.eval.preregistration.merge_p2_scorer_outputs before scoring. --task 8/9 still
+      # expect exactly one combined file.
 
 The decision logic lives in src/taxembed/eval/preregistration.py and was written and tested
 BEFORE any array result was visible (tests/eval/test_preregistration.py). This script only routes
@@ -20,7 +25,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "src"))
 
 from taxembed.eval.preregistration import (  # noqa: E402
-    p2_verdict, task8_verdict, task9_verdict,
+    merge_p2_scorer_outputs, p2_verdict, task8_verdict, task9_verdict,
 )
 
 
@@ -132,8 +137,13 @@ def _render_p2(v: dict) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="apply a frozen pre-registration to a scorer output")
     ap.add_argument("--task", choices=["8", "9", "p2"], required=True)
-    ap.add_argument("--json", required=True, help="scorer output (score_recipe_checkpoints.py "
-                    "for tasks 8/9, score_p2_linkpred.py for p2)")
+    ap.add_argument("--json", required=True, nargs="+",
+                    help="scorer output (score_recipe_checkpoints.py for tasks 8/9, "
+                         "score_p2_linkpred.py for p2). --task p2 accepts MULTIPLE paths (C4: "
+                         "scripts/p2_lrz_score.sh writes 9 separate JSON files, one per seed x "
+                         "{real vis00/vis50 pair, randomdag_vis00, randomdag_vis50}) and merges "
+                         "them via taxembed.eval.preregistration.merge_p2_scorer_outputs before "
+                         "scoring; tasks 8/9 still expect exactly one combined file.")
     ap.add_argument("--out", help="write the verdict JSON here")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--amendment-2", action="store_true",
@@ -150,19 +160,24 @@ def main() -> None:
                          "instead of raw MRR). No-op for --task 8/9.")
     args = ap.parse_args()
 
-    result = json.loads(Path(args.json).read_text())
     seeds = tuple(int(x) for x in args.seeds.split(","))
 
     if args.task == "p2":
+        results = [json.loads(Path(p).read_text()) for p in args.json]
+        result = merge_p2_scorer_outputs(results) if len(results) > 1 else results[0]
         verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1,
                              amendment_2=args.amendment_2)
         render = _render_p2
     else:
+        if len(args.json) != 1:
+            raise SystemExit(f"--task {args.task} expects exactly one --json file, got "
+                             f"{len(args.json)}")
+        result = json.loads(Path(args.json[0]).read_text())
         verdict = (task9_verdict if args.task == "9" else task8_verdict)(
             result, seeds, args.amendment_2)
         verdict["amendment_2_applied"] = bool(args.amendment_2)
         render = _render
-    verdict["scored_from"] = str(Path(args.json).resolve())
+    verdict["scored_from"] = ", ".join(str(Path(p).resolve()) for p in args.json)
     render(verdict)
     if args.out:
         out = Path(args.out)
