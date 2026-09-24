@@ -2,11 +2,12 @@
 
   <python> scripts/apply_preregistration.py --task 9 --json <seeds_*.json> --out <verdict.json>
   <python> scripts/apply_preregistration.py --task 8 --json <task8_seeds_*.json> --out <verdict.json>
+  <python> scripts/apply_preregistration.py --task p2 --json <p2_scores_*.json> --out <verdict.json>
 
 The decision logic lives in src/taxembed/eval/preregistration.py and was written and tested
-BEFORE any array result was visible (tests/eval/test_preregistration.py, 20 cases). This script
-only routes a file into it and renders the result, so that reading the verdict cannot become
-an occasion for re-deciding what the verdict rule was.
+BEFORE any array result was visible (tests/eval/test_preregistration.py). This script only routes
+a file into it and renders the result, so that reading the verdict cannot become an occasion for
+re-deciding what the verdict rule was.
 """
 from __future__ import annotations
 
@@ -18,7 +19,9 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "src"))
 
-from taxembed.eval.preregistration import task8_verdict, task9_verdict  # noqa: E402
+from taxembed.eval.preregistration import (  # noqa: E402
+    p2_verdict, task8_verdict, task9_verdict,
+)
 
 
 def _render(v: dict) -> None:
@@ -77,22 +80,67 @@ def _render(v: dict) -> None:
         print(f"    {v['attribution']}")
 
 
+def _render_p2(v: dict) -> None:
+    print(f"\n=== {v['task']} ===")
+    print(f"pre-registration: {'; '.join(v['preregistration'])}")
+    print(f"\nsibling_chance_mean (real tree) {v['sibling_chance_mean']:.4f}   "
+          f"(RandomDAG) {v['randomdag_sibling_chance_mean']:.4f}")
+
+    print(f"\nvalidity gates (a) learning (b) floor (c) completion -- "
+          f"any failing => UNINFORMATIVE, no direction read")
+    for group_name, g in {**v["groups"], "randomdag": v["control"]}.items():
+        for gate in g["gates"]:
+            mark = "PASS" if gate["valid"] else "FAIL"
+            print(f"  [{mark}] {gate['arm']}  per_run_value {gate['per_run_value']:.4f}  "
+                  f"rise {gate['gate_a_rise']:+.4f} vs {gate['gate_a_threshold']:.4f} "
+                  f"({'ok' if gate['gate_a_pass'] else 'FAILED'})  |  "
+                  f"floor ({'ok' if gate['gate_b_pass'] else 'FAILED'})  |  "
+                  f"epoch200 scored ({'ok' if gate['gate_c_pass'] else 'FAILED'})")
+
+    if v["verdict"] != "UNINFORMATIVE":
+        for name, r in v["by_arm_verdict"].items():
+            print(f"\n{name}: {r['verdict']}")
+            print(f"  margin above chance {r['margin_above_chance']:+.4f} "
+                  f"vs threshold {r['margin_threshold']:.4f} "
+                  f"({'ok' if r['above_chance_margin'] else 'FAILED'})")
+            print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
+                  f"equivalent to RandomDAG: {r['equivalent_to_control']}")
+            d = r["depth_strata"]
+            print(f"  depth strata ({name} - randomdag): {d['n_strata']} strata, "
+                  f"sign consistent {r['sign_consistent']}")
+            if d["dropped_below_min_n"]:
+                print(f"    dropped below n>=500: {d['dropped_below_min_n']}")
+
+    print(f"\n>>> VERDICT: {v['verdict']}")
+    print(f"    {v['meaning']}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="apply a frozen pre-registration to a scorer output")
-    ap.add_argument("--task", choices=["8", "9"], required=True)
-    ap.add_argument("--json", required=True, help="score_recipe_checkpoints.py output")
+    ap.add_argument("--task", choices=["8", "9", "p2"], required=True)
+    ap.add_argument("--json", required=True, help="scorer output (score_recipe_checkpoints.py "
+                    "for tasks 8/9, score_p2_linkpred.py for p2)")
     ap.add_argument("--out", help="write the verdict JSON here")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--amendment-2", action="store_true",
-                    help="apply preregistration_v2_amendment_2_20260924 (gate b: loss must not RISE)")
+                    help="tasks 8/9 only: apply preregistration_v2_amendment_2_20260924 "
+                         "(gate b: loss must not RISE). P2 has no loss gate at all -- this flag "
+                         "is a no-op for --task p2.")
     args = ap.parse_args()
 
     result = json.loads(Path(args.json).read_text())
     seeds = tuple(int(x) for x in args.seeds.split(","))
-    verdict = (task9_verdict if args.task == "9" else task8_verdict)(result, seeds, args.amendment_2)
-    verdict["amendment_2_applied"] = bool(args.amendment_2)
+
+    if args.task == "p2":
+        verdict = p2_verdict(result, seeds)
+        render = _render_p2
+    else:
+        verdict = (task9_verdict if args.task == "9" else task8_verdict)(
+            result, seeds, args.amendment_2)
+        verdict["amendment_2_applied"] = bool(args.amendment_2)
+        render = _render
     verdict["scored_from"] = str(Path(args.json).resolve())
-    _render(verdict)
+    render(verdict)
     if args.out:
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)

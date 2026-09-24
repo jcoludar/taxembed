@@ -247,6 +247,258 @@ def task9_verdict(result: dict, seeds=(0, 1, 2), amendment_2: bool = False) -> d
     }
 
 
+## ---------------------------------------------------------------------------------------------
+## P2: held-out link prediction, real taxonomy vs RandomDAG (results/p2_heldout_preregistration.json)
+##
+## P2's gates are DIFFERENT IN KIND from task8/9's, and deliberately so (see the JSON's
+## `validity_gate` for the full reasoning): there is NO training-loss gate here at all. The
+## engine above (`validity_gate`, `compare_arms`) exists to gate a training-loss proxy that failed
+## twice for two different reasons -- Task 9 could not tell a converged arm from a never-trained
+## one on flat loss, and amendment 2's fix was then blind to Task 8's fixed arm, whose loss ROSE
+## while its S_angle simultaneously rose (the model was improving). P2 gates directly on the
+## quantity of interest (MRR) and on a fact about the run (did epoch 200 get scored), never on
+## loss, so it needs its own gate and comparison engine below rather than reusing `validity_gate`.
+##
+## Consumes the Task 6 JSON (scripts/score_p2_linkpred.py): `result["arms"][f"{group}_s{seed}"]
+## ["checkpoints"]` is a list of per-checkpoint dicts (epoch, trainer.loss, metrics/metrics_cosine
+## with an "mrr" field, by_depth["cosine"][stratum] with "n"/"mrr"), and `result["baselines"]
+## ["sibling_chance_mean"]` is the chance floor for the REAL-tree arms (vis00, vis50). The
+## RandomDAG arm rewires parent assignments (Task 5), which changes grandparent fan-out and
+## therefore CAN change its own sibling-chance floor even though depth is preserved exactly -- if
+## RandomDAG was scored against its own randomised manifest in a separate invocation, its own
+## floor belongs under `result["baselines_randomdag"]["sibling_chance_mean"]`; when that key is
+## absent, `p2_group_stats` falls back to the shared `baselines` block. That fallback is a stated
+## simplifying assumption, not a silent one -- flag it if RandomDAG's real floor differs.
+
+P2_ROLL_WINDOW = 5                # trailing scored checkpoints define the per-run value + its jitter
+P2_FINAL_EPOCH = 200              # the declared final checkpoint; gate (c) requires it be present
+P2_GATE_A_JITTER_MULTIPLE = 10    # max_t MRR(t) - MRR(init) > 10 x within-run jitter SD
+P2_FLOOR_SD_MULTIPLE = 2          # "above sibling_chance_mean by >= 2x pooled within-arm seed SD"
+P2_EQUIV_FLOOR = 0.01             # equivalence-vs-RandomDAG band floor, mirrors EQUIV_FLOOR above
+P2_MIN_STRATUM_N = 500
+P2_DATA_ARMS = ("vis00", "vis50")
+P2_CONTROL_ARM = "randomdag"
+
+
+def _p2_checkpoints(result: dict, arm_seed_key: str) -> list[dict]:
+    ckpts = result["arms"][arm_seed_key]["checkpoints"]
+    return sorted(ckpts, key=lambda c: int(c["epoch"]))
+
+
+def _p2_mrr(ckpt: dict) -> float:
+    """The primary (cosine) MRR for one checkpoint.
+
+    Prefers the explicit `metrics_cosine` block over the un-suffixed `metrics` alias so this
+    reads correctly even if a JSON was produced with `--metric poincare` by mistake (Ruling 3:
+    P2's primary metric is cosine BY DESIGN, not by whatever flag the invocation happened to use --
+    see the candidate-pool depth-homogeneity argument in the pre-registration's `metrics.
+    primary_reason`).
+    """
+    block = ckpt.get("metrics_cosine", ckpt["metrics"])
+    return float(block["mrr"])
+
+
+def p2_run_value(result: dict, arm_seed_key: str) -> dict:
+    """One run's MRR trajectory, its per-run value, and its within-run jitter.
+
+    `mrr_init` is the primary MRR at the EARLIEST scored checkpoint in this run's own trajectory.
+    P2's scorer (unlike the S_angle engine's `init_null`) records no separate untrained-embedding
+    baseline, so the run's own first checkpoint stands in for it -- gate (a) below is defined on
+    the run's OWN trajectory for exactly this reason.
+
+    `per_run_value` is the mean MRR over the trailing `P2_ROLL_WINDOW` scored checkpoints (mirrors
+    the S_angle rolling-window convention), with `jitter_sd` its SD -- the noise floor gate (a)
+    measures a rise against.
+    """
+    ckpts = _p2_checkpoints(result, arm_seed_key)
+    if not ckpts:
+        raise ValueError(f"{arm_seed_key}: no checkpoints scored")
+    epochs = [int(c["epoch"]) for c in ckpts]
+    mrrs = np.array([_p2_mrr(c) for c in ckpts], dtype=float)
+    roll = mrrs[-P2_ROLL_WINDOW:]
+    return {
+        "arm": arm_seed_key,
+        "n_checkpoints": len(ckpts),
+        "epochs": epochs,
+        "mrr_series": mrrs.tolist(),
+        "mrr_init": float(mrrs[0]),
+        "mrr_max": float(mrrs.max()),
+        "per_run_value": float(roll.mean()),
+        "jitter_sd": float(roll.std(ddof=1)) if len(roll) > 1 else float("nan"),
+        "final_epoch_present": bool(P2_FINAL_EPOCH in epochs),
+    }
+
+
+def p2_validity_gate(result: dict, arm_seed_key: str, sibling_chance_mean: float) -> dict:
+    """(a) learning, on MRR's own trajectory; (b) floor, vs sibling chance; (c) completion, epoch
+    200 scored. NO loss gate -- see the module-level comment above and the JSON's `validity_gate`.
+
+    Gate (a) explicitly FAILS on a zero or non-finite jitter SD rather than letting it collapse
+    the `10 x jitter` threshold to zero and pass any positive rise: a real run always jitters, and
+    a fixture (or a genuinely dead arm) pinned to exactly one value is the degenerate case this
+    project's own test suite was once fooled by.
+    """
+    rv = p2_run_value(result, arm_seed_key)
+    rise = rv["mrr_max"] - rv["mrr_init"]
+    jitter = rv["jitter_sd"]
+    gate_a = bool(np.isfinite(jitter) and jitter > 0.0
+                  and rise > P2_GATE_A_JITTER_MULTIPLE * jitter)
+    gate_b = bool(rv["per_run_value"] > sibling_chance_mean)
+    gate_c = bool(rv["final_epoch_present"])
+    return {
+        **rv,
+        "sibling_chance_mean": float(sibling_chance_mean),
+        "gate_a_rise": float(rise),
+        "gate_a_threshold": (float(P2_GATE_A_JITTER_MULTIPLE * jitter)
+                             if np.isfinite(jitter) else float("nan")),
+        "gate_a_pass": gate_a,
+        "gate_b_pass": gate_b,
+        "gate_c_pass": gate_c,
+        "valid": bool(gate_a and gate_b and gate_c),
+    }
+
+
+def p2_group_stats(result: dict, group: str, seeds, sibling_chance_mean: float) -> dict:
+    """Gates + per-run values for one arm's seeds (e.g. group='vis00' -> vis00_s0/_s1/_s2)."""
+    gates = [p2_validity_gate(result, f"{group}_s{s}", sibling_chance_mean) for s in seeds]
+    invalid = [g["arm"] for g in gates if not g["valid"]]
+    vals = np.array([g["per_run_value"] for g in gates], dtype=float)
+    return {
+        "group": group, "seeds": list(seeds), "gates": gates, "invalid_runs": invalid,
+        "per_run_values": vals.tolist(),
+        "mean": float(vals.mean()), "min": float(vals.min()), "max": float(vals.max()),
+        "pooled_within_arm_seed_sd": float(vals.std(ddof=1)) if len(vals) > 1 else float("nan"),
+    }
+
+
+def _p2_depth_means(result: dict, group: str, seeds) -> dict:
+    """Per-depth-stratum mean MRR at the FINAL (epoch 200) checkpoint, averaged over seeds.
+
+    Strata whose mean `n` (averaged over seeds) is below `P2_MIN_STRATUM_N` are dropped and
+    reported, never silently skipped -- mirrors `_stratum_means` above.
+    """
+    per_stratum: dict[str, list] = {}
+    ns: dict[str, list] = {}
+    for s in seeds:
+        ckpts = _p2_checkpoints(result, f"{group}_s{s}")
+        final = next((c for c in ckpts if int(c["epoch"]) == P2_FINAL_EPOCH), None)
+        if final is None:
+            continue
+        for stratum, d in final.get("by_depth", {}).get("cosine", {}).items():
+            if d is None or d.get("mrr") is None:
+                continue
+            per_stratum.setdefault(stratum, []).append(float(d["mrr"]))
+            ns.setdefault(stratum, []).append(int(d.get("n", 0)))
+    means, dropped = {}, {}
+    for stratum, vals in per_stratum.items():
+        mean_n = float(np.mean(ns[stratum]))
+        if mean_n < P2_MIN_STRATUM_N:
+            dropped[stratum] = mean_n
+            continue
+        means[stratum] = float(np.mean(vals))
+    return {"means": means, "dropped_below_min_n": dropped}
+
+
+def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
+                    sibling_chance_mean: float) -> dict:
+    """GENERALISES / MEMORISES / MIXED for one real-tree arm against sibling chance + RandomDAG."""
+    margin = group["min"] - sibling_chance_mean
+    pooled_sd = group["pooled_within_arm_seed_sd"]
+    threshold = P2_FLOOR_SD_MULTIPLE * pooled_sd if np.isfinite(pooled_sd) else float("nan")
+    above_chance_margin = bool(np.isfinite(threshold) and margin >= threshold)
+    above_control_all_seeds = bool(group["min"] > control["max"])
+
+    ranges_overlap = bool(group["min"] <= control["max"] and control["min"] <= group["max"])
+    g_var = np.var(group["per_run_values"], ddof=1) if len(group["per_run_values"]) > 1 else 0.0
+    c_var = np.var(control["per_run_values"], ddof=1) if len(control["per_run_values"]) > 1 else 0.0
+    pooled_vs_control = float(np.sqrt(np.mean([g_var, c_var])))
+    equiv_band = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control)
+    mean_diff = group["mean"] - control["mean"]
+    equivalent_to_control = bool(ranges_overlap or abs(mean_diff) < equiv_band)
+
+    depth = _p2_depth_means(result, name, seeds)
+    depth_control = _p2_depth_means(result, P2_CONTROL_ARM, seeds)
+    shared = sorted(set(depth["means"]) & set(depth_control["means"]))
+    diffs = {k: depth["means"][k] - depth_control["means"][k] for k in shared}
+    sign_consistent = bool(diffs) and all(v > 0 for v in diffs.values())
+
+    if above_chance_margin and above_control_all_seeds and sign_consistent:
+        verdict, meaning = "GENERALISES", (
+            "MRR clears sibling chance by the declared margin, beats every RandomDAG seed, and "
+            "the sign holds in every depth stratum with n>=500: the model predicts relations it "
+            "never saw. This is the answer to the overfitting challenge.")
+    elif (not above_chance_margin) or equivalent_to_control:
+        verdict, meaning = "MEMORISES", (
+            "MRR is not meaningfully separated from sibling chance, or is statistically "
+            "indistinguishable from the RandomDAG control. The structure is in-sample only; the "
+            "manuscript must say so.")
+    else:
+        verdict, meaning = "MIXED", "Sign flips across depth strata; report per stratum, no aggregate claim."
+
+    return {
+        "arm": name, "verdict": verdict, "meaning": meaning,
+        "margin_above_chance": float(margin), "margin_threshold": float(threshold),
+        "above_chance_margin": above_chance_margin,
+        "above_control_all_seeds": above_control_all_seeds,
+        "equivalent_to_control": equivalent_to_control,
+        "mean_diff_vs_control": float(mean_diff), "equivalence_band_vs_control": equiv_band,
+        "depth_strata": {"diffs": diffs, "n_strata": len(shared),
+                         "dropped_below_min_n": {**depth["dropped_below_min_n"],
+                                                  **depth_control["dropped_below_min_n"]}},
+        "sign_consistent": sign_consistent,
+    }
+
+
+def p2_verdict(result: dict, seeds=(0, 1, 2)) -> dict:
+    """vis00/vis50 vs sibling chance and RandomDAG -> GENERALISES / MEMORISES / MIXED /
+    UNINFORMATIVE, per results/p2_heldout_preregistration.json.
+
+    UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including RandomDAG) fails
+    gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is read. Otherwise
+    each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading (`by_arm_verdict`); the
+    top-level `verdict` is that shared reading if both arms agree, else MIXED.
+    """
+    sibling_chance_mean = float(result["baselines"]["sibling_chance_mean"])
+    randomdag_baselines = result.get("baselines_randomdag", result["baselines"])
+    randomdag_chance = float(randomdag_baselines["sibling_chance_mean"])
+
+    control = p2_group_stats(result, P2_CONTROL_ARM, seeds, randomdag_chance)
+    groups = {g: p2_group_stats(result, g, seeds, sibling_chance_mean) for g in P2_DATA_ARMS}
+
+    invalid = list(control["invalid_runs"])
+    for g in groups.values():
+        invalid += g["invalid_runs"]
+
+    base = {
+        "task": "P2 -- held-out link prediction, real taxonomy vs RandomDAG",
+        "preregistration": ["results/p2_heldout_preregistration.json"],
+        "seeds": list(seeds),
+        "sibling_chance_mean": sibling_chance_mean,
+        "randomdag_sibling_chance_mean": randomdag_chance,
+        "control": control, "groups": groups,
+    }
+
+    if invalid:
+        base["verdict"] = "UNINFORMATIVE"
+        base["meaning"] = ("A validity gate failed; no direction is read for either arm. "
+                           f"Invalid runs: {', '.join(invalid)}")
+        return base
+
+    by_arm = {name: _p2_arm_reading(result, name, seeds, groups[name], control,
+                                    sibling_chance_mean)
+             for name in P2_DATA_ARMS}
+    verdicts = {v["verdict"] for v in by_arm.values()}
+    if len(verdicts) == 1:
+        overall = verdicts.pop()
+    else:
+        overall = "MIXED"
+
+    base["by_arm_verdict"] = by_arm
+    base["verdict"] = overall
+    base["meaning"] = "; ".join(f"{name}: {by_arm[name]['meaning']}" for name in P2_DATA_ARMS)
+    return base
+
+
 def task8_verdict(result: dict, seeds=(0, 1, 2), amendment_2: bool = False) -> dict:
     """fixed vs unfixed sampler -> MATERIAL / ROBUST / MIXED, or UNINFORMATIVE."""
     cmp = compare_arms(result, "fixed", "unfixed", seeds, amendment_2)

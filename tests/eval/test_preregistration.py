@@ -6,12 +6,17 @@ single verdict fails here rather than in the manuscript.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from taxembed.eval.preregistration import (
-    compare_arms, task8_verdict, task9_verdict, validity_gate,
+    compare_arms, p2_validity_gate, p2_verdict, task8_verdict, task9_verdict, validity_gate,
 )
+
+_REPO = Path(__file__).resolve().parents[2]
 
 
 def _ckpt(epoch, s_angle, loss, auc=0.9, poincare=None, band=None, clade=None):
@@ -283,3 +288,273 @@ class TestEngineInvariants:
         roll = [c["S_angle"] for c in res["runs"]["canonical_s0_roll"]["checkpoints"]]
         assert g["S_angle"] == pytest.approx(float(np.mean(roll)))
         assert g["roll_epochs"] == [196, 197, 198, 199, 200]
+
+
+## ------------------------------------------------------------------------------------------
+## P2: held-out link prediction (results/p2_heldout_preregistration.json). P2 HAS NO TRAINING-
+## LOSS GATE -- three gates instead, (a) learning on MRR's own trajectory, (b) floor vs sibling
+## chance, (c) completion (epoch 200 scored). Every gate below is tested BOTH ways: it fires on
+## the lesion, and it stays silent on the healthy-but-unusual case -- the pair Task 9's original
+## suite was missing.
+
+P2_EPOCHS = [10, 50, 100, 150, 180, 190, 195, 198, 200]   # last 5 = the P2_ROLL_WINDOW
+
+
+def _p2_ckpt(epoch, mrr, loss=4.0, depth=None):
+    m = {"n": 500, "mean_rank": 3.0, "mrr": mrr, "hits_at_1": mrr,
+         "hits_at_10": min(1.0, 3 * mrr), "normalized_rank": 1.0 - mrr}
+    return {
+        "epoch": epoch,
+        "trainer": {"loss": loss},
+        "metrics": m, "metrics_cosine": m, "metrics_poincare": m,
+        "by_depth": {"cosine": depth if depth is not None else {
+            "11-15": {"n": 2000, "mrr": mrr},
+            "16-21": {"n": 3000, "mrr": mrr},
+            "22-28": {"n": 800, "mrr": mrr},
+        }, "poincare": {}},
+    }
+
+
+def _p2_series(mrrs, epochs=None, losses=None, depths=None):
+    epochs = epochs if epochs is not None else P2_EPOCHS[: len(mrrs)]
+    losses = losses if losses is not None else [4.0] * len(mrrs)
+    depths = depths if depths is not None else [None] * len(mrrs)
+    return [_p2_ckpt(e, m, l, d) for e, m, l, d in zip(epochs, mrrs, losses, depths)]
+
+
+def _p2_result(groups: dict, sibling_chance_mean=0.20, randomdag_chance=None):
+    """groups: {arm_seed_key: [ckpt, ...]}"""
+    out = {"baselines": {"sibling_chance_mean": sibling_chance_mean},
+          "arms": {k: {"checkpoints": v} for k, v in groups.items()}}
+    if randomdag_chance is not None:
+        out["baselines_randomdag"] = {"sibling_chance_mean": randomdag_chance}
+    return out
+
+
+def _p2_healthy(final_mrr, init_mrr=0.05, jitter=0.004, rng_seed=0, plateau_from_epoch=180):
+    """Ramps from init_mrr toward final_mrr over the PRE-plateau epochs, then holds flat at
+    final_mrr (plus jitter) from plateau_from_epoch onward, so the trailing P2_ROLL_WINDOW
+    checkpoints (epochs 180-200) measure steady-state noise rather than the ramp's own trend --
+    mirroring the existing suite's separate roll/milestone fixture lists (see `_run` above),
+    adapted to P2's single unified checkpoint trajectory (Task 6's JSON has no roll/ms split)."""
+    rng = np.random.default_rng(rng_seed)
+    pre = [e for e in P2_EPOCHS if e < plateau_from_epoch]
+    mrrs = []
+    for ep in P2_EPOCHS:
+        if ep >= plateau_from_epoch:
+            base = final_mrr
+        else:
+            frac = pre.index(ep) / len(pre)
+            base = init_mrr + (final_mrr - init_mrr) * frac
+        mrrs.append(float(np.clip(base + rng.normal(0.0, jitter), 1e-6, 1.0)))
+    return mrrs
+
+
+def _p2_dead(level=0.05, jitter=0.01, rng_seed=0):
+    """A run that never trained: wanders at ITS OWN realistic jitter scale around a low level --
+    never pinned to exactly one value. A zero-SD fixture would collapse gate (a)'s `10 x jitter`
+    threshold to zero and let any rise through; that exact bug shipped once in this project."""
+    rng = np.random.default_rng(rng_seed)
+    return [float(np.clip(level + rng.normal(0.0, jitter), 1e-6, 1.0)) for _ in P2_EPOCHS]
+
+
+def _p2_group(final_by_seed_fn, base_seed, seed_offset=0.001, **kw):
+    """Build 3 seeds' checkpoint lists for one arm, e.g. `_p2_group(0.55, base_seed=100)`."""
+    if callable(final_by_seed_fn):
+        raise TypeError("pass a base final_mrr, not a callable")
+    return {s: _p2_series(_p2_healthy(final_by_seed_fn + i * seed_offset,
+                                      rng_seed=base_seed + s, **kw))
+           for i, s in enumerate((0, 1, 2))}
+
+
+def _p2_nine_arm_result(vis00_final, vis50_final, randomdag_final, sibling_chance=0.05):
+    groups = {}
+    for name, final, base_seed in (("vis00", vis00_final, 100),
+                                   ("vis50", vis50_final, 200),
+                                   ("randomdag", randomdag_final, 300)):
+        for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
+            groups[f"{name}_s{seed}"] = ckpts
+    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+
+
+class TestP2ValidityGate:
+    def test_gate_a_fires_on_a_dead_arm_with_realistic_jitter(self):
+        """🛑 The Task 9 fixture bug, guarded against here: jitter must NOT be pinned to 0.0."""
+        mrrs = _p2_dead(level=0.05, jitter=0.01, rng_seed=1)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        assert g["jitter_sd"] > 0.0, "fixture must genuinely jitter, not sit at exactly one value"
+        assert not g["gate_a_pass"]
+        assert not g["valid"]
+
+    def test_gate_a_stays_silent_on_a_CONVERGED_arm(self):
+        """The Task 9 lesion: a trajectory that rose early and then plateaued is convergence,
+        not failure to train, and must not fail gate (a)."""
+        mrrs = [0.05, 0.30, 0.55, 0.70, 0.702, 0.699, 0.701, 0.698, 0.700]
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        assert g["gate_a_pass"]
+        assert g["valid"]
+
+    def test_gate_a_zero_jitter_is_not_trivially_passed_by_any_rise(self):
+        """A degenerate zero-SD roll window (the exact historical bug) must FAIL gate (a), not
+        let a trivial rise clear a threshold that collapsed to zero."""
+        mrrs = [0.05, 0.05, 0.05, 0.06, 0.05, 0.05, 0.05, 0.05, 0.05]   # spike OUTSIDE the roll
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.02)
+        assert g["jitter_sd"] == 0.0
+        assert g["gate_a_rise"] > 0.0                  # there IS a rise
+        assert not g["gate_a_pass"]                    # but it must not pass on that alone
+        assert not g["valid"]
+
+    def test_gate_b_fires_when_mrr_sits_at_sibling_chance(self):
+        mrrs = _p2_healthy(final_mrr=0.20, init_mrr=0.05, rng_seed=2)
+        chance = float(np.mean(mrrs[-5:]))              # per_run_value lands EXACTLY at chance
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=chance)
+        assert g["per_run_value"] == pytest.approx(chance)
+        assert not g["gate_b_pass"]
+        assert not g["valid"]
+
+    def test_gate_b_stays_silent_when_clearly_above_chance(self):
+        mrrs = _p2_healthy(final_mrr=0.60, init_mrr=0.05, rng_seed=2)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.20)
+        assert g["gate_b_pass"]
+
+    def test_gate_c_fires_when_the_final_checkpoint_is_missing(self):
+        mrrs = _p2_healthy(final_mrr=0.60, rng_seed=2)
+        ckpts = [c for c in _p2_series(mrrs) if c["epoch"] != 200]
+        res = _p2_result({"vis00_s0": ckpts})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        assert not g["gate_c_pass"]
+        assert not g["valid"]
+
+    def test_gate_c_stays_silent_when_the_final_checkpoint_is_present(self):
+        mrrs = _p2_healthy(final_mrr=0.60, rng_seed=2)
+        res = _p2_result({"vis00_s0": _p2_series(mrrs)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        assert g["gate_c_pass"]
+
+    def test_a_rising_training_loss_alone_does_NOT_invalidate_a_run(self):
+        """🛑 The Task 8 lesion, encoded so a future editor cannot quietly reintroduce a loss
+        gate: loss rises throughout (3.90 -> 4.02, the fixed arm's real trajectory) while MRR
+        improves throughout, and the run must still be VALID -- P2 has no loss gate at all."""
+        mrrs = _p2_healthy(final_mrr=0.60, init_mrr=0.05, rng_seed=2)
+        n = len(mrrs)
+        rising_loss = [3.90 + (4.02 - 3.90) * (i / (n - 1)) for i in range(n)]
+        res = _p2_result({"vis00_s0": _p2_series(mrrs, losses=rising_loss)})
+        g = p2_validity_gate(res, "vis00_s0", sibling_chance_mean=0.05)
+        assert g["gate_a_pass"] and g["gate_b_pass"] and g["gate_c_pass"]
+        assert g["valid"]
+        # and the rising loss is nowhere in the gate's own reasoning:
+        assert not any("loss" in key for key in g), (
+            f"a loss-derived field crept back into the gate: {[k for k in g if 'loss' in k]}")
+
+
+class TestP2Verdict:
+    def test_generalises_when_both_real_arms_clear_chance_and_randomdag(self):
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        v = p2_verdict(res)
+        assert v["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
+        assert not v["control"]["invalid_runs"]
+
+    def test_memorises_when_arms_are_indistinguishable_from_randomdag(self):
+        res = _p2_nine_arm_result(vis00_final=0.11, vis50_final=0.115, randomdag_final=0.11,
+                                  sibling_chance=0.05)
+        v = p2_verdict(res)
+        assert v["verdict"] == "MEMORISES"
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "MEMORISES"
+        assert v["by_arm_verdict"]["vis50"]["verdict"] == "MEMORISES"
+
+    def test_uninformative_when_any_single_seed_fails_a_gate(self):
+        """UNINFORMATIVE must beat every other reading, even for a clean-looking pair of arms --
+        including a failure on the RandomDAG control, not only on a data arm."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        res["arms"]["randomdag_s1"]["checkpoints"] = [
+            c for c in res["arms"]["randomdag_s1"]["checkpoints"] if c["epoch"] != 200]
+        v = p2_verdict(res)
+        assert v["verdict"] == "UNINFORMATIVE"
+        assert "randomdag_s1" in v["control"]["invalid_runs"]
+        assert "by_arm_verdict" not in v            # no direction read for either arm
+
+    def test_a_depth_stratum_sign_flip_forces_MIXED_for_that_arm_and_overall(self):
+        """A seed-separated aggregate whose sign flips in one depth stratum is not GENERALISES
+        for that arm -- mirrors the Task 9 engine's stratum sign-consistency rule."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        for s in (0, 1, 2):
+            ckpts = res["arms"][f"vis00_s{s}"]["checkpoints"]
+            final = next(c for c in ckpts if c["epoch"] == 200)
+            # below EVERY randomdag seed's own "22-28" value (~0.10-0.11) in this stratum only
+            final["by_depth"]["cosine"]["22-28"] = {"n": 800, "mrr": 0.02}
+        v = p2_verdict(res)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "MIXED"
+        assert not v["by_arm_verdict"]["vis00"]["sign_consistent"]
+        assert v["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"   # untouched
+        assert v["verdict"] == "MIXED"                                    # arms disagree
+
+    def test_small_depth_strata_are_dropped_and_reported_not_silently_skipped(self):
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        for s in (0, 1, 2):
+            ckpts = res["arms"][f"vis00_s{s}"]["checkpoints"]
+            final = next(c for c in ckpts if c["epoch"] == 200)
+            final["by_depth"]["cosine"]["22-28"] = {"n": 12, "mrr": -5.0}   # would flip the sign
+        v = p2_verdict(res)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        dropped = v["by_arm_verdict"]["vis00"]["depth_strata"]["dropped_below_min_n"]
+        assert dropped.get("22-28") == 12
+
+    def test_randomdag_arm_can_use_its_own_sibling_chance_mean(self):
+        """RandomDAG's rewiring changes grandparent fan-out, so its own floor can genuinely
+        differ from the real-tree arms' -- `baselines_randomdag` must be read when present."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        res["baselines_randomdag"] = {"sibling_chance_mean": 0.30}   # randomdag now AT its floor
+        v = p2_verdict(res)
+        assert v["verdict"] == "UNINFORMATIVE"
+        assert any(a.startswith("randomdag_") for a in v["control"]["invalid_runs"])
+
+
+class TestP2PreregistrationArtifact:
+    """The frozen JSON itself must state what Ruling 1 requires, not just this session's prose."""
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_required_top_level_keys_are_present(self, prereg):
+        for key in ("status", "task", "why", "arms", "declared_confounds", "metrics",
+                   "validity_gate", "readings", "manuscript_hooks"):
+            assert key in prereg
+
+    def test_status_declares_frozen_before_any_run_and_amendment_only_revision(self, prereg):
+        assert "frozen" in prereg["status"].lower()
+        assert "amendment" in prereg["status"].lower()
+
+    def test_nine_arms_declared_including_randomdag_from_the_outset(self, prereg):
+        for name in ("vis00", "vis50", "randomdag"):
+            assert name in prereg["arms"]
+        assert "randomised" in prereg["arms"]["randomdag"].lower()
+
+    def test_exactly_four_declared_confounds(self, prereg):
+        assert len(prereg["declared_confounds"]) == 4
+
+    def test_all_four_readings_declared(self, prereg):
+        assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+
+    def test_validity_gate_states_there_is_no_loss_gate(self, prereg):
+        gate_text = prereg["validity_gate"].lower()
+        assert "no training-loss gate" in gate_text
+        assert "loss" in gate_text                  # still discussed, just never gates
+        assert "epoch 200" in prereg["validity_gate"]
+
+    def test_primary_metric_is_cosine_with_the_planted_radius_reasoning(self, prereg):
+        assert "cosine" in prereg["metrics"]["primary"].lower()
+        assert "planted" in prereg["metrics"]["primary_reason"].lower()
