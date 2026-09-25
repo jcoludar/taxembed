@@ -2,12 +2,14 @@
 
   <python> scripts/apply_preregistration.py --task 9 --json <seeds_*.json> --out <verdict.json>
   <python> scripts/apply_preregistration.py --task 8 --json <task8_seeds_*.json> --out <verdict.json>
-  <python> scripts/apply_preregistration.py --task p2 --json <p2_real_s0.json> <p2_randomdag_vis00_s0.json> ... \
-      --amendment-1 --amendment-2 --out <verdict.json>
+  <python> scripts/apply_preregistration.py --task p2 --json <p2_real_s0.json> <p2_degmatch_vis00_s0.json> ... \
+      --amendment-1 --amendment-2 --amendment-4 --out <verdict.json>
       # --task p2 accepts ONE OR MORE --json paths (scripts/p2_lrz_score.sh writes 9 separate
       # files, never one combined file) and merges them via
       # taxembed.eval.preregistration.merge_p2_scorer_outputs before scoring. --task 8/9 still
-      # expect exactly one combined file.
+      # expect exactly one combined file. --amendment-4 (p2_amendment_4_20260924): RandomDAG
+      # retired as P2's control, replaced by the degree-matched shuffle -- degmatch_vis00/
+      # degmatch_vis50 files, not randomdag_vis00/randomdag_vis50.
 
 The decision logic lives in src/taxembed/eval/preregistration.py and was written and tested
 BEFORE any array result was visible (tests/eval/test_preregistration.py). This script only routes
@@ -141,9 +143,10 @@ def main() -> None:
                     help="scorer output (score_recipe_checkpoints.py for tasks 8/9, "
                          "score_p2_linkpred.py for p2). --task p2 accepts MULTIPLE paths (C4: "
                          "scripts/p2_lrz_score.sh writes 9 separate JSON files, one per seed x "
-                         "{real vis00/vis50 pair, randomdag_vis00, randomdag_vis50}) and merges "
-                         "them via taxembed.eval.preregistration.merge_p2_scorer_outputs before "
-                         "scoring; tasks 8/9 still expect exactly one combined file.")
+                         "{real vis00/vis50 pair, degmatch_vis00, degmatch_vis50 -- or "
+                         "randomdag_vis00/randomdag_vis50 for a pre-amendment_4 array}) and "
+                         "merges them via taxembed.eval.preregistration.merge_p2_scorer_outputs "
+                         "before scoring; tasks 8/9 still expect exactly one combined file.")
     ap.add_argument("--out", help="write the verdict JSON here")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--amendment-2", action="store_true",
@@ -157,7 +160,17 @@ def main() -> None:
                     help="--task p2 only: apply p2_amendment_1_20260924 (RandomDAG's rewiring "
                          "measurably inflates its own chance floor ~5.4x, so the cross-tree "
                          "comparison uses normalized_rank, chance=0.5 for every pool size, "
-                         "instead of raw MRR). No-op for --task 8/9.")
+                         "instead of raw MRR). No-op for --task 8/9. Still the correct machinery "
+                         "under --amendment-4 too -- the degree-matched control's residual gap is "
+                         "smaller (~1.8x) but not zero (p2_amendment_4_20260924).")
+    ap.add_argument("--amendment-4", action="store_true",
+                    help="--task p2 only: apply p2_amendment_4_20260924 -- RandomDAG RETIRED as "
+                         "P2's control, replaced by the degree-matched shuffle (degmatch_vis00/ "
+                         "degmatch_vis50 read in place of randomdag_vis00/randomdag_vis50; USER "
+                         "DESIGN decision, not an outcome-driven revision). Takes precedence over "
+                         "--amendment-2 for CONTROL SELECTION -- the degree-matched arms only "
+                         "exist in the matched-per-visibility shape, so --amendment-4 always "
+                         "reads that design regardless of --amendment-2. No-op for --task 8/9.")
     args = ap.parse_args()
 
     seeds = tuple(int(x) for x in args.seeds.split(","))
@@ -166,7 +179,7 @@ def main() -> None:
         results = [json.loads(Path(p).read_text()) for p in args.json]
         result = merge_p2_scorer_outputs(results) if len(results) > 1 else results[0]
         verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1,
-                             amendment_2=args.amendment_2)
+                             amendment_2=args.amendment_2, amendment_4=args.amendment_4)
         render = _render_p2
     else:
         if len(args.json) != 1:

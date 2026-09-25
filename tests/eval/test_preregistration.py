@@ -14,8 +14,9 @@ import pytest
 
 from taxembed.eval.linkpred import linkpred_metrics
 from taxembed.eval.preregistration import (
-    P2_ROLL_WINDOW, compare_arms, merge_p2_scorer_outputs, p2_group_stats, p2_run_value,
-    p2_validity_gate, p2_verdict, task8_verdict, task9_verdict, validity_gate,
+    P2_ROLL_WINDOW, _p2_baselines_for_seed, assert_baselines_agree_across_seeds, compare_arms,
+    merge_p2_scorer_outputs, p2_group_stats, p2_run_value, p2_validity_gate, p2_verdict,
+    task8_verdict, task9_verdict, validity_gate,
 )
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -1096,3 +1097,337 @@ class TestP2Amendment3Artifact:
         assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
         assert "5.403" in json.dumps(prereg["p2_amendment_1_20260924"])
         assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])
+
+
+## ------------------------------------------------------------------------------------------
+## p2_amendment_4_20260924 -- USER DESIGN decision: RandomDAG RETIRED as P2's control, replaced
+## by degree_matched_shuffle (a fan-out-preserving configuration-model shuffle, not RandomDAG's
+## fan-out-collapsing i.i.d. rewire). Same matched-per-visibility 12-arm shape amendment_2
+## established: degmatch_vis00/degmatch_vis50 replace randomdag_vis00/randomdag_vis50.
+
+def _p2_twelve_arm_result_named(vis00_final, vis50_final, control_vis00_final, control_vis50_final,
+                                control_vis00_name, control_vis50_name, sibling_chance=0.05):
+    """Like `_p2_twelve_arm_result` above, but the two control arms' NAMES are parameters --
+    lets TestP2Amendment4 build a degmatch_vis00/degmatch_vis50 fixture without touching the
+    existing randomdag-named helper any amendment_2 test depends on."""
+    groups = {}
+    for name, final, base_seed in (
+        ("vis00", vis00_final, 100), ("vis50", vis50_final, 200),
+        (control_vis00_name, control_vis00_final, 300),
+        (control_vis50_name, control_vis50_final, 400),
+    ):
+        for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
+            groups[f"{name}_s{seed}"] = ckpts
+    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+
+
+class TestP2Amendment4:
+    """p2_amendment_4_20260924 -- mirrors TestP2Amendment2's shape exactly, with
+    degmatch_vis00/degmatch_vis50 in place of randomdag_vis00/randomdag_vis50."""
+
+    def test_matched_degmatch_controls_read_each_real_arm_against_its_own_visibility(self):
+        res = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.10,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        v = p2_verdict(res, amendment_4=True)
+        assert v["amendment_4_applied"] is True
+        assert v["amendment_2_applied"] is False   # amendment_4 does not silently flip amendment_2
+        assert v["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["verdict"] == "GENERALISES"
+        assert v["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
+        assert set(v["controls"]) == {"degmatch_vis00", "degmatch_vis50"}
+        assert not v["controls"]["degmatch_vis00"]["invalid_runs"]
+        assert not v["controls"]["degmatch_vis50"]["invalid_runs"]
+        assert "control" not in v
+
+    def test_amendment_4_default_false_reproduces_amendment_2s_own_default(self):
+        """amendment_4 defaults to False: passing it explicitly False must not change ANYTHING
+        about amendment_2's own default (single shared RandomDAG control) reading."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        default = p2_verdict(res)
+        explicit_false = p2_verdict(res, amendment_4=False)
+        assert default == explicit_false
+        assert explicit_false["amendment_4_applied"] is False
+
+    def test_amendment_4_takes_precedence_over_amendment_2_for_control_selection(self):
+        """amendment_4=True with amendment_2=True must still read the DEGMATCH controls, not
+        fall back to looking for randomdag_vis00/randomdag_vis50 (which do not exist in this
+        fixture) -- amendment_4 takes precedence over amendment_2 for control selection."""
+        res = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.10,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        v = p2_verdict(res, amendment_2=True, amendment_4=True)
+        assert v["verdict"] == "GENERALISES"
+        assert set(v["controls"]) == {"degmatch_vis00", "degmatch_vis50"}
+
+    def test_cross_matching_the_degmatch_controls_changes_the_verdict(self):
+        """Load-bearing, mirrors TestP2Amendment2's test of the same name: swapping which label
+        the two degmatch controls' checkpoint data sit under must change vis50's verdict, proving
+        the pairing is load-bearing under amendment_4 too, not decorative."""
+        matched_source = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.499,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        v_matched = p2_verdict(matched_source, amendment_4=True)
+        assert v_matched["by_arm_verdict"]["vis50"]["verdict"] == "MEMORISES", (
+            "fixture must reproduce the close-control MEMORISES reading for this test to mean "
+            "anything")
+
+        cross = json.loads(json.dumps(matched_source))
+        for s in (0, 1, 2):
+            for suffix in ("_ms", "_roll"):
+                key_a = f"degmatch_vis00_s{s}{suffix}"
+                key_b = f"degmatch_vis50_s{s}{suffix}"
+                cross["arms"][key_a], cross["arms"][key_b] = cross["arms"][key_b], cross["arms"][key_a]
+        v_cross = p2_verdict(cross, amendment_4=True)
+
+        assert v_cross["by_arm_verdict"]["vis50"]["verdict"] == "GENERALISES"
+        assert (v_matched["by_arm_verdict"]["vis50"]["verdict"]
+               != v_cross["by_arm_verdict"]["vis50"]["verdict"])
+
+    def test_uninformative_when_a_single_degmatch_control_seed_fails_a_gate(self):
+        res = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.10,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        res["arms"]["degmatch_vis50_s1_ms"]["checkpoints"] = [
+            c for c in res["arms"]["degmatch_vis50_s1_ms"]["checkpoints"] if c["epoch"] != 200]
+        v = p2_verdict(res, amendment_4=True)
+        assert v["verdict"] == "UNINFORMATIVE"
+        assert "degmatch_vis50_s1" in v["meaning"]
+        assert "by_arm_verdict" not in v
+
+
+class TestP2Amendment4Artifact:
+    """The frozen JSON's p2_amendment_4_20260924 block must state what Part 1 requires."""
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_4_20260924" in prereg
+        status = prereg["p2_amendment_4_20260924"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "before any p2 outcome data" in status
+        assert "user design" in status
+        assert "2026-09-24" in prereg["p2_amendment_4_20260924"]["status"]
+
+    def test_states_randomdag_is_retired_and_degree_matched_replaces_it(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_4_20260924"]).lower()
+        assert "retired" in blob
+        assert "degree_matched_shuffle" in blob or "degree-matched" in blob
+        assert "degmatch_vis00" in blob and "degmatch_vis50" in blob
+
+    def test_records_the_measured_residual_chance_floor_ratio(self, prereg):
+        """The task's own design assumed full parity between the two trees; the MEASURED number
+        (1.84x, not 1.0x) must be recorded honestly, not silently reported as a clean fix."""
+        blob = json.dumps(prereg["p2_amendment_4_20260924"])
+        assert "1.84" in blob
+        assert "5.403" in blob or "5.4" in blob
+
+    def test_states_amendment_1_stays_load_bearing_not_merely_belt_and_braces(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_4_20260924"]).lower()
+        assert "load-bearing" in blob
+        assert "belt-and-braces" in blob or "belt and braces" in blob
+
+    def test_frozen_block_and_earlier_amendments_are_untouched(self, prereg):
+        assert len(prereg["declared_confounds"]) == 4
+        assert set(prereg["readings"]) == {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+        assert "5.403" in json.dumps(prereg["p2_amendment_1_20260924"])
+        assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])
+        assert "c1_degree_prior_baseline" in prereg["p2_amendment_3_20260924"]
+
+
+## ------------------------------------------------------------------------------------------
+## Part 2 fix (2026-09-24, no amendment flag): each seed's own baselines block must gate THAT
+## seed's own run, never seed 0's reused for seeds 1/2 -- and the merge step must assert
+## cross-seed agreement, failing loudly rather than silently picking one.
+
+class TestP2PerSeedBaselines:
+
+    def test_p2_group_stats_gates_each_seed_against_its_own_baseline(self):
+        """LESION CHECK. Seeds 0 and 1 have the SAME MRR trajectory, but seed 1's OWN baseline
+        (chance_mrr_mean 0.60) sits far ABOVE its run's MRR (~0.30) while seed 0's OWN baseline
+        (0.05) sits well below its run's MRR. Gating seed 1 against seed 0's baseline (the
+        pre-Part-2 'seed 0 wins' defect) would wrongly PASS gate (b); gating it against its OWN
+        baseline (the fix) correctly FAILS it."""
+        mrrs0 = _p2_healthy(final_mrr=0.30, init_mrr=0.05, rng_seed=10)
+        mrrs1 = _p2_healthy(final_mrr=0.30, init_mrr=0.05, rng_seed=11)
+        res = {"arms": _p2_fanout_arms({"vis00_s0": _p2_series(mrrs0),
+                                        "vis00_s1": _p2_series(mrrs1)})}
+        baselines_by_seed = {
+            0: {"sibling_chance_mean": 0.05, "chance_mrr_mean": 0.05,
+                "degree_prior": dict(_DEFAULT_DEGREE_PRIOR)},
+            1: {"sibling_chance_mean": 0.05, "chance_mrr_mean": 0.60,
+                "degree_prior": dict(_DEFAULT_DEGREE_PRIOR)},
+        }
+        gs = p2_group_stats(res, "vis00", (0, 1), baselines_by_seed)
+        assert gs["gates"][0]["gate_b_pass"]
+        assert not gs["gates"][1]["gate_b_pass"]
+        assert "vis00_s1" in gs["invalid_runs"]
+        assert "vis00_s0" not in gs["invalid_runs"]
+
+    def test_a_shared_baseline_forced_onto_every_seed_hides_the_lesion(self):
+        """CONTROL DIRECTION for the lesion above: if the SAME (seed-0) baseline dict were used
+        for every seed -- the pre-Part-2 behaviour -- seed 1 would incorrectly PASS gate (b).
+        This is what the fix above replaces, made explicit as its own assertion."""
+        mrrs0 = _p2_healthy(final_mrr=0.30, init_mrr=0.05, rng_seed=10)
+        mrrs1 = _p2_healthy(final_mrr=0.30, init_mrr=0.05, rng_seed=11)
+        res = {"arms": _p2_fanout_arms({"vis00_s0": _p2_series(mrrs0),
+                                        "vis00_s1": _p2_series(mrrs1)})}
+        seed0_baseline = {"sibling_chance_mean": 0.05, "chance_mrr_mean": 0.05,
+                          "degree_prior": dict(_DEFAULT_DEGREE_PRIOR)}
+        baselines_by_seed_shared = {0: seed0_baseline, 1: seed0_baseline}
+        gs = p2_group_stats(res, "vis00", (0, 1), baselines_by_seed_shared)
+        assert gs["gates"][0]["gate_b_pass"]
+        assert gs["gates"][1]["gate_b_pass"], (
+            "fixture must reproduce the pre-Part-2 false-pass for this test to mean anything")
+
+    def test_backward_compatible_fallback_gives_every_seed_the_same_shared_baseline(self):
+        """HEALTHY / control direction: a scorer output with no seed-tagged key at all (every
+        pre-Part-2 fixture) must resolve EVERY seed to the SAME shared dict via
+        `_p2_baselines_for_seed`'s fallback -- p2_group_stats's output must be numerically
+        IDENTICAL to calling it with that one dict repeated by hand."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        shared = res["baselines"]
+        baselines_by_seed_repeated = {0: shared, 1: shared, 2: shared}
+        gs_direct = p2_group_stats(res, "vis00", (0, 1, 2), baselines_by_seed_repeated)
+        resolved = {s: _p2_baselines_for_seed(res, ["baselines"], s) for s in (0, 1, 2)}
+        gs_via_resolver = p2_group_stats(res, "vis00", (0, 1, 2), resolved)
+        assert gs_direct == gs_via_resolver
+
+    def test_p2_verdict_end_to_end_reproduces_prior_output_on_pre_part_2_fixtures(self):
+        """Every pre-Part-2 P2 fixture (single shared 'baselines' key) must feed p2_verdict to
+        EXACTLY the same verdict as before this fix -- the strongest form of the backward-
+        compatibility guarantee, exercised through the full public entry point."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        v = p2_verdict(res)
+        assert v["verdict"] == "GENERALISES"
+        assert v["groups"]["vis00"]["sibling_chance_mean"] == pytest.approx(0.05)
+
+
+class TestAssertBaselinesAgreeAcrossSeeds:
+    """Part 2 fix: `merge_p2_scorer_outputs` calls `assert_baselines_agree_across_seeds` and must
+    fail loudly on a genuine cross-seed disagreement, stay silent on ordinary seed-to-seed noise,
+    and be a no-op on a scorer output with no seed-tagged baselines keys at all (every pre-Part-2
+    shape)."""
+
+    @staticmethod
+    def _seeded_baselines(prefix, values_by_seed):
+        out = {}
+        for s, v in values_by_seed.items():
+            out[f"{prefix}_s{s}"] = {
+                "sibling_chance_mean": v.get("sibling_chance_mean", 0.10),
+                "chance_mrr_mean": v.get("chance_mrr_mean", 0.25),
+                "degree_prior": {"mrr": v.get("degree_prior_mrr", 0.50),
+                                 "normalized_rank": v.get("degree_prior_normalized_rank", 0.15)},
+            }
+        return out
+
+    def test_fires_when_a_seed_disagrees_beyond_tolerance(self):
+        """LESION CHECK: seed 2's chance_mrr_mean is wildly higher than seeds 0/1's, as if the
+        wrong split landed under its key -- must raise, naming the offending family+field."""
+        result = {"arms": {}}
+        result.update(self._seeded_baselines("baselines", {
+            0: {"chance_mrr_mean": 0.25}, 1: {"chance_mrr_mean": 0.26}, 2: {"chance_mrr_mean": 0.80},
+        }))
+        with pytest.raises(ValueError, match="baselines.chance_mrr_mean"):
+            assert_baselines_agree_across_seeds(result, seeds=(0, 1, 2))
+
+    def test_stays_silent_within_the_declared_tolerance(self):
+        """HEALTHY CASE: a spread comfortably inside the declared 25% tolerance (mirrors the
+        measured mollusca_6447_clean cross-seed spread of 1-12%) must not raise."""
+        result = {"arms": {}}
+        result.update(self._seeded_baselines("baselines", {
+            0: {"chance_mrr_mean": 0.227}, 1: {"chance_mrr_mean": 0.230}, 2: {"chance_mrr_mean": 0.231},
+        }))
+        report = assert_baselines_agree_across_seeds(result, seeds=(0, 1, 2))
+        assert "baselines" in report
+        assert report["baselines"]["chance_mrr_mean"] < 0.25
+
+    def test_is_a_silent_noop_on_a_result_with_no_seed_tagged_keys(self):
+        """BACKWARD-COMPATIBILITY CASE: every pre-Part-2 fixture/production JSON has no
+        seed-tagged baselines key at all -- there is nothing to check, and this must never
+        raise."""
+        result = {"arms": {}, "baselines": {"sibling_chance_mean": 0.05, "chance_mrr_mean": 0.25,
+                                            "degree_prior": {"mrr": 0.5, "normalized_rank": 0.15}}}
+        report = assert_baselines_agree_across_seeds(result, seeds=(0, 1, 2))
+        assert report == {}
+
+    def test_merge_p2_scorer_outputs_calls_the_assertion_and_raises(self):
+        """End-to-end: merge_p2_scorer_outputs itself must raise when the merged inputs' own
+        seed-tagged baselines disagree beyond tolerance -- Part 2's own ruling ('have the merge
+        step assert they agree, failing loudly if not')."""
+        a = {"baselines_s0": {"sibling_chance_mean": 0.10, "chance_mrr_mean": 0.25,
+                              "degree_prior": {"mrr": 0.50, "normalized_rank": 0.15}}, "arms": {}}
+        b = {"baselines_s1": {"sibling_chance_mean": 0.10, "chance_mrr_mean": 0.90,
+                              "degree_prior": {"mrr": 0.50, "normalized_rank": 0.15}}, "arms": {}}
+        with pytest.raises(ValueError, match="baselines.chance_mrr_mean"):
+            merge_p2_scorer_outputs([a, b])
+
+    def test_merge_p2_scorer_outputs_is_unaffected_by_seed_tagged_agreement(self):
+        """HEALTHY / control direction: seed-tagged keys that genuinely agree must merge and
+        survive DISTINCTLY, with no raise and no collision."""
+        a = {"baselines_s0": {"sibling_chance_mean": 0.10, "chance_mrr_mean": 0.250,
+                              "degree_prior": {"mrr": 0.50, "normalized_rank": 0.150}}, "arms": {}}
+        b = {"baselines_s1": {"sibling_chance_mean": 0.10, "chance_mrr_mean": 0.255,
+                              "degree_prior": {"mrr": 0.51, "normalized_rank": 0.151}}, "arms": {}}
+        merged = merge_p2_scorer_outputs([a, b])
+        assert merged["baselines_s0"]["chance_mrr_mean"] == 0.250
+        assert merged["baselines_s1"]["chance_mrr_mean"] == 0.255
+        assert "_baselines_cross_seed_spread" in merged
+
+    def test_merge_p2_scorer_outputs_is_a_noop_on_pre_part_2_shaped_inputs(self):
+        """BACKWARD-COMPATIBILITY CASE, end-to-end through the merge function itself: inputs
+        using the bare (seed-less) 'baselines'/'baselines_randomdag' keys must merge exactly as
+        before Part 2 -- no new exception, 'seed 0 wins' plus a recorded disagreement remains the
+        behaviour for that shape."""
+        a = {"baselines": {"sibling_chance_mean": 0.05}, "arms": {"vis00_s0_ms": {"checkpoints": []}}}
+        b = {"baselines": {"sibling_chance_mean": 0.06}, "arms": {"vis50_s0_ms": {"checkpoints": []}}}
+        merged = merge_p2_scorer_outputs([a, b])
+        assert merged["baselines"]["sibling_chance_mean"] == 0.05
+        assert merged["_baselines_disagreements"]["baselines"] == [{"sibling_chance_mean": 0.06}]
+        assert merged["_baselines_cross_seed_spread"] == {}
+
+
+## ------------------------------------------------------------------------------------------
+## p2_amendment_5_20260924 -- Part 2's own JSON record: the per-seed baselines correctness fix.
+
+class TestP2Amendment5Artifact:
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_5_20260924" in prereg
+        status = prereg["p2_amendment_5_20260924"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "correctness fix" in status
+
+    def test_states_seed_0_wins_was_the_defect(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_5_20260924"]).lower()
+        assert "seed 0 wins" in blob or "seed 0's own" in blob
+
+    def test_records_the_declared_tolerance_and_measured_spread(self, prereg):
+        blob = json.dumps(prereg["p2_amendment_5_20260924"])
+        assert "0.25" in blob
+        assert "1.19" in blob
+        assert "12.0" in blob or "12.00" in blob
+
+    def test_frozen_block_and_every_prior_amendment_are_untouched(self, prereg):
+        assert len(prereg["declared_confounds"]) == 4
+        assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])
+        assert "1.84" in json.dumps(prereg["p2_amendment_4_20260924"])

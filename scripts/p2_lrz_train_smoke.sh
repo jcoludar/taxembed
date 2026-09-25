@@ -64,7 +64,7 @@ python -m py_compile \
     /app/src/taxembed/eval/baselines.py \
     /app/src/taxembed/eval/preregistration.py \
     /app/scripts/build_p2_split.py \
-    /app/scripts/build_p2_randomdag_split.py \
+    /app/scripts/build_p2_degmatch_split.py \
     /app/scripts/score_p2_linkpred.py
 echo "py_compile clean"
 
@@ -82,7 +82,8 @@ done
 echo "all p2_lrz_train.sh flags real"
 
 python /app/scripts/score_p2_linkpred.py --help > /tmp/p2_score_help.txt
-for flag in --manifest --heldout --checkpoints --out --metric --max-checkpoints --seed; do
+for flag in --manifest --heldout --checkpoints --out --metric --max-checkpoints --seed \
+            --closure --baselines-key; do
     if ! grep -q -- "${flag}" /tmp/p2_score_help.txt; then
         echo "SMOKE FAILED: ${flag} is not a real option on scripts/score_p2_linkpred.py" >&2
         exit 1
@@ -112,5 +113,5 @@ if ! grep -q '"seed": 0' /app/artifacts/tags/smoke_p2_train/run.json; then
     exit 1
 fi
 
-echo "=== SMOKE PASSED -- safe to submit p2_lrz_train.sh (after confirming Task 2's vis00/vis50 splits, scripts/build_p2_randomdag_split.py's MATCHED randomdag_vis00 AND randomdag_vis50 splits -- run the builder once per --visibility, same --seed -- and the metazoa mapping TSV are all present under /data/p2_splits) ==="
+echo "=== SMOKE PASSED -- safe to submit p2_lrz_train.sh (after confirming Task 2's vis00/vis50 splits, scripts/build_p2_degmatch_split.py's MATCHED degmatch_vis00 AND degmatch_vis50 splits (p2_amendment_4_20260924) -- run the builder once per --visibility, same --seed -- and the metazoa mapping TSV are all present under /data/p2_splits) ==="
 ls -la /app/artifacts/tags/smoke_p2_train/

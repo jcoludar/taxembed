@@ -19,9 +19,12 @@ export MKL_THREADING_LAYER=GNU
 # scripts/score_p2_linkpred.py: for every held-out LEAF node whose parent edge was withheld, rank
 # its true parent among its grandparent's other children using the checkpoint's embedding.
 #
-#   12 runs = 4 arms x seeds 0/1/2, metazoa scale, 200 epochs (p2_amendment_2_20260924, USER
-#   DESIGN decision 2026-09-24: RandomDAG now runs at BOTH visibilities, matched per real arm).
-#   artifacts/tags/p2_{vis00,vis50,randomdag_vis00,randomdag_vis50}_s{0,1,2}/
+#   12 runs = 4 arms x seeds 0/1/2, metazoa scale, 200 epochs (p2_amendment_2_20260924's matched-
+#   control shape; p2_amendment_4_20260924, USER DESIGN decision 2026-09-24, BEFORE any array was
+#   submitted and BEFORE any P2 outcome data existed: the RandomDAG control is RETIRED and
+#   replaced by a DEGREE-MATCHED shuffle that preserves the fan-out multiset exactly instead of
+#   collapsing it -- see scripts/p2_lrz_train.sh's header for the measured numbers).
+#   artifacts/tags/p2_{vis00,vis50,degmatch_vis00,degmatch_vis50}_s{0,1,2}/
 #
 # Per run, TWO checkpoint groups are registered, mirroring Task 9's *_ms/*_roll convention
 # (results/p2_heldout_preregistration.json's primary-metric definition):
@@ -33,27 +36,36 @@ export MKL_THREADING_LAYER=GNU
 # THREE SEPARATE score_p2_linkpred.py CALLS PER SEED, not one for all four arms: vis00 and vis50
 # share one --manifest/--heldout pair (the held-out NODE SET and the closure's parent/depth are
 # properties of the REAL tree, unaffected by the visibility knob -- Task 2's build_p2_split.py
-# writes one heldout.npz per (clade, seed), not per visibility). randomdag_vis00 and
-# randomdag_vis50 do NOT share that real-tree pair: each holds out parent edges from the SAME
-# randomised closure (scripts/build_p2_randomdag_split.py, same seed) but is scored against its
-# OWN visibility-tagged manifest -- using the real-tree pair, or the OTHER randomdag arm's
-# manifest, for either randomdag checkpoint set would rank candidates from the WRONG tree. The two
-# randomdag arms DO share one heldout.npz (the held-out node set does not depend on visibility,
+# writes one heldout.npz per (clade, seed), not per visibility). degmatch_vis00 and
+# degmatch_vis50 do NOT share that real-tree pair: each holds out parent edges from the SAME
+# degree-matched closure (scripts/build_p2_degmatch_split.py, same seed) but is scored against its
+# OWN visibility-tagged manifest -- using the real-tree pair, or the OTHER degmatch arm's
+# manifest, for either degmatch checkpoint set would rank candidates from the WRONG tree. The two
+# degmatch arms DO share one heldout.npz (the held-out node set does not depend on visibility,
 # exactly as for vis00/vis50), so there are three manifest/heldout pairs per seed in total: the
-# real pair, and the two randomdag manifests against the one shared randomdag heldout.
+# real pair, and the two degmatch manifests against the one shared degmatch heldout.
 #
 # Pre-registration: results/p2_heldout_preregistration.json, including its
-# p2_amendment_1_20260924 and p2_amendment_2_20260924 blocks. READING RULE: do not read a verdict
-# off these JSON files by hand. Cross-tree comparisons (an arm vs its MATCHED RandomDAG control --
-# vis00 vs randomdag_vis00, vis50 vs randomdag_vis50, never crossed) use normalized_rank -- chance
-# is 0.5 for ANY pool size, which is what makes it comparable across vis00/vis50's real pools and
-# RandomDAG's collapsed-fan-out pools; within-tree comparisons (vis00 vs vis50; an arm vs its own
-# baselines.chance_mrr_mean, and, per p2_amendment_3_20260924, its own baselines.degree_prior) use
-# MRR. This job writes 9 SEPARATE JSON files (never one combined file) -- score with
-# scripts/apply_preregistration.py --task p2 --json <all 9 OUT_FILES> --amendment-1 --amendment-2,
-# which merges them (taxembed.eval.preregistration.merge_p2_scorer_outputs) before scoring. Go
-# through p2_verdict(result, seeds, amendment_1=True, amendment_2=True); never read a verdict off
-# these JSON files by hand.
+# p2_amendment_1_20260924, p2_amendment_2_20260924 and p2_amendment_4_20260924 blocks. READING
+# RULE: do not read a verdict off these JSON files by hand. Cross-tree comparisons (an arm vs its
+# MATCHED degree-matched control -- vis00 vs degmatch_vis00, vis50 vs degmatch_vis50, never
+# crossed) use normalized_rank -- chance is 0.5 for ANY pool size, which is what makes it
+# comparable across vis00/vis50's real pools and the degmatch control's pools even though (per
+# p2_amendment_4_20260924) those pools are not perfectly chance-matched either; within-tree
+# comparisons (vis00 vs vis50; an arm vs its own baselines.chance_mrr_mean, and, per
+# p2_amendment_3_20260924, its own baselines.degree_prior) use MRR. PART 2 fix (2026-09-24, no
+# amendment flag -- a correctness fix, not a design choice with two legitimate readings, same
+# posture as amendment_3's C1-C5): each seed draws its OWN held-out split and therefore has its
+# OWN sibling_chance_mean/chance_mrr_mean/degree_prior -- every --baselines-key below is now
+# SEED-TAGGED (baselines_s${s}, baselines_degmatch_vis00_s${s}, ...) so the merge step never
+# silently applies seed 0's floor to seeds 1/2's runs; see
+# taxembed.eval.preregistration._p2_baselines_for_seed and
+# assert_baselines_agree_across_seeds. This job writes 9 SEPARATE JSON files (never one combined
+# file) -- score with scripts/apply_preregistration.py --task p2 --json <all 9 OUT_FILES>
+# --amendment-1 --amendment-2 --amendment-4, which merges them
+# (taxembed.eval.preregistration.merge_p2_scorer_outputs) before scoring. Go through
+# p2_verdict(result, seeds, amendment_1=True, amendment_2=True, amendment_4=True); never read a
+# verdict off these JSON files by hand.
 # =============================================================================
 
 SPLITDIR=/data/p2_splits
@@ -111,6 +123,11 @@ for s in "${SEEDS[@]}"; do
         REAL_FLAGS+=(--checkpoints "${arm}_s${s}_roll=${dir}/${tag}_epoch*.pth")
     done
 
+    # PART 2 (2026-09-24, correctness fix, no amendment flag): --baselines-key is SEED-TAGGED
+    # (baselines_s${s}, never the bare "baselines") -- this seed's own sibling_chance_mean/
+    # chance_mrr_mean/degree_prior, drawn from THIS seed's own manifest/heldout, must survive the
+    # merge distinctly from the other two seeds' own measurements, never collapsed onto whichever
+    # seed's file happens to merge first.
     OUT_REAL="${OUTDIR}/p2_real_s${s}_${STAMP}.json"
     python /app/scripts/score_p2_linkpred.py \
         --manifest "${REAL_MANIFEST}" \
@@ -119,31 +136,34 @@ for s in "${SEEDS[@]}"; do
         "${REAL_FLAGS[@]}" \
         --metric cosine \
         --seed 0 \
+        --baselines-key "baselines_s${s}" \
         --out "${OUT_REAL}"
     OUT_FILES+=("${OUT_REAL}")
 
-    # -------- RandomDAG: TWO matched controls, each its own visibility-tagged manifest, never
-    # the real-tree pair and never each other's manifest (p2_amendment_2_20260924) --------
-    RAND_HELDOUT="${SPLITDIR}/p2_metazoa_33208_clean_randomdag_seed${s}_heldout.npz"
-    # C5: the randomised closure build_p2_randomdag_split.py writes -- SHARED by randomdag_vis00
-    # and randomdag_vis50 at this seed (only the TRAIN split's visibility thinning differs
-    # between them; the closure itself depends only on --seed, not --visibility).
-    RAND_CLOSURE="${SPLITDIR}/taxonomy_edges_metazoa_33208_clean_randomdag_seed${s}_transitive.npz"
-    for f in "${RAND_HELDOUT}" "${RAND_CLOSURE}"; do
+    # -------- degree-matched control (p2_amendment_4_20260924): TWO matched controls, each its
+    # own visibility-tagged manifest, never the real-tree pair and never each other's manifest
+    # (p2_amendment_2_20260924's matched-control shape, now built from the degree-matched
+    # shuffle instead of RandomDAG's uniform rewire) --------
+    DEGMATCH_HELDOUT="${SPLITDIR}/p2_metazoa_33208_clean_degmatch_seed${s}_heldout.npz"
+    # C5: the degree-matched closure build_p2_degmatch_split.py writes -- SHARED by
+    # degmatch_vis00 and degmatch_vis50 at this seed (only the TRAIN split's visibility thinning
+    # differs between them; the closure itself depends only on --seed, not --visibility).
+    DEGMATCH_CLOSURE="${SPLITDIR}/taxonomy_edges_metazoa_33208_clean_degmatch_seed${s}_transitive.npz"
+    for f in "${DEGMATCH_HELDOUT}" "${DEGMATCH_CLOSURE}"; do
         if [ ! -f "${f}" ]; then
             echo "ERROR: missing ${f}" >&2
             exit 1
         fi
     done
 
-    for rand_arm in randomdag_vis00 randomdag_vis50; do
-        RAND_MANIFEST="${SPLITDIR}/p2_metazoa_33208_clean_${rand_arm}_seed${s}_manifest.json"
-        if [ ! -f "${RAND_MANIFEST}" ]; then
-            echo "ERROR: missing ${RAND_MANIFEST}" >&2
+    for degmatch_arm in degmatch_vis00 degmatch_vis50; do
+        DEGMATCH_MANIFEST="${SPLITDIR}/p2_metazoa_33208_clean_${degmatch_arm}_seed${s}_manifest.json"
+        if [ ! -f "${DEGMATCH_MANIFEST}" ]; then
+            echo "ERROR: missing ${DEGMATCH_MANIFEST}" >&2
             exit 1
         fi
 
-        tag="p2_${rand_arm}_s${s}"
+        tag="p2_${degmatch_arm}_s${s}"
         dir="${TAGS}/${tag}"
         for f in "${dir}/run.json" "${dir}/${tag}_milestone_epoch200.pth" "${dir}/${tag}_epoch200.pth"; do
             if [ ! -f "${f}" ]; then
@@ -152,23 +172,25 @@ for s in "${SEEDS[@]}"; do
             fi
         done
 
-        # C4 #3: --baselines-key writes this control's OWN floor under the key
-        # p2_verdict(..., amendment_2=True) reads (baselines_randomdag_vis00 /
-        # baselines_randomdag_vis50) instead of every invocation writing the same plain
-        # "baselines" key and the engine's fallback silently handing this control the REAL
-        # tree's floor.
-        OUT_RAND="${OUTDIR}/p2_${rand_arm}_s${s}_${STAMP}.json"
+        # C4 #3 + PART 2: --baselines-key writes this control's OWN floor, for THIS SEED, under
+        # the seed-tagged key p2_verdict(..., amendment_2=True, amendment_4=True) reads
+        # (baselines_degmatch_vis00_s${s} / baselines_degmatch_vis50_s${s}) instead of every
+        # invocation writing the same plain "baselines" key (the pre-Part-2 C4 #3 fix) or the
+        # same seed-less "baselines_${degmatch_arm}" key across all 3 seeds (the seed-0-wins
+        # defect Part 2 fixes) -- each seed's own control measurement now survives the merge
+        # distinctly.
+        OUT_DEGMATCH="${OUTDIR}/p2_${degmatch_arm}_s${s}_${STAMP}.json"
         python /app/scripts/score_p2_linkpred.py \
-            --manifest "${RAND_MANIFEST}" \
-            --heldout "${RAND_HELDOUT}" \
-            --closure "${RAND_CLOSURE}" \
-            --checkpoints "${rand_arm}_s${s}_ms=${dir}/${tag}_milestone_epoch*.pth" \
-            --checkpoints "${rand_arm}_s${s}_roll=${dir}/${tag}_epoch*.pth" \
+            --manifest "${DEGMATCH_MANIFEST}" \
+            --heldout "${DEGMATCH_HELDOUT}" \
+            --closure "${DEGMATCH_CLOSURE}" \
+            --checkpoints "${degmatch_arm}_s${s}_ms=${dir}/${tag}_milestone_epoch*.pth" \
+            --checkpoints "${degmatch_arm}_s${s}_roll=${dir}/${tag}_epoch*.pth" \
             --metric cosine \
             --seed 0 \
-            --baselines-key "baselines_${rand_arm}" \
-            --out "${OUT_RAND}"
-        OUT_FILES+=("${OUT_RAND}")
+            --baselines-key "baselines_${degmatch_arm}_s${s}" \
+            --out "${OUT_DEGMATCH}"
+        OUT_FILES+=("${OUT_DEGMATCH}")
     done
 done
 

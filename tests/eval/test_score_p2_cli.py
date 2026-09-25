@@ -545,3 +545,56 @@ def test_scorer_output_flows_through_merge_and_the_verdict_engine_end_to_end(tmp
     # never silently falling back to the real tree's baselines block (C4 #3's whole point).
     assert v["randomdag_sibling_chance_mean"] == pytest.approx(
         control_result["baselines_randomdag"]["sibling_chance_mean"])
+
+
+# --- p2_amendment_4_20260924 + Part 2 (2026-09-24): the degree-matched control's name
+# (degmatch_vis00/degmatch_vis50), amendment_2's matched-per-visibility shape, and Part 2's
+# seed-tagged --baselines-key, all replayed against a REAL score_p2_linkpred.py subprocess
+# across 2 seeds -- "a verifier you wrote shares your blind spot", so this exercises the actual
+# CLI surface p2_lrz_score.sh drives, not just hand-authored fixtures.
+
+
+def test_degmatch_and_seed_tagged_baselines_flow_through_merge_and_amendment_4_end_to_end(tmp_path):
+    manifest, held = _write_small_tree(tmp_path, test=(3, 5))
+    ck = tmp_path / "ck_epoch200.pth"
+    torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "epoch": 200}, ck)
+
+    results = []
+    for s in (0, 1):
+        real_out = tmp_path / f"real_s{s}.json"
+        rc_real = subprocess.run(
+            [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+             "--checkpoints", f"vis00_s{s}_ms={ck}", "--checkpoints", f"vis00_s{s}_roll={ck}",
+             "--checkpoints", f"vis50_s{s}_ms={ck}", "--checkpoints", f"vis50_s{s}_roll={ck}",
+             "--baselines-key", f"baselines_s{s}", "--out", str(real_out)],
+            capture_output=True, text=True,
+        )
+        assert rc_real.returncode == 0, rc_real.stderr
+        results.append(json.loads(real_out.read_text()))
+
+        for arm in ("degmatch_vis00", "degmatch_vis50"):
+            control_out = tmp_path / f"{arm}_s{s}.json"
+            rc_control = subprocess.run(
+                [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
+                 "--checkpoints", f"{arm}_s{s}_ms={ck}", "--checkpoints", f"{arm}_s{s}_roll={ck}",
+                 "--baselines-key", f"baselines_{arm}_s{s}", "--out", str(control_out)],
+                capture_output=True, text=True,
+            )
+            assert rc_control.returncode == 0, rc_control.stderr
+            results.append(json.loads(control_out.read_text()))
+
+    for r in results:
+        assert any(k.endswith(f"_s{i}") and k.startswith("baselines") for i in (0, 1) for k in r), (
+            "every scorer output must carry a SEED-TAGGED baselines key, not the bare 'baselines'")
+
+    # the seed-tagged keys never collide, so merging must not raise on agreement (both seeds
+    # score the SAME tiny tree here, so the cross-seed spread is exactly 0 -- a trivial pass,
+    # but proves the wiring end to end on real scorer output rather than a hand-built fixture).
+    merged = merge_p2_scorer_outputs(results)
+    assert "_baselines_cross_seed_spread" in merged
+    assert merged["_baselines_cross_seed_spread"]     # non-empty: families were actually found
+
+    v = p2_verdict(merged, seeds=(0, 1), amendment_1=True, amendment_2=True, amendment_4=True)
+    assert v["amendment_4_applied"] is True
+    assert v["verdict"] in {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+    assert set(v.get("controls", {})) <= {"degmatch_vis00", "degmatch_vis50"}

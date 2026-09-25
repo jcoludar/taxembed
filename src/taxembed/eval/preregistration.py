@@ -282,6 +282,26 @@ P2_MATCHED_CONTROL = {                            # amendment_2=True (p2_amendme
     "vis00": "randomdag_vis00",                   # each real arm reads against its OWN
     "vis50": "randomdag_vis50",                   # visibility-matched control -- never crossed.
 }
+P2_MATCHED_CONTROL_DEGMATCH = {                   # amendment_4=True (p2_amendment_4_20260924):
+    "vis00": "degmatch_vis00",                    # RandomDAG RETIRED as P2's control -- the
+    "vis50": "degmatch_vis50",                    # degree-matched shuffle (randomdag.py::
+}                                                  # degree_matched_shuffle) replaces it, same
+                                                   # matched-pair shape amendment_2 established.
+
+P2_BASELINES_SEED_TOLERANCE = 0.25                # Part 2 fix (2026-09-24, no amendment flag --
+# a correctness fix, not a design choice with two legitimate readings, same posture as
+# amendment_3's C1-C5): declared relative-spread tolerance `assert_baselines_agree_across_seeds`
+# enforces across seeds 0/1/2's OWN sibling_chance_mean / chance_mrr_mean / degree_prior blocks.
+# Measured on the real mollusca_6447_clean closure, 3 seeds, visibility-independent (helpers/
+# p2_cross_seed_baseline_spread.py): sibling_chance_mean relative spread 1.19%, chance_mrr_mean
+# 1.63%, degree_prior.mrr 10.00%, degree_prior.normalized_rank 12.00% (740 held-out nodes/seed --
+# the production metazoa split has ~28k, so genuine sampling noise is expected to be considerably
+# smaller there, per the usual 1/sqrt(n) scaling). 25% is comfortably above every measured figure
+# yet far below what an actual bug produces (RandomDAG's own chance-floor inflation vs the real
+# tree measured 440%; the degree-matched control's residual gap, still real after amendment_4,
+# measured 84% -- see p2_amendment_4_20260924 below). A tighter tolerance would risk flagging
+# ordinary held-out-sample noise on the smaller degree_prior fields as a "disagreement"; a looser
+# one would fail to catch a genuinely wrong split/closure landing under the wrong seed's key.
 
 
 def _p2_roll_key(arm: str, seed: int) -> str:
@@ -439,7 +459,37 @@ def p2_validity_gate(result: dict, arm: str, seed: int, sibling_chance_mean: flo
     }
 
 
-def p2_group_stats(result: dict, group: str, seeds, baselines: dict) -> dict:
+def _p2_baselines_for_seed(result: dict, prefixes: list[str], seed: int) -> dict:
+    """Resolve ONE seed's own baselines block via a fallback chain of prefixes (Part 2 fix,
+    2026-09-24 -- a correctness fix, not a design choice with two legitimate readings, same
+    posture as amendment_3's C1-C5).
+
+    Each seed draws its own held-out node set (`build_p2_split.py`/`build_p2_degmatch_split.py`
+    write one manifest/heldout PER SEED), so `sibling_chance_mean`/`chance_mrr_mean`/
+    `degree_prior` are themselves PER-SEED quantities, not one shared value silently taken from
+    seed 0 and reused for seeds 1/2's runs. For each `prefix` in order, tries the SEED-SPECIFIC
+    key (`{prefix}_s{seed}`) first, then the bare `{prefix}` key, before moving to the next
+    prefix -- extending the fallback chain amendment_1/amendment_2 already established
+    (`baselines_<control>` -> `baselines_randomdag` -> `baselines`) by one more link at the front
+    of each stage. A caller passing `prefixes=["baselines"]` (the real-tree pair) therefore checks
+    `baselines_s{seed}` then `baselines`; a caller passing
+    `prefixes=["baselines_degmatch_vis00", "baselines_randomdag", "baselines"]` (a matched
+    control under amendment_4) checks `baselines_degmatch_vis00_s{seed}`,
+    `baselines_degmatch_vis00`, `baselines_randomdag_s{seed}`, `baselines_randomdag`,
+    `baselines_s{seed}`, `baselines` in that order. On a scorer output that predates Part 2 (no
+    seed-tagged key exists anywhere in the chain), every seed resolves to the SAME bare-prefix
+    dict -- reproducing the pre-Part-2 single-shared-baseline behaviour exactly, not a new one.
+    """
+    for prefix in prefixes:
+        seed_key = f"{prefix}_s{seed}"
+        if seed_key in result:
+            return result[seed_key]
+        if prefix in result:
+            return result[prefix]
+    raise KeyError(f"none of {[f'{p}(_s{seed})' for p in prefixes]} present in scorer output")
+
+
+def p2_group_stats(result: dict, group: str, seeds, baselines_by_seed: dict) -> dict:
     """Gates + per-run values for one arm's seeds (e.g. group='vis00' -> vis00_s0/_s1/_s2).
 
     Carries BOTH the MRR aggregates (unchanged, used for the own-tree floor margin and for the
@@ -447,19 +497,35 @@ def p2_group_stats(result: dict, group: str, seeds, baselines: dict) -> dict:
     the cross-tree-vs-RandomDAG reading) -- so both `_p2_arm_reading` branches can be computed
     from the same `p2_group_stats` call without re-scanning the checkpoints.
 
-    `baselines` (2026-09-24, C1/C2, `p2_amendment_3_20260924`) is THIS group's own baselines
-    block (`result["baselines"]` for vis00/vis50; a control's own `baselines_<name>` block, with
-    the established fallback chain, for a RandomDAG control) -- required directly (`baselines[k]`,
-    never `.get(k, default)`): every scorer invocation now always writes `sibling_chance_mean`,
-    `chance_mrr_mean` and `degree_prior`, so a KeyError here means the JSON predates this fix and
-    must be rescored, not silently patched over with a guessed value.
+    `baselines_by_seed` (2026-09-24, Part 2 fix -- signature change from a single shared
+    `baselines: dict`, C1/C2's original `p2_amendment_3_20260924` shape) maps EACH seed to ITS
+    OWN baselines block: `{seed: {"sibling_chance_mean": ..., "chance_mrr_mean": ...,
+    "degree_prior": {...}}}`, resolved per seed by `_p2_baselines_for_seed` (callers below always
+    go through it). Every seed's OWN gate (`p2_validity_gate`) is computed against ITS OWN
+    dict -- never seed 0's value reused for seed 1/2's runs, the defect Part 2 fixes. Required
+    directly (`baselines_by_seed[s][k]`, never `.get(k, default)`): every scorer invocation now
+    always writes `sibling_chance_mean`, `chance_mrr_mean` and `degree_prior`, so a KeyError here
+    means the JSON predates the C1/C2 fix and must be rescored, not silently patched over with a
+    guessed value.
+
+    The GROUP-level summary fields (`degree_prior`, `chance_mrr_mean`, `sibling_chance_mean`
+    returned below) come from `seeds[0]`'s own dict, never an average -- deliberately, so that on
+    a pre-Part-2 fixture (where every seed's dict is the SAME object via the fallback above) this
+    function's output is BYTE-IDENTICAL to the pre-Part-2 implementation's, with no floating-point
+    drift from averaging. This is safe specifically because `p2_verdict` calls
+    `assert_baselines_agree_across_seeds` on the merged scorer output before any gate here is
+    read -- by the time this executes, seed 0's value is already known to agree with every other
+    seed's within the declared tolerance, so which one is DISPLAYED is cosmetic. What is NOT
+    cosmetic -- which value GATES each seed's own run -- already uses that seed's own dict, above.
     """
-    sibling_chance_mean = float(baselines["sibling_chance_mean"])
-    chance_mrr = float(baselines["chance_mrr_mean"])
-    gates = [p2_validity_gate(result, group, s, sibling_chance_mean, chance_mrr) for s in seeds]
+    gates = [p2_validity_gate(result, group, s,
+                              float(baselines_by_seed[s]["sibling_chance_mean"]),
+                              float(baselines_by_seed[s]["chance_mrr_mean"]))
+            for s in seeds]
     invalid = [g["arm"] for g in gates if not g["valid"]]
     vals = np.array([g["per_run_value"] for g in gates], dtype=float)
     vals_nr = np.array([g["per_run_value_normalized_rank"] for g in gates], dtype=float)
+    first = baselines_by_seed[seeds[0]]
     return {
         "group": group, "seeds": list(seeds), "gates": gates, "invalid_runs": invalid,
         "per_run_values": vals.tolist(),
@@ -471,9 +537,10 @@ def p2_group_stats(result: dict, group: str, seeds, baselines: dict) -> dict:
         "max_normalized_rank": float(vals_nr.max()),
         "pooled_within_arm_seed_sd_normalized_rank": (
             float(vals_nr.std(ddof=1)) if len(vals_nr) > 1 else float("nan")),
-        "degree_prior": baselines["degree_prior"],
-        "chance_mrr_mean": chance_mrr,
-        "sibling_chance_mean": sibling_chance_mean,
+        "degree_prior": first["degree_prior"],
+        "chance_mrr_mean": float(first["chance_mrr_mean"]),
+        "sibling_chance_mean": float(first["sibling_chance_mean"]),
+        "baselines_by_seed": {s: baselines_by_seed[s] for s in seeds},
     }
 
 
@@ -696,39 +763,138 @@ def _p2_single_shared_control(result: dict, seeds) -> dict:
     BOTH vis00 and vis50 -- exactly the original `p2_verdict` body, unchanged, so the default
     call path stays byte-identical to before amendment_2 existed.
 
-    Passes the control's FULL baselines block (not just sibling_chance_mean) into
-    `p2_group_stats` (2026-09-24, C1/C2): `chance_mrr_mean` and `degree_prior` are required keys
-    there now, same fallback chain (`baselines_randomdag` -> `baselines`) as before.
+    Resolves the control's baselines PER SEED (2026-09-24, Part 2 fix) via
+    `_p2_baselines_for_seed`, fallback chain `baselines_randomdag_s{seed}` -> `baselines_randomdag`
+    -> `baselines_s{seed}` -> `baselines` -- extending the pre-Part-2 chain
+    (`baselines_randomdag` -> `baselines`) by one seed-specific link at each stage. On a
+    pre-Part-2 scorer output (no seed-tagged key anywhere in the chain) every seed resolves to
+    the SAME dict, reproducing the old single-shared-baseline behaviour exactly.
     """
-    randomdag_baselines = result.get("baselines_randomdag", result["baselines"])
-    control = p2_group_stats(result, P2_CONTROL_ARM, seeds, randomdag_baselines)
+    prefixes = ["baselines_randomdag", "baselines"]
+    baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+    control = p2_group_stats(result, P2_CONTROL_ARM, seeds, baselines_by_seed)
     return {P2_CONTROL_ARM: control}, {g: P2_CONTROL_ARM for g in P2_DATA_ARMS}
 
 
-def _p2_matched_controls(result: dict, seeds) -> dict:
-    """amendment_2=True (`p2_amendment_2_20260924`): one p2_group_stats per matched RandomDAG
-    control (randomdag_vis00, randomdag_vis50) -- vis00 is read ONLY against randomdag_vis00,
-    vis50 ONLY against randomdag_vis50, never crossed (rule_1 of the amendment).
+def _p2_matched_controls(result: dict, seeds, control_map: dict | None = None) -> dict:
+    """amendment_2=True (`p2_amendment_2_20260924`) or amendment_4=True
+    (`p2_amendment_4_20260924`): one p2_group_stats per matched control (randomdag_vis00/
+    randomdag_vis50 under amendment_2, degmatch_vis00/degmatch_vis50 under amendment_4) -- vis00
+    is read ONLY against its own matched control, vis50 ONLY against ITS own, never crossed
+    (rule_1 of amendment_2, unchanged in meaning by amendment_4's control swap).
 
-    Each control's own baselines block (sibling_chance_mean, chance_mrr_mean, degree_prior) is
-    read from a dedicated `baselines_<control_name>` block when the scorer output provides one,
-    else the shared `baselines_randomdag` block, else the shared `baselines` block -- the same
-    three-step fallback amendment_1 established for the single control, applied per matched pair
-    here since there are now two controls (rule_3). C4 (2026-09-24): this is the key
-    `--baselines-key` in `scripts/score_p2_linkpred.py` now lets the scorer populate directly,
-    instead of every invocation writing the same plain `baselines` and this fallback silently
-    handing every control the REAL tree's floor.
+    `control_map` (2026-09-24, amendment_4 -- generalises what was a hard-coded
+    `P2_MATCHED_CONTROL` reference): defaults to `P2_MATCHED_CONTROL`
+    (randomdag_vis00/randomdag_vis50, amendment_2's original mapping) when omitted, so every
+    existing amendment_2 call site is unchanged; `p2_verdict` passes
+    `P2_MATCHED_CONTROL_DEGMATCH` here under amendment_4.
+
+    Each control's own baselines are resolved PER SEED (2026-09-24, Part 2 fix) via
+    `_p2_baselines_for_seed`, fallback chain `baselines_<control_name>_s{seed}` ->
+    `baselines_<control_name>` -> `baselines_randomdag_s{seed}` -> `baselines_randomdag` ->
+    `baselines_s{seed}` -> `baselines` -- the same three-step (now six-step, with the seed-tagged
+    link added at each stage) fallback amendment_1 established for the single control, applied per
+    matched pair since there are two controls (rule_3). C4 (2026-09-24): `--baselines-key` in
+    `scripts/score_p2_linkpred.py` lets the scorer populate the specific key directly, instead of
+    every invocation writing the same plain `baselines` and this fallback silently handing every
+    control the REAL tree's floor; Part 2 additionally seed-tags that key so seeds 1/2 are never
+    silently handed seed 0's floor either.
     """
+    control_map = P2_MATCHED_CONTROL if control_map is None else control_map
     controls = {}
-    for control_name in sorted(set(P2_MATCHED_CONTROL.values())):
-        baselines_key = f"baselines_{control_name}"
-        control_baselines = result.get(
-            baselines_key, result.get("baselines_randomdag", result["baselines"]))
-        controls[control_name] = p2_group_stats(result, control_name, seeds, control_baselines)
-    return controls, dict(P2_MATCHED_CONTROL)
+    for control_name in sorted(set(control_map.values())):
+        prefixes = [f"baselines_{control_name}", "baselines_randomdag", "baselines"]
+        baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+        controls[control_name] = p2_group_stats(result, control_name, seeds, baselines_by_seed)
+    return controls, dict(control_map)
 
 
-def merge_p2_scorer_outputs(results: list[dict]) -> dict:
+def _p2_relative_spread(values: list[float]) -> float:
+    """(max-min)/mean -- the relative-spread statistic `assert_baselines_agree_across_seeds`
+    checks. 0.0 when every value is exactly equal (including all-zero). When the mean is
+    (numerically) zero but the values are NOT all equal, returns `inf` rather than dividing by
+    zero -- any non-zero spread around a zero mean is a genuine disagreement, never a false
+    negative that a division guard would otherwise silently wave through."""
+    arr = np.asarray(values, dtype=float)
+    spread = float(arr.max() - arr.min())
+    mean = float(arr.mean())
+    if abs(mean) < 1e-12:
+        return 0.0 if spread == 0.0 else float("inf")
+    return spread / abs(mean)
+
+
+def assert_baselines_agree_across_seeds(result: dict, seeds=(0, 1, 2),
+                                        tolerance: float = P2_BASELINES_SEED_TOLERANCE) -> dict:
+    """Fail loudly if any seed-tagged baselines FAMILY's own sibling_chance_mean/chance_mrr_mean/
+    degree_prior.{mrr,normalized_rank} disagrees across seeds by more than `tolerance` (relative
+    spread, `(max-min)/mean`) -- Part 2 fix (2026-09-24, no amendment flag: a correctness fix, not
+    a design choice with two legitimate readings, same posture as amendment_3's C1-C5). 'They
+    should agree closely' is the word that precedes every silent defect in this build, so this
+    measures it instead of assuming it -- called from `merge_p2_scorer_outputs` per Part 2's
+    ruling ('have the merge step assert they agree, failing loudly if not').
+
+    A baselines FAMILY is any prefix P such that `{P}_s{s}` exists in `result` for at least two of
+    `seeds` -- e.g. prefix `"baselines"` (the real-tree pair, shared by vis00/vis50) or
+    `"baselines_degmatch_vis00"` (one matched control). A merged result with NO seed-tagged keys
+    at all (every pre-Part-2 fixture and every pre-Part-2 production JSON, which wrote one bare
+    `"baselines"`/`"baselines_<control>"` key shared by all 3 seeds) has no families to check and
+    this is a silent no-op -- additive, never a behaviour change for an existing caller.
+
+    Returns a report dict (`family -> field -> relative spread`) for a caller that wants the
+    measured numbers even when nothing failed; raises `ValueError`, naming every offending
+    family+field and the tolerance, when any exceeds it.
+    """
+    families: set[str] = set()
+    for key in result:
+        if not key.startswith("baselines"):
+            continue
+        for s in seeds:
+            suffix = f"_s{s}"
+            if key.endswith(suffix):
+                families.add(key[: -len(suffix)])
+                break
+
+    report: dict[str, dict[str, float]] = {}
+    violations: list[str] = []
+    for family in sorted(families):
+        present = {s: result[f"{family}_s{s}"] for s in seeds if f"{family}_s{s}" in result}
+        if len(present) < 2:
+            continue
+        field_report: dict[str, float] = {}
+        for field in ("sibling_chance_mean", "chance_mrr_mean"):
+            vals = [float(b[field]) for b in present.values() if field in b]
+            if len(vals) < 2:
+                continue
+            spread = _p2_relative_spread(vals)
+            field_report[field] = spread
+            if spread > tolerance:
+                violations.append(
+                    f"{family}.{field}: relative spread {spread:.3f} exceeds tolerance "
+                    f"{tolerance:.3f} across seeds {sorted(present)}")
+        for dp_field in ("mrr", "normalized_rank"):
+            vals = [float(b["degree_prior"][dp_field]) for b in present.values()
+                   if "degree_prior" in b and dp_field in b["degree_prior"]]
+            if len(vals) < 2:
+                continue
+            spread = _p2_relative_spread(vals)
+            field_report[f"degree_prior.{dp_field}"] = spread
+            if spread > tolerance:
+                violations.append(
+                    f"{family}.degree_prior.{dp_field}: relative spread {spread:.3f} exceeds "
+                    f"tolerance {tolerance:.3f} across seeds {sorted(present)}")
+        report[family] = field_report
+
+    if violations:
+        raise ValueError(
+            "baselines disagree across seeds beyond the declared tolerance "
+            f"({tolerance:.0%}) -- a real per-seed measurement should not vary this much; this "
+            "usually means the wrong split/closure landed under the wrong seed's key, not "
+            "ordinary sampling noise:\n  " + "\n  ".join(violations))
+    return report
+
+
+def merge_p2_scorer_outputs(results: list[dict], seeds=(0, 1, 2),
+                            baselines_tolerance: float = P2_BASELINES_SEED_TOLERANCE) -> dict:
     """Merge N `scripts/score_p2_linkpred.py` output dicts into the single dict `p2_verdict`
     expects (2026-09-24, C4 #2, `p2_amendment_3_20260924`).
 
@@ -753,6 +919,21 @@ def merge_p2_scorer_outputs(results: list[dict]) -> dict:
     recorded under `_baselines_disagreements` (keyed by the baselines key) for a reader to check,
     since a few-percent difference across seeds' own splits is expected and not on its own fatal,
     but a large one would be worth knowing about before trusting the merged floor.
+
+    PART 2 FIX (2026-09-24, no amendment flag -- a correctness fix, not a design choice with two
+    legitimate readings, same posture as amendment_3's C1-C5). The paragraph above describes the
+    PRE-Part-2 world, where every seed wrote the SAME bare key (`"baselines"`) and this merge
+    picked whichever file's value merged first ("seed 0 wins", recording only that a later one
+    disagreed). `scripts/p2_lrz_score.sh` now writes SEED-TAGGED keys (`"baselines_s0"`,
+    `"baselines_degmatch_vis00_s1"`, ...), which never collide across seeds -- each survives the
+    union above distinctly, with no "first wins" step involved for them at all. What this merge
+    step ADDS for that seed-tagged shape (the task's own ruling: 'have the merge step assert they
+    agree, failing loudly if not') is calling `assert_baselines_agree_across_seeds` on the fully
+    merged result before returning: it raises `ValueError` if any seed's own sibling_chance_mean/
+    chance_mrr_mean/degree_prior sits more than `baselines_tolerance` (relative spread) from its
+    sibling seeds' -- a genuinely wrong split/closure landing under the wrong seed's key is caught
+    HERE, not three verdict computations later. A merged result with no seed-tagged keys at all
+    (every pre-Part-2 fixture) has nothing to check and this is a silent no-op.
     """
     merged: dict = {"arms": {}}
     disagreements: dict[str, list] = {}
@@ -771,27 +952,35 @@ def merge_p2_scorer_outputs(results: list[dict]) -> dict:
                 disagreements.setdefault(key, []).append(value)
     if disagreements:
         merged["_baselines_disagreements"] = disagreements
+    # PART 2: raises loudly if any seed-tagged family disagrees beyond tolerance; a no-op when no
+    # seed-tagged baselines keys are present (every pre-Part-2 shape).
+    merged["_baselines_cross_seed_spread"] = assert_baselines_agree_across_seeds(
+        merged, seeds=seeds, tolerance=baselines_tolerance)
     return merged
 
 
 def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
-               amendment_2: bool = False) -> dict:
-    """vis00/vis50 vs sibling chance and RandomDAG -> GENERALISES / MEMORISES / MIXED /
-    UNINFORMATIVE, per results/p2_heldout_preregistration.json.
+               amendment_2: bool = False, amendment_4: bool = False) -> dict:
+    """vis00/vis50 vs sibling chance and its control (RandomDAG, or the degree-matched shuffle
+    under amendment_4) -> GENERALISES / MEMORISES / MIXED / UNINFORMATIVE, per results/
+    p2_heldout_preregistration.json.
 
-    UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including every RandomDAG
-    control) fails gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is
-    read. Otherwise each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading
+    UNINFORMATIVE beats every other reading: if ANY seed of ANY arm (including every control arm)
+    fails gate (a)/(b)/(c), the whole verdict is UNINFORMATIVE and neither data arm is read.
+    Otherwise each of vis00/vis50 gets its own GENERALISES/MEMORISES/MIXED reading
     (`by_arm_verdict`); the top-level `verdict` is that shared reading if both arms agree, else
-    MIXED. The validity gates themselves (a/b/c) are untouched by `amendment_1`/`amendment_2` --
-    they are within-tree facts about a run, never a cross-tree comparison.
+    MIXED. The validity gates themselves (a/b/c) are untouched by `amendment_1`/`amendment_2`/
+    `amendment_4` -- they are within-tree facts about a run, never a cross-tree comparison.
 
     `amendment_1` (2026-09-24, `p2_amendment_1_20260924`): default False reproduces the ORIGINAL
-    2026-09-24 freeze reading unchanged (raw MRR compared head-to-head against RandomDAG). True
+    2026-09-24 freeze reading unchanged (raw MRR compared head-to-head against the control). True
     applies the amended reading -- RandomDAG's rewiring measurably inflates its own chance floor
     (~5.4x on mollusca_6447_clean seed 0), so the cross-tree comparison uses normalized_rank
-    (chance = 0.5 for every pool size) instead. See `_p2_arm_reading` and the JSON amendment
-    block for the full derivation. Both readings are always computable from the same result.
+    (chance = 0.5 for every pool size) instead. Still the correct pool-size-invariant quantity
+    under amendment_4's degree-matched control too (see that amendment's own block: the residual
+    fan-out/chance-floor gap there is smaller, ~1.8x, but not zero, so this rule stays
+    load-bearing, not merely belt-and-braces). See `_p2_arm_reading` and the JSON amendment block
+    for the full derivation. Both readings are always computable from the same result.
 
     `amendment_2` (2026-09-24, `p2_amendment_2_20260924`, USER DESIGN decision -- the arm structure
     changed from 9 arms to 12, not an outcome-driven revision): default False reproduces the
@@ -799,16 +988,34 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
     read against BOTH vis00 and vis50, exactly as before this flag existed. True switches to the
     12-arm matched-control design: vis00 is read only against `randomdag_vis00`, vis50 only against
     `randomdag_vis50` -- each real arm against a control trained at its OWN visibility, so the
-    visibility knob never leaks into the real-vs-scrambled contrast. `amendment_1` and
-    `amendment_2` are independent and combine freely (e.g. `amendment_2=True` with
-    `amendment_1=True` reads each matched pair on normalized_rank). See `_p2_matched_controls` and
-    the JSON amendment block for the full derivation.
-    """
-    sibling_chance_mean = float(result["baselines"]["sibling_chance_mean"])
-    groups = {g: p2_group_stats(result, g, seeds, result["baselines"]) for g in P2_DATA_ARMS}
+    visibility knob never leaks into the real-vs-scrambled contrast.
 
-    if amendment_2:
-        controls, control_for_arm = _p2_matched_controls(result, seeds)
+    `amendment_4` (2026-09-24, `p2_amendment_4_20260924`, USER DESIGN decision, BEFORE any array
+    was submitted and BEFORE any P2 outcome data existed): RETIRES RandomDAG as P2's control and
+    substitutes the DEGREE-MATCHED shuffle (`randomdag.degree_matched_shuffle`) -- same 12-arm
+    matched shape amendment_2 established, sole substitution: `degmatch_vis00`/`degmatch_vis50`
+    read in place of `randomdag_vis00`/`randomdag_vis50` (`P2_MATCHED_CONTROL_DEGMATCH` in place
+    of `P2_MATCHED_CONTROL`). Default False leaves amendment_2's own control selection exactly as
+    it was. When True, amendment_4 takes precedence over `amendment_2` for CONTROL SELECTION (the
+    degree-matched arms only exist in the matched-per-visibility shape, so `amendment_4=True`
+    always reads the matched design, whatever `amendment_2` is passed as) -- `amendment_1` and
+    `amendment_4` are independent and combine freely, exactly as `amendment_1`/`amendment_2` do.
+    See `_p2_matched_controls` and the JSON amendment block for the full derivation, including the
+    MEASURED (not assumed) residual chance-floor gap.
+
+    PART 2 (2026-09-24, no amendment flag -- a correctness fix): each group's/control's own
+    baselines are now resolved PER SEED (`p2_group_stats`'s `baselines_by_seed`), never one value
+    shared across all 3 seeds taken from whichever seed's file merged first. See
+    `_p2_baselines_for_seed` and `assert_baselines_agree_across_seeds`.
+    """
+    baselines_by_seed = {s: _p2_baselines_for_seed(result, ["baselines"], s) for s in seeds}
+    sibling_chance_mean = float(baselines_by_seed[seeds[0]]["sibling_chance_mean"])
+    groups = {g: p2_group_stats(result, g, seeds, baselines_by_seed) for g in P2_DATA_ARMS}
+
+    if amendment_4:
+        controls, control_for_arm = _p2_matched_controls(result, seeds, P2_MATCHED_CONTROL_DEGMATCH)
+    elif amendment_2:
+        controls, control_for_arm = _p2_matched_controls(result, seeds, P2_MATCHED_CONTROL)
     else:
         controls, control_for_arm = _p2_single_shared_control(result, seeds)
 
@@ -818,18 +1025,28 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
     for g in groups.values():
         invalid += g["invalid_runs"]
 
+    matched_controls = bool(amendment_4 or amendment_2)
     base = {
-        "task": "P2 -- held-out link prediction, real taxonomy vs RandomDAG",
+        "task": ("P2 -- held-out link prediction, real taxonomy vs degree-matched control"
+                 if amendment_4 else
+                 "P2 -- held-out link prediction, real taxonomy vs RandomDAG"),
         "preregistration": ["results/p2_heldout_preregistration.json"],
         "seeds": list(seeds),
         "amendment_1_applied": bool(amendment_1),
         "amendment_2_applied": bool(amendment_2),
+        "amendment_4_applied": bool(amendment_4),
         "sibling_chance_mean": sibling_chance_mean,
-        "chance_mrr_mean": float(result["baselines"]["chance_mrr_mean"]),
-        "degree_prior": result["baselines"]["degree_prior"],
+        "chance_mrr_mean": float(baselines_by_seed[seeds[0]]["chance_mrr_mean"]),
+        "degree_prior": baselines_by_seed[seeds[0]]["degree_prior"],
         "groups": groups,
     }
-    if amendment_2:
+    # "randomdag_sibling_chance_mean" is a legacy key name kept UNCHANGED regardless of which
+    # control is active (amendment_4's degmatch control included) -- scripts/apply_
+    # preregistration.py::_render_p2 and tests/eval/test_score_p2_cli.py read it by this name; a
+    # rename here would silently break both for no reading-accuracy benefit, since the key's
+    # VALUE is always "whichever control(s) are actually in use"'s own floor, not literally
+    # RandomDAG's.
+    if matched_controls:
         base["controls"] = controls
         base["randomdag_sibling_chance_mean"] = {
             name: c["gates"][0]["sibling_chance_mean"] for name, c in controls.items()}
