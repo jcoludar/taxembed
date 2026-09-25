@@ -61,9 +61,40 @@ def test_visibility_zero_keeps_parent_edges_plus_heldout_ancestry(tmp_path):
     # At visibility 0.0 the training file holds the retained nodes' parent edges
     # (depth_diff == 1) PLUS the held-out nodes' dd>=2 ancestry rows -- exempted from
     # thinning so every held-out node keeps at least one trainable coordinate anchor.
-    # Every surviving depth_diff >= 2 row must therefore belong to a held-out node.
     deep = train.depth_diff >= 2
-    assert set(train.descendant_idx[deep].tolist()).issubset(held_all)
+    n_deep = int(deep.sum())
+    deep_nodes = set(train.descendant_idx[deep].tolist())
+
+    # 🛑 THIS TEST USED TO BE VACUOUS, and it was named for the fix it failed to protect.
+    # The old assertion was `set(descendant_idx[deep]).issubset(held_all)`. Delete the
+    # exemption (`& ~is_heldout_row` in build_p2_split.py) and NO dd>=2 row survives at
+    # visibility 0.0, so `deep_nodes` is empty -- and the empty set is a subset of
+    # anything, so the test passed with the Task-2 plan-defect fix removed. Reproduced in
+    # a shadow tree: `helpers/p2_lesion_harness.py --mutation heldout_exemption`.
+    # The three assertions below each fail on that lesion.
+
+    # 1. The exemption actually kept rows -- this is what kills the empty-set pass.
+    assert n_deep > 0, "no dd>=2 rows survived: the held-out exemption is not doing anything"
+    # 2. It kept exactly the number the manifest claims (ties the artifact to its bookkeeping).
+    assert n_deep == m["n_pairs_heldout_ancestry_kept"]
+    # 3. EQUALITY, not issubset. `issubset` is blind to UNDER-application (the empty set);
+    #    equality also catches OVER-application, i.e. an exemption that leaked retained
+    #    nodes' deep rows into the training file.
+    assert deep_nodes == held_all
+
+    # 4. Each held-out node keeps its FULL ancestry above the dropped parent edge: a node at
+    #    depth d has ancestors at depth_diff 2..d, so exactly d-1 rows. This is the identity
+    #    hand-verified when the exemption was introduced (mollusca 7,693 / 740 = 10.4 rows
+    #    per node, mean depth ~11.4 against a max depth of 14). It pins the exemption's
+    #    EXTENT, not merely its existence -- a partial exemption passes 1-3 but fails here.
+    counts = np.bincount(train.descendant_idx[deep], minlength=train.n_nodes)
+    depth_of = np.zeros(train.n_nodes, dtype=np.int64)
+    depth_of[train.descendant_idx] = train.descendant_depth
+    for v in sorted(deep_nodes):
+        assert counts[v] == depth_of[v] - 1, (
+            f"held-out node {v} at depth {depth_of[v]} kept {counts[v]} dd>=2 rows, expected "
+            f"{depth_of[v] - 1}"
+        )
 
 
 @pytest.mark.skipif(not MOLLUSCA.exists(), reason="mollusca closure not on this machine")

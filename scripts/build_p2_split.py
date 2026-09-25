@@ -4,9 +4,33 @@
 The output is a closure .npz in the IDENTICAL TrainingPairs schema, so the trainer consumes it
 unmodified:  taxembed train --file <train.npz> --mapping <clade>.mapping.tsv ...
 
-That is the point of the design. The negative sampler builds its ancestry index from whatever
-closure it is handed (train_hierarchical.py:263-294), so feeding it the split file means held-out
-relations are invisible to training -- as ancestry knowledge as well as as positive pairs.
+That is the point of the design, and the leak argument rests on it alone: THE TRAINER READS ONLY THE
+ROWS IN THIS FILE. A held-out parent edge that is not in the .npz cannot be a positive pair, and a
+tree has no second path from p to v, so the held-out parent is not recoverable from the retained rows
+either. That argument is unconditional -- it holds for every flag combination and every entry point.
+
+🧨 CORRECTED 2026-09-25 (fix wave 3, review item 4). The previous version of this docstring argued
+leak-freedom a SECOND way, and that second argument cited a code path the P2 runs do not execute:
+
+  - It pointed at `train_hierarchical.py:263-294` ("the negative sampler builds its ancestry index
+    from whatever closure it is handed"). But the production entry point is
+    `taxembed.cli.main train` -> `train_small.py`; `train_hierarchical.py` is used as a library and
+    its `main()` is vestigial.
+  - That ancestry-index machinery is gated behind `--exclude-descendant-negatives`, which in turn
+    requires `--drop-root-anchored` (train_small.py:1087). `scripts/p2_lrz_train.sh` passes NEITHER,
+    so the mechanism -- and its own diagnostic print at train_small.py:899 -- is inactive for all 12
+    arms.
+
+Nothing about the split is wrong and there is no leak; what was wrong was citing an inactive
+mechanism as if it were a second guarantee. Two arguments where one is inert reads as belt-and-braces
+while offering one belt. Keep the row-level argument, which is the one that holds.
+
+⚠ OPEN, and worth settling before the numbers are written up: with descendant-exclusion off, nothing
+stops a held-out node's TRUE parent being drawn as one of its 300 negatives. That would push the pair
+apart and bias the measurement AGAINST the arm -- conservative, not flattering, so it cannot manufacture
+a positive result -- and at ~300 draws against metazoa's ~498k nodes the per-row probability is ~0.06%.
+The exact direction depends on whether a negative substitutes for the ancestor or the descendant in the
+softmax, which is NOT established here. Do not quote a magnitude until someone reads the sampler.
 """
 
 from __future__ import annotations

@@ -51,6 +51,43 @@ def test_randomization_is_seed_stable():
     )
 
 
+def test_randomization_different_seeds_give_different_results():
+    """🛑 Review finding I5, the half fix wave 2 did NOT close. Wave 2 gave
+    `degree_matched_shuffle` a different-seeds test plus a lesion check; `randomize_parents` kept
+    only same-seed stability, which holds trivially for a function that ignores `seed` outright.
+
+    Measured before writing this: replacing `default_rng(seed)` with `default_rng(0)` inside
+    `randomize_parents` passed ALL 16 randomdag tests
+    (`helpers/p2_lesion_harness.py --mutation randomize_parents_ignores_seed`). If that lesion were
+    real, the frozen/amendment_2 RandomDAG control's three seeds would be ONE draw reported three
+    times -- three identical 'independent' control runs.
+
+    Uses the wide fixture, not `chain_and_bush()`: with 3 candidate parents per node a small tree
+    can reproduce the same assignment across two seeds by chance, which would make this test
+    flaky rather than falsifiable.
+    """
+    parent, depth = _wide_two_level_tree()
+    out5 = randomize_parents(parent, depth, seed=5)
+    out6 = randomize_parents(parent, depth, seed=6)
+    assert not np.array_equal(out5, out6)
+
+
+def test_a_hardcoded_internal_seed_fails_the_randomize_parents_different_seeds_check():
+    """LESION CHECK for the test above, mirroring the one wave 2 wrote for
+    `degree_matched_shuffle`: a `randomize_parents`-alike that accepts `seed` and ignores it passes
+    every other assertion in this file, so the different-seeds test must be the one that refuses
+    it. Without this, the test above could itself be vacuously satisfiable."""
+    parent, depth = _wide_two_level_tree()
+
+    def hardcoded_seed_randomize(parent, depth, seed=0):
+        del seed
+        return randomize_parents(parent, depth, seed=0)   # always seed 0, ignores the arg
+
+    out5 = hardcoded_seed_randomize(parent, depth, seed=5)
+    out6 = hardcoded_seed_randomize(parent, depth, seed=6)
+    assert np.array_equal(out5, out6), "fixture must reproduce the lesion for this test to mean anything"
+
+
 ## ------------------------------------------------------------------------------------------
 ## degree_matched_shuffle (p2_amendment_4_20260924): replaces randomize_parents as P2's control.
 ## Preserves the fan-out MULTISET exactly (a permutation of the real parent-label list per depth

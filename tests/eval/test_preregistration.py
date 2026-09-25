@@ -6,6 +6,7 @@ single verdict fails here rather than in the manuscript.
 """
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
@@ -756,16 +757,36 @@ class TestP2Amendment2:
         assert "control" not in v
 
     def test_amendment_2_default_false_reproduces_the_original_nine_arm_reading(self):
-        """amendment_2 defaults to False: the 9-arm reading (one shared control) must be produced
-        unchanged, on the pre-amendment_2 fixtures -- the new flag must not rewrite the old one's
-        behaviour."""
+        """amendment_2 defaults to False: the 9-arm reading (ONE SHARED CONTROL) must be produced
+        unchanged on the pre-amendment_2 fixtures -- the new flag must not rewrite the old one's
+        behaviour.
+
+        Scope, stated precisely because the loose version of this claim invited a bad probe: inside
+        `p2_verdict`, amendment_2 touches NOTHING but control selection. P2 has its own
+        `p2_validity_gate` and deliberately no loss gate at all (see
+        `test_a_rising_training_loss_alone_does_NOT_invalidate_a_run`), so the `amendment_2`-dependent
+        gate (b) in `validity_gate` belongs to the Task 8/9 path and is not reachable from here.
+        "The old behaviour" therefore means exactly: the frozen branch still selects a single shared
+        control, and the flag still defaults to False.
+        """
         res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
                                   sibling_chance=0.05)
+
+        # 🛑 The removed line was `assert default[...] == p2_verdict(res, amendment_2=False)[...]`.
+        # Because amendment_2's default IS False, those were byte-identical invocations and the
+        # comparison asserted nothing about any implementation. Assert the claim DIRECTLY instead --
+        # this fails loudly if anyone flips the default, which is what the comparison was standing
+        # in for. Verified with helpers/p2_lesion_harness.py --mutation p2_amendment2_default_true.
+        assert inspect.signature(p2_verdict).parameters["amendment_2"].default is False
+
         default = p2_verdict(res)
-        explicit_false = p2_verdict(res, amendment_2=False)
-        assert default["verdict"] == explicit_false["verdict"] == "GENERALISES"
+        assert default["verdict"] == "GENERALISES"
         assert default["amendment_2_applied"] is False
+        # The frozen control shape: ONE shared control, not a matched pair. These three lines are
+        # what actually pin "the old behaviour", and they do fail on a rewritten frozen branch --
+        # verified with --mutation p2_frozen_control_selection_rewritten.
         assert "controls" not in default
+        assert "control" in default
         assert default["control"]["invalid_runs"] == []
 
     def test_cross_matching_the_controls_changes_the_verdict(self):
