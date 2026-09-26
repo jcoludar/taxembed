@@ -52,11 +52,20 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-CLADE = "metazoa_33208_clean"
-SOURCE = REPO / f"data/taxopy/{CLADE}/taxonomy_edges_{CLADE}_transitive.npz"
 OUTDIR = REPO / "data/p2_splits"
 PY = REPO / ".venv/bin/python"
 SEEDS = (0, 1, 2)
+
+# Clade is a parameter, not a constant: the 12-arm ARRAY runs on metazoa, but the PILOT that
+# exercises train -> score -> p2_verdict runs on mollusca, and the pilot needs all 12 arms too or the
+# verdict engine cannot be driven end to end (that is the C4 plumbing break the pilot exists to find).
+# ⚠ Mollusca's band-eligible nodes populate only the 11-15 depth stratum, so a mollusca verdict is
+# readable for PLUMBING ONLY, never as science.
+DEFAULT_CLADE = "metazoa_33208_clean"
+# Both are rebound from --clade in main() before any build runs. `build()` and `train_name()` read
+# them at module scope, so they must exist here too or the rebind would leave a NameError behind.
+CLADE = DEFAULT_CLADE
+SOURCE = REPO / f"data/taxopy/{CLADE}/taxonomy_edges_{CLADE}_transitive.npz"
 
 # arm -> (builder script, visibility)
 ARMS = {
@@ -114,11 +123,19 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--rebuild", action="store_true",
                     help="rebuild files that already exist (Rule 1: off by default)")
+    ap.add_argument("--clade", default=DEFAULT_CLADE,
+                    help=f"closure to split (default {DEFAULT_CLADE}). Use mollusca_6447_clean for "
+                         f"the plumbing pilot -- its verdict is readable for PLUMBING ONLY.")
     args = ap.parse_args()
+
+    global CLADE, SOURCE
+    CLADE = args.clade
+    SOURCE = REPO / f"data/taxopy/{CLADE}/taxonomy_edges_{CLADE}_transitive.npz"
 
     if not SOURCE.exists():
         raise SystemExit(f"source closure missing: {SOURCE}")
 
+    print(f"clade   : {CLADE}")
     print(f"source  : {SOURCE}")
     print(f"outdir  : {OUTDIR}")
     print(f"required: {len(ARMS) * len(SEEDS)} train files\n")
