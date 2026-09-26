@@ -166,12 +166,18 @@ done
 
 # C-C (2026-09-26): CLEAR THIS TAG'S CHECKPOINT DIRECTORY BEFORE TRAINING.
 # The trainer's rolling queue keeps the last 5 checkpoints PER PROCESS, and this script did not
-# clear the directory between attempts -- so a resubmitted array element (likely: --time=1-00:00:00
-# against runs sized at 11-19 h) left the FIRST attempt's orphans behind. p2_lrz_score.sh globs
-# "${tag}_epoch*.pth", so a first attempt that died at epoch 120 contributed _epoch116..120.pth to
-# the second attempt's roll window. Measured consequence: published per_run_value 0.68503 instead
-# of 0.82002 and jitter_sd 0.142284 instead of 0.000171, which fails gate (a) and renders the
-# WHOLE ARRAY UNINFORMATIVE (one invalid arm-seed invalidates everything).
+# clear the directory between attempts. p2_lrz_score.sh globs "${tag}_epoch*.pth", so a polluted
+# directory silently changes the headline number: measured on a 10-element roll set,
+# per_run_value 0.68503 instead of 0.82002 and jitter_sd 0.142284 instead of 0.000171, which
+# fails gate (a) and renders the WHOLE ARRAY UNINFORMATIVE (one invalid arm-seed invalidates
+# everything).
+#
+# ⚠ CORRECTED 2026-09-26 (I4): the order that actually pollutes is a COMPLETED run followed by a
+# FAILED SHORTER re-attempt (leaving e.g. [146..150, 196..200]). The reverse -- "died at 120,
+# then completed 200" -- is UNREACHABLE, because checkpoint paths are deterministic in the epoch
+# number so the longer second attempt overwrites and removes the first's files. The reachable
+# case is also exactly the one the older `_epoch200.pth`-exists pre-flight cannot catch, since
+# epoch 200 is still present from the successful first run.
 #
 # Scoped to THIS element's own tag directory, never the shared tags/ root -- an array element must
 # not be able to delete a sibling element's outputs. The engine also now REFUSES a roll set that
@@ -180,8 +186,25 @@ done
 # this change and the engine's refusal costs a rescore rather than a retrain.
 TAGDIR="/app/artifacts/tags/${TAG}"
 if [ -d "${TAGDIR}" ]; then
+    # 🛑 I4 (2026-09-26): REFUSE TO CLEAR A COMPLETED RUN. The clear above is an rm-class
+    # operation (CLAUDE.md Rules 3/5) and, as first written, it ran unconditionally at the top of
+    # EVERY attempt -- so the ordinary operator action of resubmitting `--array=0-11%4` after a
+    # partial failure would delete 5 rolling + 20 milestone checkpoints from every element that
+    # had ALREADY SUCCEEDED, before retraining them. If that retrain were then cancelled or hit
+    # the walltime, ~1-6 GPU-h of finished work would be gone with no way back.
+    #
+    # The milestone at P2_FINAL_EPOCH is the completion marker the score job itself requires, so
+    # it is the right sentinel: if it is here, this element is done and clearing it is never what
+    # the operator meant. Deleting the directory by hand stays available and is deliberate.
+    if [ -f "${TAGDIR}/${TAG}_milestone_epoch200.pth" ]; then
+        echo "pre-flight: ${TAGDIR} already holds ${TAG}_milestone_epoch200.pth -- this element"
+        echo "            has COMPLETED. Refusing to clear it and skipping retraining. To force a"
+        echo "            retrain, delete ${TAGDIR} by hand first."
+        exit 0
+    fi
     n_existing="$(find "${TAGDIR}" -maxdepth 1 -name "${TAG}_epoch*.pth" | wc -l | tr -d ' ')"
-    echo "pre-flight: ${TAGDIR} exists with ${n_existing} rolling checkpoint(s) from a previous attempt"
+    echo "pre-flight: ${TAGDIR} exists with ${n_existing} rolling checkpoint(s) from an INCOMPLETE"
+    echo "            previous attempt (no epoch-200 milestone) -- clearing before retraining"
     find "${TAGDIR}" -maxdepth 1 -name "${TAG}_epoch*.pth" -delete
     find "${TAGDIR}" -maxdepth 1 -name "${TAG}_milestone_epoch*.pth" -delete
     echo "pre-flight: cleared; $(find "${TAGDIR}" -maxdepth 1 -name '*.pth' | wc -l | tr -d ' ') .pth file(s) remain"

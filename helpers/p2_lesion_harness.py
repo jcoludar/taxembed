@@ -244,7 +244,10 @@ MUTATIONS: dict[str, Mutation] = {
     "amendment6_ratio_reverted_to_raw": Mutation(
         name="amendment6_ratio_reverted_to_raw",
         rel_path="src/taxembed/eval/preregistration.py",
-        old="        g_cmp, c_cmp = g_nr / g_prior_nr, c_nr / c_prior_nr",
+        # 2026-09-26: re-anchored after I1 made the denominators per-seed vectors. Self-check 1
+        # caught the stale text -- the SECOND time this session that adding a fix silently
+        # invalidated an existing lesion, which is precisely what that self-check is for.
+        old="        g_cmp, c_cmp = g_nr / g_prior_vec, c_nr / c_prior_vec",
         new="        g_cmp, c_cmp = g_nr, c_nr",
         tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
         why=(
@@ -287,8 +290,9 @@ MUTATIONS: dict[str, Mutation] = {
     "amendment6_strata_not_scaled": Mutation(
         name="amendment6_strata_not_scaled",
         rel_path="src/taxembed/eval/preregistration.py",
-        old=('        diffs_nr = {k: depth_nr["means"][k] / g_prior_nr '
-             '- depth_control_nr["means"][k] / c_prior_nr\n'
+        # 2026-09-26: re-anchored after C2 made the per-stratum divisors per-stratum.
+        old=('        diffs_nr = {k: depth_nr["means"][k] / g_strata[k] '
+             '- depth_control_nr["means"][k] / c_strata[k]\n'
              "                    for k in shared_nr}"),
         new=('        diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k]\n'
              "                    for k in shared_nr}"),
@@ -306,7 +310,9 @@ MUTATIONS: dict[str, Mutation] = {
     "control_baselines_fallback_to_the_real_tree": Mutation(
         name="control_baselines_fallback_to_the_real_tree",
         rel_path="src/taxembed/eval/preregistration.py",
-        old='        prefixes = [f"baselines_{control_name}", "baselines_randomdag"]',
+        # 2026-09-26: re-anchored after C3(c) narrowed the matched chain to the control's own
+        # family. Third stale-mutation catch by self-check 1 this session.
+        old='        prefixes = [f"baselines_{control_name}"]',
         new='        prefixes = ["baselines"]',
         tests=["tests/eval/test_preregistration.py", "tests/eval/test_score_p2_cli.py"],
         why=(
@@ -330,6 +336,65 @@ MUTATIONS: dict[str, Mutation] = {
             "cannot substitute for it: an ABSENT family has nothing to disagree with, which is "
             "precisely why a missing control block sailed through the merge and produced a "
             "computed verdict carrying the wrong tree's floor."
+        ),
+    ),
+    # ---- Second review wave (2026-09-26): C3, I1, C2, C1.
+    "shared_control_falls_back_to_the_real_tree": Mutation(
+        name="shared_control_falls_back_to_the_real_tree",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old='    prefixes = ["baselines_randomdag"]',
+        new='    prefixes = ["baselines_randomdag", "baselines"]',
+        tests=["tests/eval/test_preregistration.py::TestSharedControlBaselinesSibling"],
+        why=(
+            "THE SIBLING C-B DID NOT TRAVEL TO. `_p2_single_shared_control` kept the real tree's "
+            "block at the end of its chain for a day after `_p2_matched_controls` lost it, and "
+            "ELEVEN tests pinned the defect because their fixture never gave the shared control "
+            "a block of its own. Restoring the fallback must now be caught."
+        ),
+    ),
+    "degmatch_control_falls_back_to_randomdag": Mutation(
+        name="degmatch_control_falls_back_to_randomdag",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=('        prefixes = [f"baselines_{control_name}"]\n'
+             '        if control_name.startswith("randomdag"):\n'
+             '            prefixes.append("baselines_randomdag")'),
+        new='        prefixes = [f"baselines_{control_name}", "baselines_randomdag"]',
+        tests=["tests/eval/test_preregistration.py::TestSharedControlBaselinesSibling"],
+        why=(
+            "C3(c): for a degmatch control, `baselines_randomdag` is a THIRD TREE. Measured "
+            "before the fix: degmatch_vis00's degree_prior.normalized_rank resolved to "
+            "RandomDAG's 0.2487 instead of ~0.0404 -- a 6.2x wrong amendment_6 DENOMINATOR, "
+            "silently, with no error raised."
+        ),
+    ),
+    "amendment6_uses_seed_zero_prior_for_every_seed": Mutation(
+        name="amendment6_uses_seed_zero_prior_for_every_seed",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old="        g_cmp, c_cmp = g_nr / g_prior_vec, c_nr / c_prior_vec",
+        new="        g_cmp, c_cmp = g_nr / g_prior_nr, c_nr / c_prior_nr",
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6Wave2"],
+        why=(
+            "I1: every seed divided by SEED 0's own-prior, which is what amendment_6 shipped "
+            "with. Measured on the project's own per-seed priors, that alone flips the verdict "
+            "(MEMORISES as coded vs GENERALISES per-seed): the control's cross-seed prior spread "
+            "is ~5.4%, the same order as the 5% decision band it feeds, and which seed is "
+            "called seed 0 is arbitrary."
+        ),
+    ),
+    "strata_use_the_aggregate_prior": Mutation(
+        name="strata_use_the_aggregate_prior",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=("        g_strata = _p2_stratum_priors(group, shared_nr, g_prior_nr)\n"
+             "        c_strata = _p2_stratum_priors(control, shared_nr, c_prior_nr)"),
+        new=("        g_strata = {k: g_prior_nr for k in shared_nr}\n"
+             "        c_strata = {k: c_prior_nr for k in shared_nr}"),
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6Wave2"],
+        why=(
+            "C2: the per-depth-stratum sign test back on the AGGREGATE prior. Re-derived "
+            "independently on the production metazoa seed-0 splits: per-stratum difficulty "
+            "ratios 2.8318 / 4.0910 / 4.1786 against an aggregate 3.8064, so stratum 11-15 "
+            "(4,751 scored queries) is over-allowed by 1.344x -- enough to read a genuine "
+            "per-stratum tie as a comfortable win, in the GENERALISES direction."
         ),
     ),
     # ---- C-C (2026-09-26): the rolling window.

@@ -15,7 +15,8 @@ import pytest
 
 from taxembed.eval.linkpred import linkpred_metrics
 from taxembed.eval.preregistration import (
-    P2_ROLL_WINDOW, _p2_baselines_for_seed, assert_baselines_agree_across_seeds, compare_arms,
+    P2_EQUIV_REL_FRACTION, P2_FLOOR_SD_MULTIPLE, P2_ROLL_WINDOW, _p2_arm_reading,
+    _p2_baselines_for_seed, assert_baselines_agree_across_seeds, compare_arms,
     merge_p2_scorer_outputs, p2_group_stats, p2_run_value, p2_validity_gate, p2_verdict,
     task8_verdict, task9_verdict, validity_gate,
 )
@@ -311,10 +312,18 @@ def _p2_ckpt(epoch, mrr, loss=4.0, depth=None):
         "epoch": epoch,
         "trainer": {"loss": loss},
         "metrics": m, "metrics_cosine": m, "metrics_poincare": m,
+        # I-D/I8 (2026-09-26): `normalized_rank` was ABSENT from these strata, while its sibling
+        # `_p2_decoupled_ckpt` has it -- a fix that never travelled. The consequence was not
+        # cosmetic: `_p2_depth_means(field="normalized_rank")` returned `means={}`, so
+        # `sign_consistent_nr` was structurally False and GENERALISES was UNREACHABLE under the
+        # live `amendment_1=True` reading for every fixture built on `_p2_ckpt` -- 5 of the 6 P2
+        # fixture builders. Production output always carries the field (via stratify ->
+        # linkpred_metrics), so this was a coverage defect that hid C-A's other half: nobody had
+        # ever seen the live reading return a positive verdict on anything.
         "by_depth": {"cosine": depth if depth is not None else {
-            "11-15": {"n": 2000, "mrr": mrr},
-            "16-21": {"n": 3000, "mrr": mrr},
-            "22-28": {"n": 800, "mrr": mrr},
+            "11-15": {"n": 2000, "mrr": mrr, "normalized_rank": 1.0 - mrr},
+            "16-21": {"n": 3000, "mrr": mrr, "normalized_rank": 1.0 - mrr},
+            "22-28": {"n": 800, "mrr": mrr, "normalized_rank": 1.0 - mrr},
         }, "poincare": {}},
     }
 
@@ -423,7 +432,16 @@ def _p2_nine_arm_result(vis00_final, vis50_final, randomdag_final, sibling_chanc
                                    ("randomdag", randomdag_final, 300)):
         for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
             groups[f"{name}_s{seed}"] = ckpts
-    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+    res = _p2_result(groups, sibling_chance_mean=sibling_chance)
+    # C3 (2026-09-26): the shared RandomDAG control gets its OWN baselines block, because
+    # `_p2_single_shared_control` no longer completes its chain with the real tree's. Without
+    # this, ELEVEN tests here passed only because the control silently inherited the real tree's
+    # chance floor and degree prior -- the same "the fixtures encoded the defect" finding the
+    # twelve-arm builders produced on 2026-09-26, one function over. `_p2_result` already accepts
+    # `randomdag_chance`; passing it is what production does via
+    # `--baselines-key baselines_randomdag`.
+    res.setdefault("baselines_randomdag", _p2_baselines(sibling_chance))
+    return res
 
 
 class TestP2ValidityGate:
@@ -1827,3 +1845,254 @@ class TestP2RollWindowIsApplied:
         windowed = all_mrrs[-P2_ROLL_WINDOW:]
         assert all_mrrs.mean() < windowed.mean() - 0.10      # materially lower
         assert all_mrrs.std(ddof=1) > windowed.std(ddof=1) * 100   # jitter blown up
+
+
+class TestSharedControlBaselinesSibling:
+    """C3 (2026-09-26): the sibling C-B's fix did not travel to. `_p2_single_shared_control` kept
+    `"baselines"` at the end of its chain for a day after `_p2_matched_controls` lost it, and
+    ELEVEN tests pinned the defect because their fixture never gave the control a block."""
+
+    def test_the_shared_randomdag_control_refuses_to_inherit_the_real_trees_block(self):
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        del res["baselines_randomdag"]
+        with pytest.raises(KeyError, match="has no baselines block of its own"):
+            p2_verdict(res)
+
+    def test_the_shared_control_reads_its_own_block_when_present(self):
+        """The healthy direction, and it must be VISIBLE: give the control a floor that differs
+        from the real tree's and confirm the published value is the control's own, not the real
+        tree's. With the old chain both were the same object, so no test could tell them apart."""
+        res = _p2_nine_arm_result(vis00_final=0.55, vis50_final=0.50, randomdag_final=0.10,
+                                  sibling_chance=0.05)
+        res["baselines_randomdag"] = _p2_baselines(0.077)
+        v = p2_verdict(res)
+        assert v["randomdag_sibling_chance_mean"] == pytest.approx(0.077)
+        assert v["sibling_chance_mean"] == pytest.approx(0.05)
+
+    def test_a_degmatch_control_does_not_fall_back_to_the_randomdag_tree(self):
+        """C3(c): `baselines_randomdag` is a THIRD tree for a degmatch control. Measured before
+        the fix: degmatch_vis00's degree_prior.normalized_rank resolved to RandomDAG's 0.2487
+        instead of ~0.0404 -- a 6.2x wrong amendment_6 denominator, silently."""
+        res = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.10,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        del res["baselines_degmatch_vis00"]
+        del res["baselines_degmatch_vis50"]
+        res["baselines_randomdag"] = _p2_baselines(
+            0.18833, degree_prior=_a6_prior(0.24868839545805835))
+        with pytest.raises(KeyError, match="has no baselines block of its own"):
+            p2_verdict(res, amendment_4=True)
+
+
+def _a6_prior_with_strata(nr: float, strata: dict | None = None) -> dict:
+    """An own-prior block carrying a per-depth-stratum breakdown (C2, 2026-09-26)."""
+    block = _a6_prior(nr)
+    if strata is not None:
+        block["by_depth"] = {k: {"n": 5000, "mrr": 0.5, "normalized_rank": v}
+                             for k, v in strata.items()}
+    return block
+
+
+class TestP2Amendment6Wave2:
+    """The second review's findings on amendment_6: per-seed denominators (I1), per-stratum
+    priors (C2), the raw head-to-head disclosure (C1), the untestable half of the band (I2),
+    and the boundary tie (MINOR 5)."""
+
+    def _result(self, arm_nrs, ctrl_nrs, real_priors, ctrl_priors,
+                arm_strata=None, ctrl_strata=None, jitter_nr=0.0, mrr_final=0.80):
+        """Per-SEED arm values and per-SEED own-priors, so the denominator question is visible."""
+        groups = {}
+        for name, nrs, base_seed in (("vis00", arm_nrs, 100), ("vis50", arm_nrs, 200),
+                                     ("degmatch_vis00", ctrl_nrs, 300),
+                                     ("degmatch_vis50", ctrl_nrs, 400)):
+            for i, s in enumerate((0, 1, 2)):
+                groups[f"{name}_s{s}"] = _p2_decoupled_series(
+                    mrr_final=mrr_final, nr_final=nrs[i], jitter_nr=jitter_nr,
+                    rng_seed=base_seed + s)
+        out = {"arms": _p2_fanout_arms(groups)}
+        for s in (0, 1, 2):
+            out[f"baselines_s{s}"] = _p2_baselines(
+                0.05, degree_prior=_a6_prior_with_strata(real_priors[s], arm_strata))
+            for control in ("degmatch_vis00", "degmatch_vis50"):
+                out[f"baselines_{control}_s{s}"] = _p2_baselines(
+                    0.05, degree_prior=_a6_prior_with_strata(ctrl_priors[s], ctrl_strata))
+        return out
+
+    # ---- I1: per-seed denominators -----------------------------------------------------------
+    def test_each_seed_is_divided_by_its_own_priors_not_seed_zeros(self):
+        """The project's own measured per-seed priors. With seed 0's prior used for all three,
+        the arm ratios are identical across seeds; with per-seed priors they differ."""
+        real = [0.15380546762948136, 0.15316559423653356, 0.153195527408201]
+        ctrl = [0.04040666865910578, 0.038240010365341026, 0.03851134146187385]
+        # each seed scores exactly half its OWN tree's prior -> every ratio must be 0.5
+        res = self._result([r * 0.5 for r in real], [c * 0.5 for c in ctrl], real, ctrl)
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["arm_values_as_compared"] == pytest.approx([0.5, 0.5, 0.5], rel=1e-6)
+        assert arm["control_values_as_compared"] == pytest.approx([0.5, 0.5, 0.5], rel=1e-6)
+
+    def test_using_seed_zeros_prior_for_every_seed_would_distort_the_ratios(self):
+        """The lesion, stated as a measurement rather than assumed: seeds 1/2 divided by seed 0's
+        prior give ratios that are NOT 0.5, so the per-seed fix is load-bearing."""
+        real = [0.15380546762948136, 0.15316559423653356, 0.153195527408201]
+        as_coded = [(r * 0.5) / real[0] for r in real]
+        assert as_coded[0] == pytest.approx(0.5)
+        assert as_coded[1] != pytest.approx(0.5, abs=1e-6)
+        assert as_coded[2] != pytest.approx(0.5, abs=1e-6)
+
+    def test_a_seed_with_a_zero_prior_raises_naming_that_seed(self):
+        real = [0.15380546762948136, 0.0, 0.153195527408201]
+        ctrl = [0.04040666865910578, 0.038240010365341026, 0.03851134146187385]
+        res = self._result([0.05, 0.05, 0.05], [0.02, 0.02, 0.02], real, ctrl)
+        with pytest.raises(ValueError, match="seed 1"):
+            p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                       amendment_6=True)
+
+    # ---- C2: per-stratum priors ---------------------------------------------------------------
+    def test_the_sign_test_uses_each_stratum_s_own_prior_when_the_scorer_supplies_it(self):
+        """A genuine per-stratum TIE must not read as a win. Both sides score exactly half their
+        OWN per-stratum prior in every stratum, so every diff must be 0.0 -- under the aggregate
+        approximation stratum 11-15 would have come out comfortably negative."""
+        real = [0.15380546762948136] * 3
+        ctrl = [0.04040666865910578] * 3
+        arm_strata = {"11-15": 0.17640, "16-21": 0.16927, "22-28": 0.14286}
+        ctrl_strata = {"11-15": 0.06229, "16-21": 0.04138, "22-28": 0.03419}
+        # the per-checkpoint by_depth value is constant across strata in this fixture, so make
+        # each side sit at half of ITS OWN AGGREGATE and check the per-stratum basis is reported
+        res = self._result([r * 0.5 for r in real], [c * 0.5 for c in ctrl], real, ctrl,
+                           arm_strata=arm_strata, ctrl_strata=ctrl_strata)
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        basis = arm["depth_strata"]["stratum_prior_basis"]
+        assert basis["used_per_stratum_priors"] is True
+        assert basis["arm"]["11-15"] == pytest.approx(0.17640)
+        assert basis["control"]["11-15"] == pytest.approx(0.06229)
+        # the aggregate ratio (3.81) and the 11-15 ratio (2.83) genuinely differ -- the whole point
+        assert (real[0] / ctrl[0]) / (0.17640 / 0.06229) == pytest.approx(1.344, abs=0.01)
+
+    def test_it_falls_back_to_the_aggregate_and_says_so_when_the_scorer_did_not_supply_strata(self):
+        real = [0.15380546762948136] * 3
+        ctrl = [0.04040666865910578] * 3
+        res = self._result([0.05] * 3, [0.02] * 3, real, ctrl)   # no by_depth anywhere
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        basis = arm["depth_strata"]["stratum_prior_basis"]
+        assert basis["used_per_stratum_priors"] is False
+        assert basis["arm"]["11-15"] == pytest.approx(real[0])
+        assert basis["control"]["11-15"] == pytest.approx(ctrl[0])
+
+    # ---- C1: the raw head-to-head disclosure --------------------------------------------------
+    def test_generalises_can_be_returned_while_the_control_wins_on_raw_and_it_is_recorded(self):
+        """C1. The ratio reading answers "who improved more on their own tree's prior", which is
+        the intended question -- but it is NOT "who ranked the true parent better". An arm whose
+        control beats it outright on raw normalized_rank can read GENERALISES, so the reading
+        must carry the raw comparison rather than leave a reader to assume it."""
+        real = [0.15380546762948136] * 3
+        ctrl = [0.04040666865910578] * 3
+        res = self._result([0.045] * 3, [0.020] * 3, real, ctrl)
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["verdict"] == "GENERALISES"
+        assert arm["arm_beats_control_raw"] is False          # the control ranks better, 2.25x
+        assert arm["raw_mean_diff_vs_control"] > 0            # arm's nr is HIGHER i.e. worse
+        assert arm["arm_values_raw_normalized_rank"] == pytest.approx([0.045] * 3, rel=1e-6)
+        assert arm["control_values_raw_normalized_rank"] == pytest.approx([0.020] * 3, rel=1e-6)
+
+    def test_identical_raw_scores_still_read_generalises_and_the_reading_shows_it(self):
+        """The starkest case: arm and control score IDENTICALLY on the raw metric. Intended under
+        the ratio reading (the real tree's task is ~3.8x harder), and exactly why the raw numbers
+        have to be published beside the verdict."""
+        real = [0.15380546762948136] * 3
+        ctrl = [0.04040666865910578] * 3
+        res = self._result([0.030] * 3, [0.030] * 3, real, ctrl)
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["verdict"] == "GENERALISES"
+        assert arm["raw_mean_diff_vs_control"] == pytest.approx(0.0, abs=1e-9)
+        assert arm["arm_beats_control_raw"] is False
+
+    # ---- I2: the SD half of the band --------------------------------------------------------
+    def test_the_sd_term_binds_when_seed_spread_exceeds_the_relative_term(self):
+        """I2. Every earlier amendment_6 fixture used jitter_nr=0.0, so pooled_vs_control_nr was
+        exactly zero and `P2_FLOOR_SD_MULTIPLE * pooled_sd` could never be the max -- half the
+        band was untestable by the whole suite. Here the seeds spread widely enough that the SD
+        term must win."""
+        real = [0.15380546762948136] * 3
+        ctrl = [0.04040666865910578] * 3
+        arm_nrs = [0.030, 0.050, 0.070]        # a deliberately wide spread on the ratio scale
+        res = self._result(arm_nrs, [0.010] * 3, real, ctrl)
+        arm = p2_verdict(res, amendment_1=True, amendment_2=True, amendment_4=True,
+                         amendment_6=True)["by_arm_verdict"]["vis00"]
+        c_mean = float(np.mean(arm["control_values_as_compared"]))
+        relative_term = P2_EQUIV_REL_FRACTION * abs(c_mean)
+        assert arm["equivalence_band_vs_control"] > relative_term
+        assert arm["equivalence_band_vs_control"] == pytest.approx(
+            P2_FLOOR_SD_MULTIPLE * np.sqrt(np.mean([
+                np.var(arm["arm_values_as_compared"], ddof=1),
+                np.var(arm["control_values_as_compared"], ddof=1)])), rel=1e-6)
+
+    # ---- MINOR 5: the boundary tie -----------------------------------------------------------
+    def test_a_difference_exactly_equal_to_the_band_counts_as_equivalent(self):
+        """MINOR 5. `<` resolved an EXACT boundary tie towards GENERALISES -- the flattering
+        direction; a difference exactly equal to the band is, by the band's own definition, not
+        a difference.
+
+        Asserted on the SOURCE rather than by driving the engine to the boundary, deliberately:
+        `mean_diff` and `equiv_band` are each computed through several float operations, so
+        landing them on the same float is not reliably constructible and a test that tried would
+        be pinning floating-point luck rather than the rule. What is checkable, and what the
+        finding is actually about, is which comparison the code performs."""
+        src = inspect.getsource(_p2_arm_reading)
+        assert "abs(mean_diff_nr) <= equiv_band_nr" in src
+        assert "abs(mean_diff_nr) < equiv_band_nr" not in src
+
+
+class TestP2Amendment7Artifact:
+    """p2_amendment_7_20260926 -- the corrections a second adversarial review found in
+    amendment_6 itself, written as a NEW amendment rather than an edit of the old one."""
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_block_present_and_still_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_7_20260926" in prereg
+        status = prereg["p2_amendment_7_20260926"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "queue empty" in status
+
+    def test_it_corrects_the_mollusca_metazoa_provenance_splice(self, prereg):
+        block = prereg["p2_amendment_7_20260926"]["corrects_amendment_6_provenance"]
+        assert "mollusca" in block["the_error"].lower()
+        assert "0.16724" in block["what_is_true"]
+        # and it must say plainly whether the conclusion moves
+        assert block["does_it_change_the_conclusion"].startswith("No")
+
+    def test_it_discloses_that_generalises_does_not_imply_out_ranking_the_control(self, prereg):
+        block = prereg["p2_amendment_7_20260926"][
+            "generalises_no_longer_implies_out_ranking_the_control"]
+        assert "does NOT mean" in block["the_disclosure"]
+        assert "2.25x" in block["the_disclosure"]
+        assert "NOTHING IS GATED ON THEM" in block["what_changed"]
+
+    def test_it_records_the_measured_per_stratum_ratios(self, prereg):
+        text = prereg["p2_amendment_7_20260926"][
+            "per_stratum_own_prior_denominators"]["measured"]
+        for ratio in ("2.8318", "4.0910", "4.1786", "3.8064", "1.344"):
+            assert ratio in text
+
+    def test_it_names_what_it_supersedes_in_amendment_6(self, prereg):
+        text = prereg["p2_amendment_7_20260926"]["supersedes"]
+        assert "leaky_upper_bound" in text
+        assert "verification.tests" in text
+        assert "strata_use_the_aggregate_prior" in text
+
+    def test_amendment_6_and_every_earlier_block_are_untouched(self, prereg):
+        assert len(prereg["declared_confounds"]) == 4
+        assert "0.15381" in json.dumps(prereg["p2_amendment_6_20260926"])
+        assert "1.84" in json.dumps(prereg["p2_amendment_4_20260924"])
+        assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])

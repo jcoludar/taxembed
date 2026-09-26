@@ -100,9 +100,23 @@ def main() -> None:
         print(f"\nby_depth keys: {list(by_depth)}")
 
     # Parse whichever arm+seed pairs the engine can actually see (both _ms and _roll present).
+    # I3 (2026-09-26): `arms_to_check` used to be `set(P2_DATA_ARMS) | {a for a in sys.argv[2:]}`
+    # -- but sys.argv[2:] is the list of EXTRA FILE PATHS, not arm names, so the union added
+    # paths that match no arm and the helper only ever parsed vis00/vis50. Measured on a full
+    # 9-file production input it gated 6 runs and ZERO control runs: the bridge check that C-B
+    # nominates for the control-baselines boundary never parsed a control arm. Derive the arms
+    # from the merged result instead, which cannot drift from the input.
+    # (`sorted(...) or [...]` was also dead code: sorted() of a non-empty set is always truthy.)
     seeds = []
-    arms_to_check = set(P2_DATA_ARMS) | {a for a in sys.argv[2:]}
-    for arm in sorted(arms_to_check) or ["vis00", "vis50"]:
+    arms_to_check = set()
+    for key in result["arms"]:
+        for kind in ("_ms", "_roll"):
+            if key.endswith(kind):
+                stem = key[: -len(kind)]
+                if "_s" in stem:
+                    arms_to_check.add(stem.rsplit("_s", 1)[0])
+    print(f"arms derived from the merged result: {sorted(arms_to_check)}")
+    for arm in sorted(arms_to_check):
         for s in (0, 1, 2):
             if f"{arm}_s{s}_ms" in result["arms"] and f"{arm}_s{s}_roll" in result["arms"]:
                 seeds.append((arm, s))

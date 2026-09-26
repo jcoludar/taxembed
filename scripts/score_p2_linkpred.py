@@ -76,7 +76,8 @@ sys.path.insert(0, str(_REPO / "src"))
 sys.path.insert(0, str(_REPO))
 
 from taxembed.eval.baselines import (  # noqa: E402
-    chance_mrr_mean, degree_prior_metrics, majority_parent_rate, sibling_chance,
+    chance_mrr_mean, degree_prior_metrics, degree_prior_ranks, majority_parent_rate,
+    sibling_chance,
 )
 from taxembed.eval.linkpred import (  # noqa: E402
     candidate_pool, linkpred_metrics, rank_of_true_parent, stratify,
@@ -315,6 +316,17 @@ def main() -> None:
                                         "mean_rank": float("nan"), "mrr": float("nan"),
                                         "hits_at_1": float("nan"), "hits_at_10": float("nan"),
                                         "normalized_rank": float("nan")})
+    # C2 (2026-09-26): the degree prior PER DEPTH STRATUM, stratified with the same bins and the
+    # same reducer a checkpoint's ranks get. `p2_amendment_6_20260926`'s cross-tree sign test
+    # divides each side by its own tree's prior; with only an aggregate available it divided
+    # every stratum by one number, and the per-stratum difficulty ratios are NOT the aggregate
+    # (measured, metazoa seed 0: 2.83 / 4.09 / 4.18 vs an aggregate 3.81, so stratum 11-15 was
+    # over-allowed by 1.344x -- enough to read a genuine tie as a win, towards GENERALISES).
+    # Costs one extra stratify() over ranks that were already computed.
+    if len(held):
+        dp_ranks = degree_prior_ranks(parent, held, candidates_list, true_parents,
+                                      tie_seed=args.seed)
+        degree_prior["by_depth"] = stratify(dp_ranks, n_cand, depth_held, bins=DEPTH_BINS)
     baselines_block = {
         "sibling_chance_mean": sibling_chance_mean,
         "chance_hits_at_1_mean": sibling_chance_mean,  # C2: same quantity, second explicit name

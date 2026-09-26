@@ -112,15 +112,35 @@ def degree_prior_metrics(parent: np.ndarray, held_out: np.ndarray, candidates_li
     `helpers/p2_degree_prior_and_chance_verify.py`) for a quantity that does not change across
     calls.
     """
+    return linkpred_metrics(
+        degree_prior_ranks(parent, held_out, candidates_list, true_parents, tie_seed=tie_seed),
+        n_candidates)
+
+
+def degree_prior_ranks(parent: np.ndarray, held_out: np.ndarray, candidates_list,
+                       true_parents: np.ndarray, tie_seed: int = 0) -> np.ndarray:
+    """The training-free degree prior's per-query RANK vector, before any reduction.
+
+    C2 (2026-09-26). `degree_prior_metrics` reduced straight to aggregate metrics, so the prior
+    existed only as one number per tree -- and `p2_amendment_6_20260926`'s per-depth-stratum sign
+    test consequently divided every stratum by that single AGGREGATE value. Measured on the real
+    metazoa seed-0 splits, the per-stratum difficulty ratios are 2.83 / 4.09 / 4.18 against an
+    aggregate of 3.81, so the aggregate OVER-ALLOWS by 1.344x in stratum 11-15 (4,751 scored
+    queries, 9.5x P2_MIN_STRATUM_N) -- enough to read a genuine per-stratum TIE as a comfortable
+    win, in the direction of GENERALISES.
+
+    Exposing the ranks lets the scorer `stratify` them exactly as it stratifies a checkpoint's,
+    so the sign test can compare like with like. Nothing is recomputed: `degree_prior_metrics`
+    now calls this.
+    """
     parent = np.asarray(parent, dtype=np.int64)
     held_out = np.asarray(held_out, dtype=np.int64)
     true_parents = np.asarray(true_parents, dtype=np.int64)
     fanout = _fanout_of(parent)
-    ranks = np.array(
+    return np.array(
         [degree_prior_rank(parent, int(v), int(tp), c, tie_seed=tie_seed, fanout=fanout)
          for v, tp, c in zip(held_out, true_parents, candidates_list)],
         dtype=np.int64)
-    return linkpred_metrics(ranks, n_candidates)
 
 
 def chance_mrr_mean(n_candidates: np.ndarray) -> float:

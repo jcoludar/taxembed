@@ -415,14 +415,23 @@ def p2_run_value(result: dict, arm: str, seed: int) -> dict:
     # (`p2_lrz_score.sh`: --checkpoints "${arm}_s${s}_roll=${dir}/${tag}_epoch*.pth").
     #
     # This is not a tidy-up. The trainer keeps the last 5 rolling checkpoints PER PROCESS and
-    # `p2_lrz_train.sh` writes into /app/artifacts/tags/${TAG}/ WITHOUT clearing it, while the
-    # array runs at --time=1-00:00:00 against runs the ledger sizes at 11-19 h -- so a resubmitted
-    # element is likely, and a first attempt that died at epoch 120 leaves _epoch116..120.pth
-    # orphaned beside the second attempt's _epoch196..200.pth. Measured on exactly that 10-element
-    # roll set (helpers/p2_review3_roll_window_and_strata.py): published per_run_value 0.68503
-    # instead of 0.82002 (-16% on the headline number) and jitter_sd 0.142284 instead of 0.000171,
-    # which FAILS gate (a) and makes the WHOLE ARRAY UNINFORMATIVE, since one invalid arm-seed
-    # invalidates everything.
+    # `p2_lrz_train.sh` wrote into /app/artifacts/tags/${TAG}/ WITHOUT clearing it. Measured on a
+    # 10-element roll set (helpers/p2_review3_roll_window_and_strata.py): published per_run_value
+    # 0.68503 instead of 0.82002 (-16% on the headline number) and jitter_sd 0.142284 instead of
+    # 0.000171, which FAILS gate (a) and makes the WHOLE ARRAY UNINFORMATIVE, since one invalid
+    # arm-seed invalidates everything.
+    #
+    # ⚠ CORRECTED 2026-09-26 (I4) -- THE MECHANISM WAS WRITTEN BACKWARDS HERE, and the wrong
+    # version is worth keeping visible because it is the one a reader would otherwise reconstruct.
+    # The original text said "a first attempt that died at epoch 120 leaves _epoch116..120.pth
+    # orphaned beside the second attempt's _epoch196..200.pth". That scenario is UNREACHABLE:
+    # checkpoint paths are deterministic in the epoch number, so a second, longer attempt
+    # OVERWRITES and then removes the first's files -- replaying the trainer's own bookkeeping
+    # gives exactly 5 for (died at 120, then completed 200), never 10.
+    # The reachable pollution is the REVERSE order: a COMPLETED 200-epoch run followed by a
+    # FAILED short re-attempt, which leaves e.g. [146..150, 196..200] -- and that is precisely
+    # the case the older `_epoch200.pth`-exists pre-flight cannot catch, because epoch 200 is
+    # still sitting there from the successful first run.
     #
     # The count is asserted rather than silently trimmed: taking the trailing 5 of a 10-element
     # set would quietly average the right checkpoints while concealing that the tag directory was
@@ -623,16 +632,95 @@ def _p2_depth_means(result: dict, group: str, seeds, field: str = "mrr") -> dict
                 continue
             per_stratum.setdefault(stratum, []).append(float(d[field]))
             ns.setdefault(stratum, []).append(int(d.get("n", 0)))
-    means, dropped = {}, {}
+    means, dropped, no_value = {}, {}, {}
     for stratum in seen_strata:
         vals = per_stratum.get(stratum)
         stratum_ns = ns.get(stratum)
         mean_n = float(np.mean(stratum_ns)) if stratum_ns else 0.0
-        if not vals or mean_n < P2_MIN_STRATUM_N:
+        # I-E (2026-09-26): a stratum with NO VALUE for this field is reported separately from
+        # one that is genuinely too small. Before this both landed in `dropped_below_min_n`, the
+        # missing-field case with `n = 0.0` -- so a reader chasing a MIXED verdict investigated
+        # stratum SIZE when the real cause was an absent `normalized_rank`. Measured: all three
+        # metazoa strata reported at n = 0.0 when their real sizes are 4,950 / 5,573 / 17,895.
+        # It fires in production too: `_json_safe` turns a NaN into `null`, which takes the same
+        # branch as a field that was never written.
+        if not vals:
+            no_value[stratum] = mean_n
+            continue
+        if mean_n < P2_MIN_STRATUM_N:
             dropped[stratum] = mean_n
             continue
         means[stratum] = float(np.mean(vals))
-    return {"means": means, "dropped_below_min_n": dropped}
+    return {"means": means, "dropped_below_min_n": dropped, "dropped_no_value": no_value}
+
+
+def _p2_has_stratum_priors(stats: dict) -> bool:
+    """Does this arm's own baselines block carry a per-depth-stratum degree prior?
+
+    C2 (2026-09-26). `scripts/score_p2_linkpred.py` writes `degree_prior.by_depth` from that
+    date; anything scored earlier has only the aggregate. Averaged over seeds, mirroring how
+    `_p2_depth_means` averages the arms' own strata.
+    """
+    for block in stats.get("baselines_by_seed", {}).values():
+        by_depth = block.get("degree_prior", {}).get("by_depth")
+        if not by_depth:
+            return False
+    return bool(stats.get("baselines_by_seed"))
+
+
+def _p2_stratum_priors(stats: dict, strata, aggregate: float) -> dict:
+    """Per-stratum own-prior denominators, averaged over seeds, falling back to `aggregate`.
+
+    C2 (2026-09-26). Falls back PER STRATUM rather than all-or-nothing, so a stratum the scorer
+    did record is used even if a sibling stratum is missing -- and `used_per_stratum_priors` in
+    the reading records whether the fallback was needed at all, because a silent fallback to the
+    aggregate is exactly the over-allowance this exists to remove.
+    """
+    out = {}
+    for stratum in strata:
+        vals = []
+        for block in stats.get("baselines_by_seed", {}).values():
+            by_depth = block.get("degree_prior", {}).get("by_depth") or {}
+            entry = by_depth.get(stratum) or {}
+            nr = entry.get("normalized_rank")
+            if nr is not None and np.isfinite(float(nr)) and float(nr) > 0.0:
+                vals.append(float(nr))
+        out[stratum] = float(np.mean(vals)) if vals else float(aggregate)
+    return out
+
+
+def _p2_own_prior_nr_per_seed(stats: dict, which: str) -> np.ndarray:
+    """One own-prior denominator PER SEED, in `stats["seeds"]` order.
+
+    I1 (2026-09-26). amendment_6 originally divided all three seeds by `stats["degree_prior"]`,
+    which `p2_group_stats` takes from `seeds[0]` alone. That was defensible before amendment_6 --
+    its docstring argues the group-level block is "cosmetic … which value GATES each seed's own
+    run already uses that seed's own dict" -- and amendment_6 made it false, because the
+    group-level prior became the DENOMINATOR of the published cross-tree statistic and of
+    `below_degree_prior`.
+
+    It is not a rounding difference. Using the project's own measured per-seed priors
+    (real 0.15381/0.15317/0.15320, degmatch 0.04041/0.03824/0.03851) the seed-0 denominator gives
+    |mean_diff| 0.014356 against a band of 0.025717 -> equivalent, MEMORISES; per-seed
+    denominators give 0.031184 against 0.026626 -> not equivalent, GENERALISES. The control's
+    cross-seed prior spread is ~5.4%, the same order as the 5% decision band it feeds, and which
+    seed is called "seed 0" is arbitrary.
+
+    Each seed draws its OWN held-out set, so its degree prior is genuinely its own quantity --
+    `p2_group_stats` already carries `baselines_by_seed`, so nothing new has to be measured.
+    """
+    out = []
+    for s in stats["seeds"]:
+        block = stats["baselines_by_seed"][s]
+        prior = float(block["degree_prior"]["normalized_rank"])
+        if not np.isfinite(prior) or prior <= 0.0:
+            raise ValueError(
+                f"amendment_6: {which} ({stats['group']}) seed {s} has "
+                f"degree_prior.normalized_rank={prior!r}, which cannot be an own-prior "
+                "denominator. The baselines block for this arm/seed is wrong or missing -- "
+                "rescore it; do not read a verdict off this result.")
+        out.append(prior)
+    return np.asarray(out, dtype=float)
 
 
 def _p2_own_prior_nr(stats: dict, which: str) -> float:
@@ -762,7 +850,9 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
             "mean_diff_vs_control": float(mean_diff), "equivalence_band_vs_control": equiv_band,
             "depth_strata": {"diffs": diffs, "n_strata": len(shared),
                              "dropped_below_min_n": {**depth["dropped_below_min_n"],
-                                                      **depth_control["dropped_below_min_n"]}},
+                                                      **depth_control["dropped_below_min_n"]},
+                             "dropped_no_value": {**depth["dropped_no_value"],
+                                                  **depth_control["dropped_no_value"]}},
             "sign_consistent": sign_consistent,
         }
 
@@ -786,9 +876,14 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     # free" -- and is invariant to the difficulty gap by construction. 1.0 is exactly "no better
     # than the training-free prior" on either tree.
     if amendment_6:
+        # I1 (2026-09-26): PER-SEED denominators. Each seed draws its own held-out set, so its
+        # degree prior is its own quantity; dividing every seed by seed 0's flipped a measured
+        # MEMORISES to GENERALISES. The seed-0 scalars below are kept for DISPLAY only.
+        g_prior_vec = _p2_own_prior_nr_per_seed(group, "real arm")
+        c_prior_vec = _p2_own_prior_nr_per_seed(control, "control")
         g_prior_nr = _p2_own_prior_nr(group, "real arm")
         c_prior_nr = _p2_own_prior_nr(control, "control")
-        g_cmp, c_cmp = g_nr / g_prior_nr, c_nr / c_prior_nr
+        g_cmp, c_cmp = g_nr / g_prior_vec, c_nr / c_prior_vec
     else:
         g_prior_nr = float(degree_prior["normalized_rank"])
         # None, not NaN: "no denominator was used" is a fact, whereas NaN is a number that is
@@ -802,9 +897,11 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     below_chance_level = bool(g_nr.max() < 0.5)                  # weakest (highest) seed still <0.5
     # C1, normalized_rank form: the arm's own normalized_rank must ALSO sit below the degree
     # prior's normalized_rank on this SAME tree (own-tree, mirrors above_degree_prior on MRR).
-    # Untouched by amendment_6 -- it was ALREADY an own-tree comparison, and under amendment_6 it
-    # is exactly the statement `g_cmp.max() < 1.0`.
-    below_degree_prior = bool(g_nr.max() < degree_prior["normalized_rank"])
+    # Under amendment_6 this is exactly `g_cmp.max() < 1.0` -- but computed against EACH SEED's
+    # own prior (I1), not seed 0's for all three, which is what `degree_prior["normalized_rank"]`
+    # would give. Without amendment_6 it keeps the seed-0 group-level value unchanged.
+    below_degree_prior = bool(g_cmp.max() < 1.0) if amendment_6 else bool(
+        g_nr.max() < degree_prior["normalized_rank"])
 
     ranges_overlap_nr = bool(g_cmp.min() <= c_cmp.max() and c_cmp.min() <= g_cmp.max())
     g_var_nr = float(np.var(g_cmp, ddof=1)) if len(g_cmp) > 1 else 0.0
@@ -818,7 +915,25 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     else:
         equiv_band_nr = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)
     mean_diff_nr = float(g_cmp.mean() - c_cmp.mean())
-    equivalent_to_control_nr = bool(ranges_overlap_nr or abs(mean_diff_nr) < equiv_band_nr)
+    # MINOR 5 (2026-09-26): `<` resolved an EXACT boundary tie in favour of GENERALISES -- the
+    # flattering direction. A difference exactly equal to the equivalence band is, by the band's
+    # own definition, not a difference.
+    equivalent_to_control_nr = bool(ranges_overlap_nr or abs(mean_diff_nr) <= equiv_band_nr)
+
+    # C1 (2026-09-26): the RAW head-to-head, recorded because amendment_6 changes what
+    # GENERALISES means and the published sentence does not say so.
+    #
+    # Under the ratio reading, "the arm out-improved its control relative to each tree's own
+    # training-free prior" is the question being answered -- and that is the intended question,
+    # since the control's task is ~3.8x easier. But it is NOT the same statement as "the arm
+    # ranked the true parent better than the control did". Measured: any raw ratio
+    # arm_nr/ctrl_nr up to ~3.6x reads GENERALISES, so an arm whose control out-ranks it 2.2x on
+    # the raw held-out metric can be published as generalising, and an arm that scores EXACTLY
+    # what its control scores -- the textbook MEMORISES signature in raw terms -- also can.
+    # Whether to GATE on this is a design decision for the USER, not one to take silently here;
+    # RECORDING it is not optional, so the reading now carries it and the renderer prints it.
+    raw_mean_diff = float(g_nr.mean() - c_nr.mean())
+    arm_beats_control_raw = bool(g_nr.max() < c_nr.min())   # lower normalized_rank is better
 
     depth_nr = _p2_depth_means(result, name, seeds, field="normalized_rank")
     depth_control_nr = _p2_depth_means(result, control_group, seeds, field="normalized_rank")
@@ -832,10 +947,27 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     # per-stratum prior would be sharper and is NOT claimed here -- recorded as a stated
     # limitation in the amendment block, not a silent approximation.
     if amendment_6:
-        diffs_nr = {k: depth_nr["means"][k] / g_prior_nr - depth_control_nr["means"][k] / c_prior_nr
+        # C2 (2026-09-26): divide each stratum by THAT STRATUM's own prior when the scorer
+        # supplies one (`degree_prior.by_depth`, added the same day), falling back to the
+        # aggregate only for outputs scored before that field existed. The aggregate is not a
+        # safe stand-in: measured on metazoa seed 0 the per-stratum difficulty ratios are
+        # 2.83 / 4.09 / 4.18 against an aggregate of 3.81, so stratum 11-15 was over-allowed by
+        # 1.344x -- enough to turn a genuine per-stratum tie into a comfortable win, in the
+        # GENERALISES direction. `_p2_stratum_prior` reports which basis it used so the fallback
+        # can never be silent.
+        g_strata = _p2_stratum_priors(group, shared_nr, g_prior_nr)
+        c_strata = _p2_stratum_priors(control, shared_nr, c_prior_nr)
+        diffs_nr = {k: depth_nr["means"][k] / g_strata[k] - depth_control_nr["means"][k] / c_strata[k]
                     for k in shared_nr}
+        stratum_prior_basis = {
+            "arm": {k: float(g_strata[k]) for k in shared_nr},
+            "control": {k: float(c_strata[k]) for k in shared_nr},
+            "used_per_stratum_priors": bool(_p2_has_stratum_priors(group)
+                                            and _p2_has_stratum_priors(control)),
+        }
     else:
         diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k] for k in shared_nr}
+        stratum_prior_basis = None
     sign_consistent_nr = bool(diffs_nr) and all(v < 0 for v in diffs_nr.values())
 
     # The cross-tree clause reads differently under amendment_6, and the verdict's own prose is
@@ -925,9 +1057,18 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
                                                  else float(c_prior_nr)),
         "arm_values_as_compared": [float(v) for v in g_cmp],
         "control_values_as_compared": [float(v) for v in c_cmp],
+        # C1: the RAW cross-tree comparison, always reported, never gated on. Under amendment_6
+        # GENERALISES does NOT imply `arm_beats_control_raw` -- see the comment at its definition.
+        "raw_mean_diff_vs_control": raw_mean_diff,
+        "arm_beats_control_raw": arm_beats_control_raw,
+        "arm_values_raw_normalized_rank": [float(v) for v in g_nr],
+        "control_values_raw_normalized_rank": [float(v) for v in c_nr],
         "depth_strata": {"diffs": diffs_nr, "n_strata": len(shared_nr),
                          "dropped_below_min_n": {**depth_nr["dropped_below_min_n"],
-                                                  **depth_control_nr["dropped_below_min_n"]}},
+                                                  **depth_control_nr["dropped_below_min_n"]},
+                         "dropped_no_value": {**depth_nr["dropped_no_value"],
+                                              **depth_control_nr["dropped_no_value"]},
+                         "stratum_prior_basis": stratum_prior_basis},
         "sign_consistent": sign_consistent_nr,
     }
 
@@ -944,8 +1085,28 @@ def _p2_single_shared_control(result: dict, seeds) -> dict:
     pre-Part-2 scorer output (no seed-tagged key anywhere in the chain) every seed resolves to
     the SAME dict, reproducing the old single-shared-baseline behaviour exactly.
     """
-    prefixes = ["baselines_randomdag", "baselines"]
-    baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+    # C3 (2026-09-26): THE SIBLING C-B DID NOT TRAVEL TO. `_p2_matched_controls` had
+    # `"baselines"` -- the REAL TREE's block -- removed from its chain on 2026-09-26; this
+    # function, one definition above it, kept it, so the single shared RandomDAG control could
+    # still silently publish the real tree's chance floor and degree prior as its own. Worse,
+    # ELEVEN tests actively PINNED the defect: applying the same fix here without touching the
+    # fixtures fails TestP2Verdict (5), TestP2Amendment1, TestP2Amendment2,
+    # TestP2DegreePriorClause (2), TestP2Amendment4 and TestP2PerSeedBaselines -- the identical
+    # "the fixtures encoded the defect" finding that the matched path produced, one function
+    # over, unacted on. `_p2_nine_arm_result` now supplies `baselines_randomdag` exactly as
+    # `_p2_add_control_baselines` does for the twelve-arm builders.
+    #
+    # This is the session's own recurring shape landing on the session: WHEN A FIX LANDS, ASK
+    # WHAT ELSE IS THE SAME SHAPE -- same file, same family.
+    prefixes = ["baselines_randomdag"]
+    try:
+        baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+    except KeyError as exc:
+        raise KeyError(
+            f"the shared control '{P2_CONTROL_ARM}' has no baselines block of its own: {exc}. "
+            f"Falling back to the real tree's 'baselines' would publish the REAL tree's chance "
+            f"floor and degree prior as the control's, which is never correct -- rescore with "
+            f"--baselines-key baselines_randomdag_s<seed>.") from exc
     control = p2_group_stats(result, P2_CONTROL_ARM, seeds, baselines_by_seed)
     return {P2_CONTROL_ARM: control}, {g: P2_CONTROL_ARM for g in P2_DATA_ARMS}
 
@@ -992,7 +1153,16 @@ def _p2_matched_controls(result: dict, seeds, control_map: dict | None = None) -
         # seed-tagged -> bare-prefix fallback WITHIN the control's own family is kept: that one
         # is the documented pre-Part-2 compatibility path, and it can only ever resolve to a
         # block measured on this control's own tree.
-        prefixes = [f"baselines_{control_name}", "baselines_randomdag"]
+        # C3(c) (2026-09-26): `baselines_randomdag` is only a legitimate fallback for a control
+        # that IS a RandomDAG arm. For `degmatch_vis00` it is a THIRD TREE, and the measured
+        # consequence is not subtle: with the degmatch keys absent and a stale RandomDAG block
+        # present, degmatch_vis00's degree_prior.normalized_rank resolved to 0.2487 (the RETIRED
+        # RandomDAG tree's) instead of ~0.0404 -- a 6.2x wrong amendment_6 DENOMINATOR, silently.
+        # The chain now genuinely "ends inside the control's own family", which is what the
+        # comment above already claimed and the code did not do.
+        prefixes = [f"baselines_{control_name}"]
+        if control_name.startswith("randomdag"):
+            prefixes.append("baselines_randomdag")
         try:
             baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
         except KeyError as exc:

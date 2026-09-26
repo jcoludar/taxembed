@@ -161,7 +161,13 @@ def main() -> int:
     # 6. C-C: the train job must clear its tag directory before training.
     print("\n6. does p2_lrz_train.sh clear its tag directory before training?")
     train_text = (REPO / "scripts/p2_lrz_train.sh").read_text()
-    if "_epoch*.pth\" -delete" not in train_text:
+    # I6 (2026-09-26): this was `"_epoch*.pth\" -delete" not in train_text`, which the MILESTONE
+    # delete line also satisfies -- so removing the ROLLING clear (the line C-C is actually
+    # about) left the gate green. Measured: lesion applied, static gate still exit 0. Match the
+    # tag-prefixed rolling pattern specifically, and require BOTH lines.
+    rolling_clear = '-name "${TAG}_epoch*.pth" -delete'
+    milestone_clear = '-name "${TAG}_milestone_epoch*.pth" -delete'
+    if rolling_clear not in train_text or milestone_clear not in train_text:
         problems.append("p2_lrz_train.sh does not clear ${TAG}'s rolling checkpoints before "
                         "training -- a resubmitted array element would leave the previous "
                         "attempt's orphans for the scorer's glob to pick up (C-C)")

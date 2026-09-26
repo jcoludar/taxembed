@@ -145,6 +145,20 @@ def _render_p2(v: dict) -> None:
                     print(f"    control {[round(x, 4) for x in r['control_values_as_compared']]}")
                     print(f"  mean diff {r['mean_diff_vs_control']:+.5f} vs equivalence band "
                           f"{r['equivalence_band_vs_control']:.5f} (RELATIVE)")
+                    # C1 (2026-09-26): the RAW head-to-head, printed next to the ratio so a
+                    # reader cannot mistake "out-improved its own prior" for "out-ranked the
+                    # control". Under amendment_6 GENERALISES does not imply the latter.
+                    print(f"  RAW normalized_rank (NOT the gated quantity):")
+                    print(f"    arm     {[round(x, 5) for x in r['arm_values_raw_normalized_rank']]}")
+                    print(f"    control {[round(x, 5) for x in r['control_values_raw_normalized_rank']]}")
+                    print(f"    raw mean diff {r['raw_mean_diff_vs_control']:+.5f}   "
+                          f"arm beats control on raw, every seed: "
+                          f"{r['arm_beats_control_raw']}")
+                    if r["verdict"] == "GENERALISES" and not r["arm_beats_control_raw"]:
+                        print("    ⚠ GENERALISES here means the arm improved MORE ON ITS OWN "
+                              "TREE'S PRIOR, not that it out-ranked the control in absolute "
+                              "terms (p2_amendment_7_20260926).")
+                print(f"  below its own tree's degree prior: {r['below_degree_prior']}")
             else:
                 print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
                       f"equivalent to RandomDAG: {r['equivalent_to_control']}")
@@ -213,7 +227,13 @@ def main() -> None:
 
     if args.task == "p2":
         results = [json.loads(Path(p).read_text()) for p in args.json]
-        result = merge_p2_scorer_outputs(results) if len(results) > 1 else results[0]
+        # I3 (2026-09-26): merge UNCONDITIONALLY. `if len(results) > 1` meant a single --json
+        # skipped merge_p2_scorer_outputs entirely, and with it BOTH merge-time asserts
+        # (assert_baselines_agree_across_seeds and assert_control_baselines_exist) -- so the one
+        # input shape that bypasses every guard was also the one the bridge helper certified as
+        # "PARSER OK". Merging a single result is a no-op on its content, and the asserts are
+        # exactly what must not be optional.
+        result = merge_p2_scorer_outputs(results)
         verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1,
                              amendment_2=args.amendment_2, amendment_4=args.amendment_4,
                              amendment_6=args.amendment_6)
