@@ -32,7 +32,8 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "src"))
 
 from taxembed.eval.preregistration import (  # noqa: E402
-    P2_DATA_ARMS, merge_p2_scorer_outputs, p2_group_stats, p2_run_value, p2_validity_gate,
+    P2_DATA_ARMS, _p2_baselines_for_seed, merge_p2_scorer_outputs, p2_group_stats, p2_run_value,
+    p2_validity_gate,
 )
 
 REQUIRED_BASELINE_FIELDS = ("sibling_chance_mean", "chance_mrr_mean", "chance_hits_at_1_mean",
@@ -107,32 +108,63 @@ def main() -> None:
                 seeds.append((arm, s))
     print(f"\nparsing {len(seeds)} run(s) the engine can see (both _ms and _roll present): {seeds}")
 
-    baselines = result.get("baselines")
+    # C-B (2026-09-26). This block used to read `baselines = result.get("baselines")` and gate
+    # BOTH checks below behind `if baselines is not None:`, then print "PARSER OK"
+    # UNCONDITIONALLY. Production (`scripts/p2_lrz_score.sh`) writes SEED-TAGGED keys
+    # (`baselines_s{n}`) and no bare `baselines` key at all, so on the only shape this script
+    # will ever see it skipped both checks and exited 0 reporting success. On the pre-Part-2
+    # shape it instead CRASHED, because `p2_group_stats`'s `baselines` parameter became a
+    # `{seed: block}` mapping in Part 2 and the signature change was never propagated here
+    # (KeyError: 0). Both directions broken: it could not fail on the shape it will see, and
+    # would have crashed if it could. It now resolves per seed exactly as the engine does, and
+    # a failure to resolve ANY baselines is a hard exit 1 -- never a skip to "PARSER OK".
+    try:
+        baselines_by_seed = {s: _p2_baselines_for_seed(result, ["baselines"], s)
+                             for s in (0, 1, 2)}
+    except KeyError as exc:
+        print(f"\nCANNOT RESOLVE THE REAL-TREE BASELINES FOR EVERY SEED: {exc}")
+        print("The engine requires one per seed (`baselines_s{n}`, or a bare `baselines` "
+              "fallback). Refusing to report PARSER OK on an input whose gates cannot run.")
+        raise SystemExit(1)
+    print(f"resolved real-tree baselines for seeds {sorted(baselines_by_seed)}: "
+          f"{[k for k in result if k.startswith('baselines')]}")
+
+    n_gated = 0
     for arm, s in seeds:
         rv = p2_run_value(result, arm, s)
         print(f"  {arm}_s{s}: per_run_value {rv['per_run_value']:.4f} over {rv['n_roll']} roll "
               f"ckpt(s) {rv['roll_epochs']}, {rv['n_milestones']} milestone(s) | "
               f"milestone_mrr_max {rv['milestone_mrr_max']:.4f} | "
               f"final_epoch_present {rv['final_epoch_present']}")
-        if baselines is not None:
-            g = p2_validity_gate(result, arm, s, float(baselines["sibling_chance_mean"]),
-                                 float(baselines["chance_mrr_mean"]))
-            print(f"    gate_a {g['gate_a_pass']} (rise {g['gate_a_rise']:+.4f} vs "
-                  f"{g['gate_a_threshold']:.4f}) | gate_b {g['gate_b_pass']} | "
-                  f"gate_c {g['gate_c_pass']} | valid {g['valid']}")
+        b = baselines_by_seed[s]
+        g = p2_validity_gate(result, arm, s, float(b["sibling_chance_mean"]),
+                             float(b["chance_mrr_mean"]))
+        n_gated += 1
+        print(f"    gate_a {g['gate_a_pass']} (rise {g['gate_a_rise']:+.4f} vs "
+              f"{g['gate_a_threshold']:.4f}) | gate_b {g['gate_b_pass']} | "
+              f"gate_c {g['gate_c_pass']} | valid {g['valid']}")
 
     # A full p2_group_stats pass for any arm with all 3 seeds present -- exercises the exact call
     # path p2_verdict uses (including the REQUIRED chance_mrr_mean/degree_prior baseline keys).
-    if baselines is not None:
-        for arm in P2_DATA_ARMS:
-            if all((arm, s) in seeds for s in (0, 1, 2)):
-                gs = p2_group_stats(result, arm, (0, 1, 2), baselines)
-                print(f"\n{arm} group stats: mean {gs['mean']:.4f}, min {gs['min']:.4f}, "
-                      f"invalid_runs {gs['invalid_runs']}, "
-                      f"degree_prior.mrr {gs['degree_prior']['mrr']:.4f}")
+    n_group_stats = 0
+    for arm in P2_DATA_ARMS:
+        if all((arm, s) in seeds for s in (0, 1, 2)):
+            gs = p2_group_stats(result, arm, (0, 1, 2), baselines_by_seed)
+            n_group_stats += 1
+            print(f"\n{arm} group stats: mean {gs['mean']:.4f}, min {gs['min']:.4f}, "
+                  f"invalid_runs {gs['invalid_runs']}, "
+                  f"degree_prior.mrr {gs['degree_prior']['mrr']:.4f}")
 
-    print("\nPARSER OK on real scorer output. No verdict computed: the pre-registration admits "
-          "only the complete design (3 seeds per arm, every baselines block present).")
+    # The check that makes the line below mean something. "PARSER OK" is only true if the parser
+    # actually PARSED -- a run of zero gates and zero group-stats passes is the no-op this script
+    # spent its whole existence reporting as success.
+    if n_gated == 0:
+        print("\nNOTHING WAS GATED: no arm+seed had both a _ms and a _roll entry. This is not a "
+              "pass, it is an empty run.")
+        raise SystemExit(1)
+    print(f"\nPARSER OK on real scorer output: {n_gated} run(s) gated, {n_group_stats} full "
+          f"p2_group_stats pass(es). No verdict computed: the pre-registration admits only the "
+          f"complete design (3 seeds per arm, every baselines block present).")
 
 
 if __name__ == "__main__":

@@ -135,6 +135,40 @@ def main() -> int:
     else:
         print(f"   ok   the smoke's list covers every flag the job passes")
 
+    # 5. C-C (2026-09-26): the shell's roll-window count must equal the Python constant.
+    # `p2_lrz_score.sh` grew a `P2_ROLL_WINDOW_EXPECTED` pre-flight, which is a SECOND COPY of
+    # `preregistration.P2_ROLL_WINDOW` -- exactly the shape check 4 exists to police. Two copies
+    # drift, and drift here is silent: the shell would wave through a roll set the engine then
+    # refuses, after the scoring CPU is already spent, or worse pass a count the engine accepts
+    # for a different reason. Derived comparison, not a second hardcoded number in a third place.
+    print("\n5. does the shell's roll-window count match the engine's P2_ROLL_WINDOW?")
+    sys.path.insert(0, str(REPO / "src"))
+    from taxembed.eval.preregistration import P2_ROLL_WINDOW  # noqa: E402
+    score_text = (REPO / "scripts/p2_lrz_score.sh").read_text()
+    m = re.search(r"^P2_ROLL_WINDOW_EXPECTED=(\d+)", score_text, re.MULTILINE)
+    if m is None:
+        problems.append("p2_lrz_score.sh has no P2_ROLL_WINDOW_EXPECTED pre-flight -- the "
+                        "roll-window count check (C-C) is missing from the job")
+        print("   🛑 P2_ROLL_WINDOW_EXPECTED not found in p2_lrz_score.sh")
+    elif int(m.group(1)) != P2_ROLL_WINDOW:
+        problems.append(f"p2_lrz_score.sh P2_ROLL_WINDOW_EXPECTED={m.group(1)} but "
+                        f"preregistration.P2_ROLL_WINDOW={P2_ROLL_WINDOW} -- the shell pre-flight "
+                        f"and the engine disagree about the rolling window")
+        print(f"   🛑 shell {m.group(1)} vs engine {P2_ROLL_WINDOW}")
+    else:
+        print(f"   ok   both say {P2_ROLL_WINDOW}")
+
+    # 6. C-C: the train job must clear its tag directory before training.
+    print("\n6. does p2_lrz_train.sh clear its tag directory before training?")
+    train_text = (REPO / "scripts/p2_lrz_train.sh").read_text()
+    if "_epoch*.pth\" -delete" not in train_text:
+        problems.append("p2_lrz_train.sh does not clear ${TAG}'s rolling checkpoints before "
+                        "training -- a resubmitted array element would leave the previous "
+                        "attempt's orphans for the scorer's glob to pick up (C-C)")
+        print("   🛑 no pre-training clear found")
+    else:
+        print("   ok   the tag directory is cleared before each attempt")
+
     print(f"\n{'=' * 78}")
     if problems:
         print(f"🛑 {len(problems)} PROBLEM(S) -- DO NOT SUBMIT:")

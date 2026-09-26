@@ -174,8 +174,11 @@ MUTATIONS: dict[str, Mutation] = {
     "p2_amendment2_default_true": Mutation(
         name="p2_amendment2_default_true",
         rel_path="src/taxembed/eval/preregistration.py",
-        old="               amendment_2: bool = False, amendment_4: bool = False) -> dict:",
-        new="               amendment_2: bool = True, amendment_4: bool = False) -> dict:",
+        # 2026-09-26: re-anchored after amendment_6 was added to the signature. Self-check 1
+        # caught the stale text -- a `str.replace` matching nothing would otherwise have
+        # "proved" the test survives a lesion that was never introduced.
+        old="               amendment_2: bool = False, amendment_4: bool = False,",
+        new="               amendment_2: bool = True, amendment_4: bool = False,",
         tests=[
             "tests/eval/test_preregistration.py::TestP2Amendment2"
             "::test_amendment_2_default_false_reproduces_the_original_nine_arm_reading",
@@ -235,6 +238,155 @@ MUTATIONS: dict[str, Mutation] = {
             "trusting the ledger's word for it."
         ),
     ),
+    # ---- amendment_6 (2026-09-26, C-A). Five lesions, one per clause the amendment changed:
+    # ---- reverting ANY of them silently restores the confound the amendment exists to remove,
+    # ---- and each failure mode is different, so one lesion would not enumerate the guard.
+    "amendment6_ratio_reverted_to_raw": Mutation(
+        name="amendment6_ratio_reverted_to_raw",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old="        g_cmp, c_cmp = g_nr / g_prior_nr, c_nr / c_prior_nr",
+        new="        g_cmp, c_cmp = g_nr, c_nr",
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
+        why=(
+            "THE amendment_6 lesion: the cross-tree comparison goes back to raw normalized_rank "
+            "head-to-head, so the real arm must again beat a number its ~3.8x-easier control gets "
+            "for free and GENERALISES becomes structurally unreachable. The flag would still "
+            "report amendment_6_applied=True -- the failure is silent in every field except the "
+            "verdict itself."
+        ),
+    ),
+    "amendment6_equivalence_clause_dropped": Mutation(
+        name="amendment6_equivalence_clause_dropped",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=("            and below_chance_level and sign_consistent_nr\n"
+             "            and not equivalent_to_control_nr):"),
+        new="            and below_chance_level and sign_consistent_nr):",
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
+        why=(
+            "amendment_6's SECOND correction removed. GENERALISES can then be published on an arm "
+            "its own reading calls equivalent_to_control, because `below_control_all_seeds` is a "
+            "strict max<min that settles a mathematical tie on the last bit of floating point. "
+            "This is the review's EXPECTED case (control improves on its own prior as much as the "
+            "arm does), so the lesion is not a corner."
+        ),
+    ),
+    "amendment6_band_reverted_to_absolute": Mutation(
+        name="amendment6_band_reverted_to_absolute",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=("        equiv_band_nr = max(P2_EQUIV_REL_FRACTION * abs(float(c_cmp.mean())),\n"
+             "                            P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)"),
+        new=("        equiv_band_nr = max(P2_EQUIV_FLOOR,\n"
+             "                            P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)"),
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
+        why=(
+            "C-A's second mechanism restored: the MRR-scale 0.01 floor applied to a quantity whose "
+            "production values are ~0.04, i.e. a ~25% equivalence band. Measured live in review "
+            "scenario S3, where two arms differing by 0.2% read equivalent_to_control=True."
+        ),
+    ),
+    "amendment6_strata_not_scaled": Mutation(
+        name="amendment6_strata_not_scaled",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=('        diffs_nr = {k: depth_nr["means"][k] / g_prior_nr '
+             '- depth_control_nr["means"][k] / c_prior_nr\n'
+             "                    for k in shared_nr}"),
+        new=('        diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k]\n'
+             "                    for k in shared_nr}"),
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
+        why=(
+            "A FIX THAT DOES NOT TRAVEL TO ITS SIBLING -- the session's recurring shape. The "
+            "aggregate comparison moves to the own-prior ratio scale while the per-stratum sign "
+            "test keeps the raw cross-tree difference, so sign_consistent still carries the full "
+            "difficulty confound and GENERALISES stays unreachable through that clause alone, "
+            "with every aggregate field looking correct."
+        ),
+    ),
+    # ---- C-B (2026-09-26). The FIRST of these is the reviewer's lesion VERBATIM -- C4 #3
+    # ---- restored -- which survived the whole 335-test suite on 2026-09-25.
+    "control_baselines_fallback_to_the_real_tree": Mutation(
+        name="control_baselines_fallback_to_the_real_tree",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old='        prefixes = [f"baselines_{control_name}", "baselines_randomdag"]',
+        new='        prefixes = ["baselines"]',
+        tests=["tests/eval/test_preregistration.py", "tests/eval/test_score_p2_cli.py"],
+        why=(
+            "C4 #3 VERBATIM: every matched control resolves its chance floor and degree prior "
+            "from the REAL tree's block. Measured in production terms by review scenario S5 -- "
+            "the control publishes 0.13126 (the real tree's) instead of its own 0.18833, with "
+            "no error and no _baselines_disagreements, and its gate (b) is then tested against "
+            "a floor 23% too low. On 2026-09-25 this was NOT CAUGHT by the named boundary test "
+            "NOR by all 335 tests; nothing in the suite protected the control-baselines "
+            "resolution. This mutation is the measurement that C-B is actually closed."
+        ),
+    ),
+    "control_baselines_existence_check_removed": Mutation(
+        name="control_baselines_existence_check_removed",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old='    merged["_control_baselines_present"] = assert_control_baselines_exist(merged)',
+        new='    merged["_control_baselines_present"] = {}',
+        tests=["tests/eval/test_preregistration.py::TestControlBaselinesExistence"],
+        why=(
+            "The merge-level EXISTENCE check removed. `assert_baselines_agree_across_seeds` "
+            "cannot substitute for it: an ABSENT family has nothing to disagree with, which is "
+            "precisely why a missing control block sailed through the merge and produced a "
+            "computed verdict carrying the wrong tree's floor."
+        ),
+    ),
+    # ---- C-C (2026-09-26): the rolling window.
+    "roll_window_not_applied": Mutation(
+        name="roll_window_not_applied",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old="    roll = all_roll[-P2_ROLL_WINDOW:]",
+        new="    roll = all_roll",
+        tests=["tests/eval/test_preregistration.py::TestP2RollWindowIsApplied"],
+        why=(
+            "The exact pre-2026-09-26 state: P2_ROLL_WINDOW declared, documented in the "
+            "docstring, applied by the TEST FIXTURE, and never applied in production. "
+            "`per_run_value` reverts to the mean over every checkpoint the scorer's glob "
+            "returned. Measured on a 10-element roll set: 0.68503 instead of 0.82002 and "
+            "jitter_sd 0.142284 instead of 0.000171 -> gate (a) fails -> the WHOLE ARRAY reads "
+            "UNINFORMATIVE. The old fixture guaranteed exactly 5, so no test could see it."
+        ),
+    ),
+    "roll_window_fix_fully_reverted": Mutation(
+        name="roll_window_fix_fully_reverted",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old=("    roll = all_roll[-P2_ROLL_WINDOW:]\n"
+             "    if len(all_roll) != P2_ROLL_WINDOW:"),
+        new=("    roll = all_roll\n"
+             "    if False:"),
+        tests=["tests/eval/test_preregistration.py::TestP2RollWindowIsApplied"],
+        why=(
+            "THE C-C lesion: BOTH halves reverted together, reproducing the exact "
+            "pre-2026-09-26 production state. This is the one that matters -- see "
+            "`roll_window_not_applied` below for why the slice alone proves nothing."
+        ),
+    ),
+    "roll_window_count_assert_removed": Mutation(
+        name="roll_window_count_assert_removed",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old="    if len(all_roll) != P2_ROLL_WINDOW:",
+        new="    if False:",
+        tests=["tests/eval/test_preregistration.py::TestP2RollWindowIsApplied"],
+        why=(
+            "The window is still applied but the COUNT assert is gone, so a polluted tag "
+            "directory is silently trimmed to its trailing 5 instead of refusing. That averages "
+            "the right checkpoints while concealing that the directory was never cleared -- the "
+            "run is then read as clean when its provenance is not."
+        ),
+    ),
+    "amendment6_zero_prior_guard_removed": Mutation(
+        name="amendment6_zero_prior_guard_removed",
+        rel_path="src/taxembed/eval/preregistration.py",
+        old="    if not np.isfinite(prior) or prior <= 0.0:",
+        new="    if False:",
+        tests=["tests/eval/test_preregistration.py::TestP2Amendment6"],
+        why=(
+            "The denominator guard removed. A 0.0 or missing own-prior then divides to inf/nan, "
+            "and a NaN comparison is uniformly False -- so every clause reads False and the arm "
+            "reads MEMORISES with no error raised. A silent wrong verdict, not a crash."
+        ),
+    ),
 }
 
 # 🧨 PATH-BOUNDARY MARKER, and the reason this field exists at all. `p2_frozen_gate_b_amended` mutates
@@ -251,6 +403,22 @@ MUTATIONS: dict[str, Mutation] = {
 # under test proves nothing about that test, and a count lifted from the wrong run proves less.
 MUTATIONS["p2_frozen_gate_b_amended"] = replace(
     MUTATIONS["p2_frozen_gate_b_amended"], expect_caught=False
+)
+
+# 🧨 SECOND PATH-BOUNDARY MARKER (2026-09-26), and this one was found BY the harness, against my
+# own expectation. `roll_window_not_applied` reverts ONLY the slice, leaving the count assert in
+# place -- and it is NOT CAUGHT, correctly. Given `len(all_roll) == P2_ROLL_WINDOW` (which the
+# assert guarantees for every input that gets past it), `all_roll[-P2_ROLL_WINDOW:]` IS
+# `all_roll`: the slice is redundant BY CONSTRUCTION, so removing it cannot change any accepted
+# input and no test could distinguish the two. That is a fact about the code, not a hole in the
+# suite -- the distinction the `expect_caught` field exists for.
+#
+# The slice is kept anyway, deliberately: it is the belt to the assert's braces, and if anyone
+# later relaxes the count check the window would otherwise silently stop being applied, which is
+# the original defect returning. `roll_window_fix_fully_reverted` above reverts BOTH halves and
+# IS caught -- that is the lesion that measures whether C-C is closed.
+MUTATIONS["roll_window_not_applied"] = replace(
+    MUTATIONS["roll_window_not_applied"], expect_caught=False
 )
 
 

@@ -93,6 +93,31 @@ pip install --no-cache-dir -e . 2>&1 | tail -3
 mkdir -p "${OUTDIR}"
 OUT_FILES=()
 
+# C-C (2026-09-26): the roll-window COUNT pre-flight.
+# The existing pre-flight below checks only that ${tag}_epoch200.pth EXISTS -- never how many
+# ${tag}_epoch*.pth files there are. Since the scorer registers that glob wholesale as the arm's
+# `_roll` group, and `p2_run_value` derives the published per-run value and its jitter from it,
+# an uncleared tag directory from a re-run silently changes the headline number (measured:
+# 0.68503 vs 0.82002, jitter_sd 0.142284 vs 0.000171, gate (a) FAILS -> the whole array reads
+# UNINFORMATIVE). p2_lrz_train.sh now clears the directory before each attempt and the engine
+# now REFUSES a wrong-length window; this check sits between them so the failure surfaces HERE,
+# before ~20 minutes of scoring, naming the directory to clean rather than after the fact.
+P2_ROLL_WINDOW_EXPECTED=5
+check_roll_count() {
+    local dir="$1" tag="$2" n
+    n="$(find "${dir}" -maxdepth 1 -name "${tag}_epoch*.pth" | wc -l | tr -d ' ')"
+    if [ "${n}" -ne "${P2_ROLL_WINDOW_EXPECTED}" ]; then
+        echo "ERROR: ${dir} holds ${n} rolling checkpoint(s) matching ${tag}_epoch*.pth," >&2
+        echo "       expected exactly ${P2_ROLL_WINDOW_EXPECTED}. More than that means the tag" >&2
+        echo "       directory was not cleared between training attempts and this glob would" >&2
+        echo "       pick up an earlier attempt's orphans; fewer means the run did not complete" >&2
+        echo "       its rolling window. Clear the directory and retrain, or rescore after" >&2
+        echo "       removing the orphans -- do not read a verdict off this." >&2
+        find "${dir}" -maxdepth 1 -name "${tag}_epoch*.pth" | sort >&2
+        exit 1
+    fi
+}
+
 for s in "${SEEDS[@]}"; do
     # -------- real-tree pair: vis00 + vis50, same seed, same manifest/heldout --------
     REAL_MANIFEST="${SPLITDIR}/p2_metazoa_33208_clean_vis00_seed${s}_manifest.json"
@@ -119,6 +144,7 @@ for s in "${SEEDS[@]}"; do
                 exit 1
             fi
         done
+        check_roll_count "${dir}" "${tag}"
         REAL_FLAGS+=(--checkpoints "${arm}_s${s}_ms=${dir}/${tag}_milestone_epoch*.pth")
         REAL_FLAGS+=(--checkpoints "${arm}_s${s}_roll=${dir}/${tag}_epoch*.pth")
     done
@@ -171,6 +197,7 @@ for s in "${SEEDS[@]}"; do
                 exit 1
             fi
         done
+        check_roll_count "${dir}" "${tag}"
 
         # C4 #3 + PART 2: --baselines-key writes this control's OWN floor, for THIS SEED, under
         # the seed-tagged key p2_verdict(..., amendment_2=True, amendment_4=True) reads

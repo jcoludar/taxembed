@@ -3,7 +3,7 @@
   <python> scripts/apply_preregistration.py --task 9 --json <seeds_*.json> --out <verdict.json>
   <python> scripts/apply_preregistration.py --task 8 --json <task8_seeds_*.json> --out <verdict.json>
   <python> scripts/apply_preregistration.py --task p2 --json <p2_real_s0.json> <p2_degmatch_vis00_s0.json> ... \
-      --amendment-1 --amendment-2 --amendment-4 --out <verdict.json>
+      --amendment-1 --amendment-2 --amendment-4 --amendment-6 --out <verdict.json>
       # --task p2 accepts ONE OR MORE --json paths (scripts/p2_lrz_score.sh writes 9 separate
       # files, never one combined file) and merges them via
       # taxembed.eval.preregistration.merge_p2_scorer_outputs before scoring. --task 8/9 still
@@ -106,7 +106,15 @@ def _render_p2(v: dict) -> None:
     for group_name, g in {**v["groups"], **controls}.items():
         for gate in g["gates"]:
             mark = "PASS" if gate["valid"] else "FAIL"
-            print(f"  [{mark}] {gate['arm']}  per_run_value {gate['per_run_value']:.4f}  "
+            # C-C (2026-09-26): print `roll_epochs`. `p2_run_value` has always recorded WHICH
+            # checkpoints the published per_run_value was averaged over; the renderer never
+            # showed them, so a value computed over a re-run's orphaned checkpoints looked
+            # exactly like a clean one on screen. The engine now refuses a wrong-length window,
+            # but a reader should be able to SEE the set, not infer it.
+            roll = gate.get("roll_epochs")
+            roll_str = f"  roll {roll}" if roll else ""
+            print(f"  [{mark}] {gate['arm']}  per_run_value {gate['per_run_value']:.4f}"
+                  f"{roll_str}  "
                   f"rise {gate['gate_a_rise']:+.4f} vs {gate['gate_a_threshold']:.4f} "
                   f"({'ok' if gate['gate_a_pass'] else 'FAILED'})  |  "
                   f"floor ({'ok' if gate['gate_b_pass'] else 'FAILED'})  |  "
@@ -119,10 +127,24 @@ def _render_p2(v: dict) -> None:
                   f"vs threshold {r['margin_threshold']:.4f} "
                   f"({'ok' if r['above_chance_margin'] else 'FAILED'})")
             if r["amendment_1_applied"]:
-                print(f"  below every RandomDAG seed (normalized_rank): "
-                      f"{r['below_control_all_seeds']}   "
+                print(f"  beats the control on every seed: {r['below_control_all_seeds']}   "
                       f"below chance level 0.5: {r['below_chance_level']}   "
-                      f"equivalent to RandomDAG: {r['equivalent_to_control']}")
+                      f"equivalent to control: {r['equivalent_to_control']}")
+                # amendment_6 (2026-09-26): show BOTH denominators and both sides as compared,
+                # so the ratio scale is visible rather than something the reader must know about.
+                if r.get("amendment_6_applied"):
+                    print(f"  own-prior denominators: arm "
+                          f"{r['arm_degree_prior_normalized_rank']:.5f}  control "
+                          f"{r['control_degree_prior_normalized_rank']:.5f}  "
+                          f"(control task "
+                          f"{r['arm_degree_prior_normalized_rank'] / r['control_degree_prior_normalized_rank']:.2f}x "
+                          f"easier training-free)")
+                    print("  values AS COMPARED (normalized_rank / own tree's degree prior; "
+                          "1.0 == no better than that tree's training-free prior):")
+                    print(f"    arm     {[round(x, 4) for x in r['arm_values_as_compared']]}")
+                    print(f"    control {[round(x, 4) for x in r['control_values_as_compared']]}")
+                    print(f"  mean diff {r['mean_diff_vs_control']:+.5f} vs equivalence band "
+                          f"{r['equivalence_band_vs_control']:.5f} (RELATIVE)")
             else:
                 print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
                       f"equivalent to RandomDAG: {r['equivalent_to_control']}")
@@ -171,6 +193,15 @@ def main() -> None:
                          "--amendment-2 for CONTROL SELECTION -- the degree-matched arms only "
                          "exist in the matched-per-visibility shape, so --amendment-4 always "
                          "reads that design regardless of --amendment-2. No-op for --task 8/9.")
+    ap.add_argument("--amendment-6", action="store_true",
+                    help="--task p2 only: apply p2_amendment_6_20260926 (USER design decision of "
+                         "2026-09-25) -- read every CROSS-TREE quantity as a RATIO to each arm's "
+                         "OWN tree's training-free degree prior, and make the normalized_rank "
+                         "equivalence band RELATIVE instead of the absolute MRR-scale floor. "
+                         "REQUIRES --amendment-1 (it amends that branch's comparison and would "
+                         "silently do nothing otherwise, so the engine RAISES). Without it the "
+                         "degree-matched control's ~4x-easier task makes GENERALISES structurally "
+                         "unreachable. No-op for --task 8/9.")
     args = ap.parse_args()
 
     seeds = tuple(int(x) for x in args.seeds.split(","))
@@ -179,7 +210,8 @@ def main() -> None:
         results = [json.loads(Path(p).read_text()) for p in args.json]
         result = merge_p2_scorer_outputs(results) if len(results) > 1 else results[0]
         verdict = p2_verdict(result, seeds, amendment_1=args.amendment_1,
-                             amendment_2=args.amendment_2, amendment_4=args.amendment_4)
+                             amendment_2=args.amendment_2, amendment_4=args.amendment_4,
+                             amendment_6=args.amendment_6)
         render = _render_p2
     else:
         if len(args.json) != 1:

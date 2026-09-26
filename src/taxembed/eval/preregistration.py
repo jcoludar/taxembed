@@ -275,6 +275,18 @@ P2_FINAL_EPOCH = 200              # the declared final checkpoint; gate (c) requ
 P2_GATE_A_JITTER_MULTIPLE = 10    # max_t MRR(t) - MRR(init) > 10 x within-run jitter SD
 P2_FLOOR_SD_MULTIPLE = 2          # "above chance_mrr_mean by >= 2x pooled within-arm seed SD"
 P2_EQUIV_FLOOR = 0.01             # equivalence-vs-RandomDAG band floor, mirrors EQUIV_FLOOR above
+P2_EQUIV_REL_FRACTION = 0.05      # amendment_6=True: equivalence band as a FRACTION of the control's
+# own mean, replacing the absolute MRR-scale `P2_EQUIV_FLOOR` on the normalized_rank reading.
+# WHY A FRACTION AT ALL (2026-09-26, `p2_amendment_6_20260926`, C-A's second mechanism): 0.01 was
+# calibrated on MRR, whose production values are ~0.8, so it is a ~1.2% band there. Applied
+# unchanged to `normalized_rank` at the amendment_1 branch it became ~25% of the quantity compared
+# (production normalized_rank ~0.04), and the measured consequence is not hypothetical: in review
+# scenario S3 two arms differing by 0.2% read `equivalent_to_control=True` on a |mean_diff| of
+# 0.00008 -- an automatic MEMORISES. 5% of the control's own mean reproduces the ~1.2% - 5% order
+# the MRR reading always had, on whatever scale the compared quantity actually lives at, and the
+# `P2_FLOOR_SD_MULTIPLE * pooled_sd` term is unchanged and still dominates whenever seed noise is
+# the larger effect. Chosen for scale-consistency with the existing MRR band BEFORE any P2 array
+# ran and before any P2 outcome data existed -- not tuned against a result.
 P2_MIN_STRATUM_N = 500
 P2_DATA_ARMS = ("vis00", "vis50")
 P2_CONTROL_ARM = "randomdag"                     # amendment_2=False (default): one shared control
@@ -384,14 +396,48 @@ def p2_run_value(result: dict, arm: str, seed: int) -> dict:
 
     `per_run_value` is the mean MRR over the trailing `P2_ROLL_WINDOW` ROLLING checkpoints (mirrors
     the S_angle rolling-window convention), with `jitter_sd` its SD -- the noise floor gate (a)
-    measures a rise against.
+    measures a rise against. C-C (2026-09-26): that sentence was TRUE OF THE DOCSTRING ONLY until
+    this date -- the window is now actually applied, and a roll set that is not exactly
+    `P2_ROLL_WINDOW` long RAISES. See the comment in the body.
+
+    `roll_epochs` records which epochs the window actually covered, so a reader can see the set
+    the published value was computed over instead of inferring it.
     """
-    roll = _p2_checkpoints(result, _p2_roll_key(arm, seed))
+    all_roll = _p2_checkpoints(result, _p2_roll_key(arm, seed))
     ms = _p2_checkpoints(result, _p2_ms_key(arm, seed))
-    if not roll:
+    if not all_roll:
         raise ValueError(f"{_p2_roll_key(arm, seed)}: no checkpoints scored")
     if not ms:
         raise ValueError(f"{_p2_ms_key(arm, seed)}: no checkpoints scored")
+    # C-C (2026-09-26). `P2_ROLL_WINDOW` was DECLARED, described in this docstring, and applied
+    # only by a TEST FIXTURE -- nothing in src/ or scripts/ ever applied it, so `per_run_value`
+    # was the mean over EVERY checkpoint the scorer's glob returned
+    # (`p2_lrz_score.sh`: --checkpoints "${arm}_s${s}_roll=${dir}/${tag}_epoch*.pth").
+    #
+    # This is not a tidy-up. The trainer keeps the last 5 rolling checkpoints PER PROCESS and
+    # `p2_lrz_train.sh` writes into /app/artifacts/tags/${TAG}/ WITHOUT clearing it, while the
+    # array runs at --time=1-00:00:00 against runs the ledger sizes at 11-19 h -- so a resubmitted
+    # element is likely, and a first attempt that died at epoch 120 leaves _epoch116..120.pth
+    # orphaned beside the second attempt's _epoch196..200.pth. Measured on exactly that 10-element
+    # roll set (helpers/p2_review3_roll_window_and_strata.py): published per_run_value 0.68503
+    # instead of 0.82002 (-16% on the headline number) and jitter_sd 0.142284 instead of 0.000171,
+    # which FAILS gate (a) and makes the WHOLE ARRAY UNINFORMATIVE, since one invalid arm-seed
+    # invalidates everything.
+    #
+    # The count is asserted rather than silently trimmed: taking the trailing 5 of a 10-element
+    # set would quietly average the right checkpoints while concealing that the tag directory was
+    # never cleared, and a run with the wrong number of rolling checkpoints is a fact worth
+    # failing on. The test fixture guaranteed exactly 5, so no test could ever see this.
+    roll = all_roll[-P2_ROLL_WINDOW:]
+    if len(all_roll) != P2_ROLL_WINDOW:
+        raise ValueError(
+            f"{_p2_roll_key(arm, seed)}: {len(all_roll)} rolling checkpoints "
+            f"(epochs {[int(c['epoch']) for c in all_roll]}), expected exactly "
+            f"{P2_ROLL_WINDOW}. More than {P2_ROLL_WINDOW} usually means the tag directory was "
+            f"not cleared between training attempts and this run's glob picked up a previous "
+            f"attempt's orphaned checkpoints; fewer means the run did not complete its rolling "
+            f"window. Either way the per-run value and its jitter would be computed over the "
+            f"wrong set -- clear the tag directory and rescore rather than reading this.")
     roll_epochs = [int(c["epoch"]) for c in roll]
     ms_epochs = [int(c["epoch"]) for c in ms]
     roll_mrrs = np.array([_p2_mrr(c) for c in roll], dtype=float)
@@ -589,8 +635,30 @@ def _p2_depth_means(result: dict, group: str, seeds, field: str = "mrr") -> dict
     return {"means": means, "dropped_below_min_n": dropped}
 
 
+def _p2_own_prior_nr(stats: dict, which: str) -> float:
+    """The training-free degree prior's `normalized_rank` for ONE tree, as the amendment_6
+    denominator -- raising rather than returning a value that would silently divide.
+
+    `stats` is a `p2_group_stats` dict (a real arm's or a control's); `which` names it for the
+    error message. A prior of 0.0 means the training-free ranker put the true parent first for
+    every single held-out node, and a negative one is impossible for `(rank-1)/(pool-1)`: either
+    is a broken baselines block, not a tree that is merely very easy. Dividing by it would yield
+    `inf`/`nan` and propagate into a comparison where NaN is uniformly False -- i.e. a silent
+    MEMORISES. Measured production values are ~0.153 (real) and ~0.038-0.040 (degmatch), so this
+    raise is a structural guard, never a threshold anything is expected to approach.
+    """
+    prior = float(stats["degree_prior"]["normalized_rank"])
+    if not np.isfinite(prior) or prior <= 0.0:
+        raise ValueError(
+            f"amendment_6: {which} ({stats['group']}) has degree_prior.normalized_rank={prior!r}, "
+            "which cannot be an own-prior denominator. The baselines block for this arm is wrong "
+            "or missing -- rescore it; do not read a verdict off this result.")
+    return prior
+
+
 def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
-                    amendment_1: bool = False, control_group: str = P2_CONTROL_ARM) -> dict:
+                    amendment_1: bool = False, control_group: str = P2_CONTROL_ARM,
+                    amendment_6: bool = False) -> dict:
     """GENERALISES / MEMORISES / MIXED for one real-tree arm against chance, the degree prior,
     and RandomDAG.
 
@@ -698,50 +766,142 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
     # is exactly 0.5 for every pool size, so it needs no per-arm floor the way MRR does.
     g_nr = np.asarray(group["per_run_values_normalized_rank"], dtype=float)
     c_nr = np.asarray(control["per_run_values_normalized_rank"], dtype=float)
-    below_control_all_seeds = bool(g_nr.max() < c_nr.min())      # mirrors above_control_all_seeds
+
+    # amendment_6_20260926 (C-A): every CROSS-TREE quantity below is read as a RATIO TO THE
+    # ARM'S OWN TREE'S training-free degree prior, never as a raw normalized_rank head-to-head.
+    # amendment_1 made the metric pool-size invariant, which removes the FAN-OUT confound; it
+    # does not remove the TASK-DIFFICULTY confound, because the two trees have different
+    # training-free floors. Measured on the 12 production metazoa splits
+    # (helpers/p2_review3_measure_production_splits.py, re-derived 2026-09-26): degree-prior
+    # normalized_rank is 0.15381/0.15317/0.15320 on the real tree and 0.04041/0.03824/0.03851
+    # on the degree-matched control -- the control's task is ~4x easier for a ranker that
+    # learned NOTHING. Under the raw reading a real arm must beat a number its control gets for
+    # free, so `below_control_all_seeds` is structurally unreachable and GENERALISES cannot be
+    # returned however good the geometry is. Dividing each side by its own tree's prior asks the
+    # question the design intends -- "which model improved more on what its tree hands out for
+    # free" -- and is invariant to the difficulty gap by construction. 1.0 is exactly "no better
+    # than the training-free prior" on either tree.
+    if amendment_6:
+        g_prior_nr = _p2_own_prior_nr(group, "real arm")
+        c_prior_nr = _p2_own_prior_nr(control, "control")
+        g_cmp, c_cmp = g_nr / g_prior_nr, c_nr / c_prior_nr
+    else:
+        g_prior_nr = float(degree_prior["normalized_rank"])
+        # None, not NaN: "no denominator was used" is a fact, whereas NaN is a number that is
+        # not equal to itself -- which silently breaks the byte-identity check that keeps the
+        # unamended reading reproducible (`p2_verdict(...) == p2_verdict(..., amendment_6=False)`
+        # compares False on a NaN field however identical the two readings are).
+        c_prior_nr = None
+        g_cmp, c_cmp = g_nr, c_nr
+
+    below_control_all_seeds = bool(g_cmp.max() < c_cmp.min())    # mirrors above_control_all_seeds
     below_chance_level = bool(g_nr.max() < 0.5)                  # weakest (highest) seed still <0.5
     # C1, normalized_rank form: the arm's own normalized_rank must ALSO sit below the degree
     # prior's normalized_rank on this SAME tree (own-tree, mirrors above_degree_prior on MRR).
+    # Untouched by amendment_6 -- it was ALREADY an own-tree comparison, and under amendment_6 it
+    # is exactly the statement `g_cmp.max() < 1.0`.
     below_degree_prior = bool(g_nr.max() < degree_prior["normalized_rank"])
 
-    ranges_overlap_nr = bool(g_nr.min() <= c_nr.max() and c_nr.min() <= g_nr.max())
-    g_var_nr = float(np.var(g_nr, ddof=1)) if len(g_nr) > 1 else 0.0
-    c_var_nr = float(np.var(c_nr, ddof=1)) if len(c_nr) > 1 else 0.0
+    ranges_overlap_nr = bool(g_cmp.min() <= c_cmp.max() and c_cmp.min() <= g_cmp.max())
+    g_var_nr = float(np.var(g_cmp, ddof=1)) if len(g_cmp) > 1 else 0.0
+    c_var_nr = float(np.var(c_cmp, ddof=1)) if len(c_cmp) > 1 else 0.0
     pooled_vs_control_nr = float(np.sqrt(np.mean([g_var_nr, c_var_nr])))
-    equiv_band_nr = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)
-    mean_diff_nr = float(g_nr.mean() - c_nr.mean())
+    if amendment_6:
+        # RELATIVE band (see `P2_EQUIV_REL_FRACTION`): a fraction of the control's own mean
+        # instead of the absolute MRR-scale floor, which was ~25% of a normalized_rank value.
+        equiv_band_nr = max(P2_EQUIV_REL_FRACTION * abs(float(c_cmp.mean())),
+                            P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)
+    else:
+        equiv_band_nr = max(P2_EQUIV_FLOOR, P2_FLOOR_SD_MULTIPLE * pooled_vs_control_nr)
+    mean_diff_nr = float(g_cmp.mean() - c_cmp.mean())
     equivalent_to_control_nr = bool(ranges_overlap_nr or abs(mean_diff_nr) < equiv_band_nr)
 
     depth_nr = _p2_depth_means(result, name, seeds, field="normalized_rank")
     depth_control_nr = _p2_depth_means(result, control_group, seeds, field="normalized_rank")
     shared_nr = sorted(set(depth_nr["means"]) & set(depth_control_nr["means"]))
-    diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k] for k in shared_nr}
+    # amendment_6 applies the SAME own-prior scaling per stratum. The scorer emits `degree_prior`
+    # only as an aggregate (scripts/score_p2_linkpred.py writes one block per `--baselines-key`,
+    # with no by_depth breakdown), so each side is divided by its tree's AGGREGATE prior rather
+    # than by a per-stratum one. That is a uniform positive rescaling of each side, so it cannot
+    # reorder strata within an arm; what it does is relax the cross-tree sign test by exactly the
+    # measured difficulty ratio (~4x), which is the confound amendment_6 exists to remove. A
+    # per-stratum prior would be sharper and is NOT claimed here -- recorded as a stated
+    # limitation in the amendment block, not a silent approximation.
+    if amendment_6:
+        diffs_nr = {k: depth_nr["means"][k] / g_prior_nr - depth_control_nr["means"][k] / c_prior_nr
+                    for k in shared_nr}
+    else:
+        diffs_nr = {k: depth_nr["means"][k] - depth_control_nr["means"][k] for k in shared_nr}
     sign_consistent_nr = bool(diffs_nr) and all(v < 0 for v in diffs_nr.values())
 
+    # The cross-tree clause reads differently under amendment_6, and the verdict's own prose is
+    # what ends up quoted in the manuscript -- so it states WHICH comparison was made, never a
+    # generic "beats the control".
+    _cross = ("its improvement on its OWN tree's training-free degree prior exceeds the "
+              "control's improvement on ITS own tree's prior, for every seed "
+              "(amendment_6_20260926)" if amendment_6 else
+              "normalized_rank sits below every control seed's normalized_rank")
+    _amendments = ("amendment_1_20260924, amendment_3_20260924, amendment_6_20260926."
+                   if amendment_6 else "amendment_1_20260924, amendment_3_20260924.")
+    # amendment_6_20260926, second correction (found by helpers/p2_amendment6_reachability.py
+    # scenario R2, PRE-RUN): GENERALISES did not require `not equivalent_to_control_nr`, so an arm
+    # STATISTICALLY INDISTINGUISHABLE from its control could still be published as generalising --
+    # the MEMORISES branch tests that boolean, but it is an `elif` and never runs once GENERALISES
+    # has fired. `below_control_all_seeds` is a strict ordering (`max < min`) and settles a
+    # mathematical TIE on the last bit of floating point, so under amendment_6's ratio scale the
+    # case the review calls the EXPECTED one -- real arm and control improving on their own priors
+    # by the SAME factor -- read GENERALISES with |mean_diff| = 0.000000 and
+    # equivalent_to_control = True in the same dict. A verdict that contradicts its own reported
+    # booleans is not a reading. Adding the clause makes the two branches consistent: an arm must
+    # be better than its control AND distinguishable from it.
+    #
+    # Scope: the amendment_1 branch only. The frozen `amendment_1=False` raw-MRR reading above
+    # carries the same latent structure and is deliberately NOT changed -- it is kept reachable
+    # solely so the original 2026-09-24 freeze stays byte-identically reproducible, and it is
+    # never the published reading. Recorded in the amendment block rather than silently fixed.
     if (above_chance_margin and below_degree_prior and below_control_all_seeds
-            and below_chance_level and sign_consistent_nr):
+            and below_chance_level and sign_consistent_nr
+            and not equivalent_to_control_nr):
         verdict, meaning = "GENERALISES", (
             "MRR clears its own chance MRR by the declared margin, AND normalized_rank sits "
-            "below the training-free degree prior's normalized_rank AND below every RandomDAG "
-            "seed's normalized_rank AND below the pool-size-invariant chance level of 0.5, AND "
-            "the sign holds in every depth stratum with n>=500: the model predicts relations it "
-            "never saw, read on a metric RandomDAG's inflated own chance floor cannot confound, "
-            "and clears a training-free prior. amendment_1_20260924, amendment_3_20260924.")
+            f"below the training-free degree prior's normalized_rank AND {_cross} AND below the "
+            "pool-size-invariant chance level of 0.5, AND the sign holds in every depth stratum "
+            "with n>=500: the model predicts relations it never saw, read on a metric the "
+            "control's own chance floor cannot confound, and clears a training-free prior. "
+            + _amendments)
     elif (not above_chance_margin) or (not below_degree_prior) or equivalent_to_control_nr:
         verdict, meaning = "MEMORISES", (
             "MRR is not meaningfully separated from its own chance MRR, normalized_rank does not "
-            "beat the training-free degree prior, or normalized_rank is statistically "
-            "indistinguishable from the RandomDAG control's normalized_rank. The structure is "
-            "in-sample only, or explained by a training-free prior; the manuscript must say so. "
-            "amendment_1_20260924, amendment_3_20260924.")
+            "beat the training-free degree prior, or the arm is statistically indistinguishable "
+            "from the control on the cross-tree quantity. The structure is in-sample only, or "
+            "explained by a training-free prior; the manuscript must say so. " + _amendments)
     else:
-        verdict, meaning = "MIXED", ("Sign of (arm - RandomDAG) normalized_rank flips across "
-                                     "depth strata; report per stratum, no aggregate claim. "
-                                     "amendment_1_20260924.")
+        # amendment_6_20260926, third correction (found by p2_amendment6_reachability.py scenario
+        # R3, PRE-RUN): this branch is reached for THREE different reasons -- a depth-stratum sign
+        # flip, the arm failing to beat its control on every seed, or the arm not clearing the
+        # 0.5 chance level -- but its prose asserted the first one unconditionally. On R3 (the arm
+        # uniformly WORSE than its control, sign_consistent False only because the diffs are
+        # positive throughout, no flip anywhere) the published sentence would have been simply
+        # untrue. A verdict string is quoted into the manuscript, so it now names what actually
+        # happened.
+        _why = []
+        if not below_control_all_seeds:
+            _why.append("the arm does not beat its control on every seed")
+        if not below_chance_level:
+            _why.append("normalized_rank does not clear the pool-size-invariant chance level 0.5")
+        if not sign_consistent_nr:
+            _why.append("the sign of (arm - control) is not negative in every depth stratum "
+                        "with n>=500" if diffs_nr else
+                        "no depth stratum with n>=500 is shared by the arm and its control")
+        verdict, meaning = "MIXED", ("No aggregate claim; report per stratum. Binding: "
+                                     + "; ".join(_why) + ". " + _amendments)
 
     return {
         "arm": name, "verdict": verdict, "meaning": meaning,
-        "amendment_1_applied": True, "cross_tree_metric": "normalized_rank",
+        "amendment_1_applied": True,
+        "amendment_6_applied": bool(amendment_6),
+        "cross_tree_metric": ("normalized_rank_over_own_degree_prior" if amendment_6
+                              else "normalized_rank"),
         "margin_above_chance": float(margin), "margin_threshold": float(threshold),
         "above_chance_margin": above_chance_margin,
         "chance_mrr_mean": float(chance_mrr),
@@ -751,6 +911,15 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
         "below_chance_level": below_chance_level,
         "equivalent_to_control": equivalent_to_control_nr,
         "mean_diff_vs_control": mean_diff_nr, "equivalence_band_vs_control": equiv_band_nr,
+        # amendment_6's own audit trail: the two denominators and both sides of the comparison
+        # AS COMPARED, so a reader never has to reconstruct which scale a number lives on.
+        # Under amendment_6=False these are the raw normalized_rank values and
+        # `control_degree_prior_normalized_rank` is None (no denominator was used).
+        "arm_degree_prior_normalized_rank": float(g_prior_nr),
+        "control_degree_prior_normalized_rank": (None if c_prior_nr is None
+                                                 else float(c_prior_nr)),
+        "arm_values_as_compared": [float(v) for v in g_cmp],
+        "control_values_as_compared": [float(v) for v in c_cmp],
         "depth_strata": {"diffs": diffs_nr, "n_strata": len(shared_nr),
                          "dropped_below_min_n": {**depth_nr["dropped_below_min_n"],
                                                   **depth_control_nr["dropped_below_min_n"]}},
@@ -803,8 +972,31 @@ def _p2_matched_controls(result: dict, seeds, control_map: dict | None = None) -
     control_map = P2_MATCHED_CONTROL if control_map is None else control_map
     controls = {}
     for control_name in sorted(set(control_map.values())):
-        prefixes = [f"baselines_{control_name}", "baselines_randomdag", "baselines"]
-        baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+        # C-B (2026-09-26): `"baselines"` -- the REAL TREE's block -- is NO LONGER the last link
+        # in a control's fallback chain. It was, and the consequence was measured (review
+        # scenario S5): with `baselines_degmatch_vis{00,50}_s{n}` merely ABSENT from the merge --
+        # a `--baselines-key` typo, one of the 9 JSONs not passed to `apply_preregistration.py`,
+        # or a partially-failed scoring job -- every matched control silently resolved the REAL
+        # tree's floor and published `randomdag_sibling_chance_mean` 0.13126 instead of its own
+        # 0.18833. No error, no warning, and `assert_baselines_agree_across_seeds` cannot see it
+        # because the real and control blocks are DIFFERENT FAMILIES and an absent family has
+        # nothing to disagree with. The control's gate (b) was then tested against a floor 23%
+        # too low, i.e. the control became EASIER to validate than it should be. A control
+        # reading the real tree's floor is never the right answer, so the chain now ends inside
+        # the control's own family and a miss RAISES, naming the key that is missing. The
+        # seed-tagged -> bare-prefix fallback WITHIN the control's own family is kept: that one
+        # is the documented pre-Part-2 compatibility path, and it can only ever resolve to a
+        # block measured on this control's own tree.
+        prefixes = [f"baselines_{control_name}", "baselines_randomdag"]
+        try:
+            baselines_by_seed = {s: _p2_baselines_for_seed(result, prefixes, s) for s in seeds}
+        except KeyError as exc:
+            raise KeyError(
+                f"control '{control_name}' has no baselines block of its own: {exc}. Falling "
+                f"back to the real tree's 'baselines' would publish the REAL tree's chance floor "
+                f"and degree prior as this control's, which is never correct -- rescore this "
+                f"control with --baselines-key baselines_{control_name}_s<seed>, or pass the "
+                f"missing file to the merge.") from exc
         controls[control_name] = p2_group_stats(result, control_name, seeds, baselines_by_seed)
     return controls, dict(control_map)
 
@@ -956,11 +1148,60 @@ def merge_p2_scorer_outputs(results: list[dict], seeds=(0, 1, 2),
     # seed-tagged baselines keys are present (every pre-Part-2 shape).
     merged["_baselines_cross_seed_spread"] = assert_baselines_agree_across_seeds(
         merged, seeds=seeds, tolerance=baselines_tolerance)
+    merged["_control_baselines_present"] = assert_control_baselines_exist(merged)
     return merged
 
 
+def assert_control_baselines_exist(result: dict) -> dict:
+    """Every CONTROL arm present under `arms` must have a baselines family of its own.
+
+    C-B (2026-09-26). `assert_baselines_agree_across_seeds` measures AGREEMENT, which is a
+    question you can only ask about a family that is present -- an ABSENT family has nothing to
+    disagree with, so a missing control block sailed through it. That is not hypothetical:
+    review scenario S5 measured the whole chain, with `baselines_degmatch_vis{00,50}_s{n}`
+    simply absent from the merge, producing a verdict with the REAL tree's floor published as
+    the control's, `_baselines_disagreements` absent, and no error. EXISTENCE, not agreement,
+    is the check nothing performed.
+
+    Raising here rather than in `_p2_matched_controls` alone is deliberate: the merge is where
+    the 9 (now 12) separate scorer JSONs come together, so it is the first moment at which
+    "this file was never passed in" is knowable, and it fails before any verdict is computed
+    rather than partway through one.
+
+    Returns `{control_arm: resolving_key}` for a caller that wants to see WHICH key each control
+    resolved to; raises `ValueError` naming every control that has none.
+    """
+    control_arms = set()
+    for key in result.get("arms", {}):
+        # keys are "<arm>_s<seed>_<kind>"; the arm may itself contain underscores
+        parts = key.rsplit("_s", 1)
+        if len(parts) != 2:
+            continue
+        arm = parts[0]
+        if arm not in P2_DATA_ARMS:
+            control_arms.add(arm)
+
+    present, missing = {}, []
+    for arm in sorted(control_arms):
+        candidates = [f"baselines_{arm}"] + [f"baselines_{arm}_s{s}" for s in range(16)]
+        found = next((k for k in candidates if k in result), None)
+        if found is None:
+            missing.append(arm)
+        else:
+            present[arm] = found
+    if missing:
+        raise ValueError(
+            "control arm(s) present under 'arms' with NO baselines family of their own: "
+            f"{missing}. Without one, each would resolve the REAL tree's floor and degree prior "
+            "-- a control judged against the wrong tree's difficulty. Rescore with "
+            "--baselines-key baselines_<arm>_s<seed>, or pass the missing scorer JSON to the "
+            "merge.")
+    return present
+
+
 def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
-               amendment_2: bool = False, amendment_4: bool = False) -> dict:
+               amendment_2: bool = False, amendment_4: bool = False,
+               amendment_6: bool = False) -> dict:
     """vis00/vis50 vs sibling chance and its control (RandomDAG, or the degree-matched shuffle
     under amendment_4) -> GENERALISES / MEMORISES / MIXED / UNINFORMATIVE, per results/
     p2_heldout_preregistration.json.
@@ -1003,11 +1244,29 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
     See `_p2_matched_controls` and the JSON amendment block for the full derivation, including the
     MEASURED (not assumed) residual chance-floor gap.
 
+    `amendment_6` (2026-09-26, `p2_amendment_6_20260926`, USER DESIGN decision of 2026-09-25,
+    BEFORE any array was submitted and BEFORE any P2 outcome data existed): every CROSS-TREE
+    quantity is read as a RATIO TO EACH ARM'S OWN TREE'S training-free degree prior, and the
+    normalized_rank equivalence band becomes RELATIVE (`P2_EQUIV_REL_FRACTION` of the control's
+    own mean) instead of the absolute MRR-scale `P2_EQUIV_FLOOR`. Default False leaves
+    amendment_1's reading exactly as it was. REQUIRES `amendment_1=True` -- it amends that
+    branch's cross-tree comparison and has no meaning on the raw-MRR frozen reading, so passing
+    it alone RAISES rather than being silently ignored (a flag that does nothing is how a
+    pre-registration stops describing the computation it names). See `_p2_arm_reading`'s
+    amendment_6 block for the measured justification: the degree-matched control's task is ~4x
+    easier for a training-free ranker, which makes GENERALISES structurally unreachable under
+    the unamended reading.
+
     PART 2 (2026-09-24, no amendment flag -- a correctness fix): each group's/control's own
     baselines are now resolved PER SEED (`p2_group_stats`'s `baselines_by_seed`), never one value
     shared across all 3 seeds taken from whichever seed's file merged first. See
     `_p2_baselines_for_seed` and `assert_baselines_agree_across_seeds`.
     """
+    if amendment_6 and not amendment_1:
+        raise ValueError(
+            "amendment_6=True requires amendment_1=True: amendment_6 amends the normalized_rank "
+            "cross-tree comparison that only the amendment_1 branch performs. On the raw-MRR "
+            "frozen reading it would silently do nothing.")
     baselines_by_seed = {s: _p2_baselines_for_seed(result, ["baselines"], s) for s in seeds}
     sibling_chance_mean = float(baselines_by_seed[seeds[0]]["sibling_chance_mean"])
     groups = {g: p2_group_stats(result, g, seeds, baselines_by_seed) for g in P2_DATA_ARMS}
@@ -1035,6 +1294,7 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
         "amendment_1_applied": bool(amendment_1),
         "amendment_2_applied": bool(amendment_2),
         "amendment_4_applied": bool(amendment_4),
+        "amendment_6_applied": bool(amendment_6),
         "sibling_chance_mean": sibling_chance_mean,
         "chance_mrr_mean": float(baselines_by_seed[seeds[0]]["chance_mrr_mean"]),
         "degree_prior": baselines_by_seed[seeds[0]]["degree_prior"],
@@ -1062,7 +1322,8 @@ def p2_verdict(result: dict, seeds=(0, 1, 2), amendment_1: bool = False,
         return base
 
     by_arm = {name: _p2_arm_reading(result, name, seeds, groups[name], controls[control_for_arm[name]],
-                                    amendment_1=amendment_1, control_group=control_for_arm[name])
+                                    amendment_1=amendment_1, control_group=control_for_arm[name],
+                                    amendment_6=amendment_6)
              for name in P2_DATA_ARMS}
     verdicts = {v["verdict"] for v in by_arm.values()}
     if len(verdicts) == 1:

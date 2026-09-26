@@ -15,7 +15,9 @@ from score_p2_linkpred import (  # noqa: E402
     _vendrov_recall_core, _visible_basic_edges, vendrov_recall,
 )
 from taxembed.eval import baselines  # noqa: E402
-from taxembed.eval.preregistration import merge_p2_scorer_outputs, p2_verdict  # noqa: E402
+from taxembed.eval.preregistration import (  # noqa: E402
+    P2_ROLL_WINDOW, merge_p2_scorer_outputs, p2_verdict,
+)
 from taxembed.eval.randomdag import closure_from_parent  # noqa: E402
 
 
@@ -505,16 +507,33 @@ def test_missing_closure_argument_fails_fast_with_a_clear_message(tmp_path):
 # shape through the parser exactly as helpers/check_p2_prereg_parses_real_scorer_output.py does.
 
 
+def _write_roll_window(tmp_path, stem="roll"):
+    """Write a FULL rolling window of `P2_ROLL_WINDOW` checkpoints and return the glob for it.
+
+    C-C (2026-09-26): `p2_run_value` now applies `P2_ROLL_WINDOW` and RAISES on a roll set that
+    is not exactly that long. These end-to-end tests previously registered ONE checkpoint under
+    the `_roll` key, which no production run ever produces -- the trainer's rolling queue keeps
+    the last 5 and `p2_lrz_score.sh` globs `${tag}_epoch*.pth`. A fixture that is unrepresentative
+    in precisely the dimension under test is how the window went unapplied for as long as it did,
+    so the fixture is corrected rather than the invariant relaxed.
+    """
+    for epoch in range(201 - P2_ROLL_WINDOW, 201):
+        torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "epoch": epoch},
+                   tmp_path / f"{stem}_epoch{epoch}.pth")
+    return str(tmp_path / f"{stem}_epoch*.pth")
+
+
 def test_scorer_output_flows_through_merge_and_the_verdict_engine_end_to_end(tmp_path):
     manifest, held = _write_small_tree(tmp_path, test=(3, 5))
     ck = tmp_path / "ck_epoch200.pth"
     torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "epoch": 200}, ck)
+    roll = _write_roll_window(tmp_path)
 
     real_out = tmp_path / "real.json"
     rc_real = subprocess.run(
         [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
-         "--checkpoints", f"vis00_s0_ms={ck}", "--checkpoints", f"vis00_s0_roll={ck}",
-         "--checkpoints", f"vis50_s0_ms={ck}", "--checkpoints", f"vis50_s0_roll={ck}",
+         "--checkpoints", f"vis00_s0_ms={ck}", "--checkpoints", f"vis00_s0_roll={roll}",
+         "--checkpoints", f"vis50_s0_ms={ck}", "--checkpoints", f"vis50_s0_roll={roll}",
          "--out", str(real_out)],
         capture_output=True, text=True,
     )
@@ -523,7 +542,7 @@ def test_scorer_output_flows_through_merge_and_the_verdict_engine_end_to_end(tmp
     control_out = tmp_path / "control.json"
     rc_control = subprocess.run(
         [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
-         "--checkpoints", f"randomdag_s0_ms={ck}", "--checkpoints", f"randomdag_s0_roll={ck}",
+         "--checkpoints", f"randomdag_s0_ms={ck}", "--checkpoints", f"randomdag_s0_roll={roll}",
          "--baselines-key", "baselines_randomdag", "--out", str(control_out)],
         capture_output=True, text=True,
     )
@@ -540,7 +559,11 @@ def test_scorer_output_flows_through_merge_and_the_verdict_engine_end_to_end(tmp
            "randomdag_s0_ms", "randomdag_s0_roll"} <= set(merged["arms"])
 
     v = p2_verdict(merged, seeds=(0,))
-    assert v["verdict"] in {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
+    # C-B (2026-09-26): `verdict in {the four possible verdicts}` cannot fail -- replaced with
+    # the structural facts this test is actually about.
+    assert v["amendment_1_applied"] is False        # the frozen single-shared-control reading
+    assert "control" in v and "controls" not in v
+    assert v["control"]["group"] == "randomdag"
     # the control's OWN measured floor (from control_result) is what the engine actually used --
     # never silently falling back to the real tree's baselines block (C4 #3's whole point).
     assert v["randomdag_sibling_chance_mean"] == pytest.approx(
@@ -558,14 +581,15 @@ def test_degmatch_and_seed_tagged_baselines_flow_through_merge_and_amendment_4_e
     manifest, held = _write_small_tree(tmp_path, test=(3, 5))
     ck = tmp_path / "ck_epoch200.pth"
     torch.save({"embeddings": _SMALL_TREE_BALL_COORDS, "epoch": 200}, ck)
+    roll = _write_roll_window(tmp_path)
 
     results = []
     for s in (0, 1):
         real_out = tmp_path / f"real_s{s}.json"
         rc_real = subprocess.run(
             [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
-             "--checkpoints", f"vis00_s{s}_ms={ck}", "--checkpoints", f"vis00_s{s}_roll={ck}",
-             "--checkpoints", f"vis50_s{s}_ms={ck}", "--checkpoints", f"vis50_s{s}_roll={ck}",
+             "--checkpoints", f"vis00_s{s}_ms={ck}", "--checkpoints", f"vis00_s{s}_roll={roll}",
+             "--checkpoints", f"vis50_s{s}_ms={ck}", "--checkpoints", f"vis50_s{s}_roll={roll}",
              "--baselines-key", f"baselines_s{s}", "--out", str(real_out)],
             capture_output=True, text=True,
         )
@@ -576,7 +600,7 @@ def test_degmatch_and_seed_tagged_baselines_flow_through_merge_and_amendment_4_e
             control_out = tmp_path / f"{arm}_s{s}.json"
             rc_control = subprocess.run(
                 [sys.executable, str(SCRIPT), "--manifest", str(manifest), "--heldout", str(held),
-                 "--checkpoints", f"{arm}_s{s}_ms={ck}", "--checkpoints", f"{arm}_s{s}_roll={ck}",
+                 "--checkpoints", f"{arm}_s{s}_ms={ck}", "--checkpoints", f"{arm}_s{s}_roll={roll}",
                  "--baselines-key", f"baselines_{arm}_s{s}", "--out", str(control_out)],
                 capture_output=True, text=True,
             )
@@ -596,5 +620,24 @@ def test_degmatch_and_seed_tagged_baselines_flow_through_merge_and_amendment_4_e
 
     v = p2_verdict(merged, seeds=(0, 1), amendment_1=True, amendment_2=True, amendment_4=True)
     assert v["amendment_4_applied"] is True
-    assert v["verdict"] in {"GENERALISES", "MEMORISES", "MIXED", "UNINFORMATIVE"}
-    assert set(v.get("controls", {})) <= {"degmatch_vis00", "degmatch_vis50"}
+    # C-B (2026-09-26): the two assertions that used to stand here could not fail.
+    # `v["verdict"] in {the four possible verdicts}` is true for every input and every
+    # implementation of the reading logic, and `set(v["controls"]) <= {...}` is satisfied by the
+    # EMPTY SET and by a single control -- blind to under-application, which is the `issubset`
+    # lesion recurring one file over from
+    # test_visibility_zero_keeps_parent_edges_plus_heldout_ancestry, where wave 3 had just fixed
+    # it. Replaced with the verdict's own named booleans and an EQUALITY on the controls.
+    assert set(v["controls"]) == {"degmatch_vis00", "degmatch_vis50"}
+    # This fixture scores a TINY tree for a handful of epochs, so its runs do not clear the
+    # validity gates and the reading is UNINFORMATIVE. Stating that is the point: the old
+    # `verdict in {the four}` assertion passed while concealing it, so a change that made this
+    # input suddenly readable -- or that broke the gates open -- would not have been noticed.
+    # UNINFORMATIVE means no arm is read, hence no `by_arm_verdict`.
+    assert v["verdict"] == "UNINFORMATIVE"
+    assert "by_arm_verdict" not in v
+    assert v["meaning"].startswith("A validity gate failed")
+    # each control's published floor must be ITS OWN measured value, never the real tree's
+    for control in ("degmatch_vis00", "degmatch_vis50"):
+        own = merged[f"baselines_{control}_s0"]["sibling_chance_mean"]
+        assert v["randomdag_sibling_chance_mean"][control] == pytest.approx(own)
+        assert merged["_control_baselines_present"][control] == f"baselines_{control}_s0"

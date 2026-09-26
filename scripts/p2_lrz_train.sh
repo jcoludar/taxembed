@@ -132,6 +132,29 @@ for f in "${TRAIN}" "${MAP}"; do
     fi
 done
 
+# C-C (2026-09-26): CLEAR THIS TAG'S CHECKPOINT DIRECTORY BEFORE TRAINING.
+# The trainer's rolling queue keeps the last 5 checkpoints PER PROCESS, and this script did not
+# clear the directory between attempts -- so a resubmitted array element (likely: --time=1-00:00:00
+# against runs sized at 11-19 h) left the FIRST attempt's orphans behind. p2_lrz_score.sh globs
+# "${tag}_epoch*.pth", so a first attempt that died at epoch 120 contributed _epoch116..120.pth to
+# the second attempt's roll window. Measured consequence: published per_run_value 0.68503 instead
+# of 0.82002 and jitter_sd 0.142284 instead of 0.000171, which fails gate (a) and renders the
+# WHOLE ARRAY UNINFORMATIVE (one invalid arm-seed invalidates everything).
+#
+# Scoped to THIS element's own tag directory, never the shared tags/ root -- an array element must
+# not be able to delete a sibling element's outputs. The engine also now REFUSES a roll set that
+# is not exactly P2_ROLL_WINDOW long, so this is the prevention and that is the detection; neither
+# is sufficient alone, because clearing cannot help a directory that was already polluted before
+# this change and the engine's refusal costs a rescore rather than a retrain.
+TAGDIR="/app/artifacts/tags/${TAG}"
+if [ -d "${TAGDIR}" ]; then
+    n_existing="$(find "${TAGDIR}" -maxdepth 1 -name "${TAG}_epoch*.pth" | wc -l | tr -d ' ')"
+    echo "pre-flight: ${TAGDIR} exists with ${n_existing} rolling checkpoint(s) from a previous attempt"
+    find "${TAGDIR}" -maxdepth 1 -name "${TAG}_epoch*.pth" -delete
+    find "${TAGDIR}" -maxdepth 1 -name "${TAG}_milestone_epoch*.pth" -delete
+    echo "pre-flight: cleared; $(find "${TAGDIR}" -maxdepth 1 -name '*.pth' | wc -l | tr -d ' ') .pth file(s) remain"
+fi
+
 python -m taxembed.cli.main train \
     --file "${TRAIN}" \
     --mapping "${MAP}" \

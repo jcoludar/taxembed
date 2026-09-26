@@ -724,6 +724,24 @@ class TestP2Amendment1:
 ## randomdag_vis50). 12 arms, not 9. vis00 is read ONLY against randomdag_vis00, vis50 ONLY
 ## against randomdag_vis50 -- never cross-matched.
 
+def _p2_add_control_baselines(res: dict, control_names, sibling_chance) -> dict:
+    """Give each matched control its OWN `baselines_<control>` block.
+
+    C-B (2026-09-26). Before this, the 12-arm fixtures emitted only the real tree's `baselines`
+    key and every control resolved its floor through `_p2_matched_controls`' fallback chain,
+    whose last link was that same real-tree block. The fixtures therefore ENCODED the defect:
+    7 tests across TestP2Amendment2/4 passed only because a control silently inherited the real
+    tree's chance floor and degree prior, which is exactly C4 #3 and exactly what review
+    scenario S5 measured in production. With `"baselines"` removed from the chain those 7 tests
+    raise, which is the correct new behaviour -- so the fixtures must now supply what production
+    supplies (`--baselines-key baselines_<control>_s<seed>`), rather than relying on a fallback
+    that is no longer there.
+    """
+    for control in control_names:
+        res[f"baselines_{control}"] = _p2_baselines(sibling_chance)
+    return res
+
+
 def _p2_twelve_arm_result(vis00_final, vis50_final, randomdag_vis00_final, randomdag_vis50_final,
                           sibling_chance=0.05):
     groups = {}
@@ -734,7 +752,9 @@ def _p2_twelve_arm_result(vis00_final, vis50_final, randomdag_vis00_final, rando
     ):
         for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
             groups[f"{name}_s{seed}"] = ckpts
-    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+    return _p2_add_control_baselines(
+        _p2_result(groups, sibling_chance_mean=sibling_chance),
+        ("randomdag_vis00", "randomdag_vis50"), sibling_chance)
 
 
 class TestP2Amendment2:
@@ -1139,7 +1159,9 @@ def _p2_twelve_arm_result_named(vis00_final, vis50_final, control_vis00_final, c
     ):
         for seed, ckpts in _p2_group(final, base_seed=base_seed).items():
             groups[f"{name}_s{seed}"] = ckpts
-    return _p2_result(groups, sibling_chance_mean=sibling_chance)
+    return _p2_add_control_baselines(
+        _p2_result(groups, sibling_chance_mean=sibling_chance),
+        (control_vis00_name, control_vis50_name), sibling_chance)
 
 
 class TestP2Amendment4:
@@ -1452,3 +1474,356 @@ class TestP2Amendment5Artifact:
         assert len(prereg["declared_confounds"]) == 4
         assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])
         assert "1.84" in json.dumps(prereg["p2_amendment_4_20260924"])
+
+
+# ---------------------------------------------------------------------------------------------
+# amendment_6 (2026-09-26, C-A): cross-tree quantities read as a RATIO to each arm's OWN tree's
+# training-free degree prior, and a RELATIVE normalized_rank equivalence band.
+# ---------------------------------------------------------------------------------------------
+
+# MEASURED on the 12 production metazoa splits, seed 0 (helpers/p2_review3_measure_production_
+# splits.py, re-derived 2026-09-26). Hard-coded here deliberately: amendment_6's whole premise is
+# the SIZE of the gap between these two numbers, so a fixture that invented its own would be
+# testing an assumption rather than the production reality.
+_A6_REAL_PRIOR_NR = 0.15380546762948136
+_A6_CTRL_PRIOR_NR = 0.04040666865910578
+
+
+def _a6_prior(nr: float) -> dict:
+    return {"n": 28418, "n_scored": 27446, "n_trivial": 972, "mean_rank": 6.0,
+            "mrr": 0.56, "hits_at_1": 0.40, "hits_at_10": 0.86, "normalized_rank": nr}
+
+
+def _p2_amendment6_result(real_factor: float, ctrl_factor: float,
+                          real_prior_nr: float = _A6_REAL_PRIOR_NR,
+                          ctrl_prior_nr: float = _A6_CTRL_PRIOR_NR,
+                          mrr_final: float = 0.80, sibling_chance: float = 0.05):
+    """A 12-arm degmatch-controlled result parameterised by each side's IMPROVEMENT FACTOR on
+    ITS OWN tree's training-free degree prior.
+
+    factor < 1.0 == better than that tree's prior (normalized_rank is lower-is-better); 1.0 ==
+    learned nothing beyond fan-out. Expressing the fixture this way is the point: under the
+    unamended reading the two sides' RAW normalized_rank values are not comparable at all, so a
+    fixture written in raw values encodes the very confound amendment_6 removes.
+
+    Seeds carry no nr offset -- the factor IS the quantity under test, and a per-seed spread
+    would make `below_control_all_seeds` depend on which seed landed where rather than on the
+    relationship being asserted.
+    """
+    groups = {}
+    for name, factor, prior, base_seed in (
+        ("vis00", real_factor, real_prior_nr, 100),
+        ("vis50", real_factor, real_prior_nr, 200),
+        ("degmatch_vis00", ctrl_factor, ctrl_prior_nr, 300),
+        ("degmatch_vis50", ctrl_factor, ctrl_prior_nr, 400),
+    ):
+        for s in (0, 1, 2):
+            groups[f"{name}_s{s}"] = _p2_decoupled_series(
+                mrr_final=mrr_final, nr_final=max(1e-6, factor * prior),
+                jitter_nr=0.0, rng_seed=base_seed + s)
+    out = {
+        "baselines": _p2_baselines(sibling_chance, degree_prior=_a6_prior(real_prior_nr)),
+        "arms": _p2_fanout_arms(groups),
+    }
+    for control in ("degmatch_vis00", "degmatch_vis50"):
+        out[f"baselines_{control}"] = _p2_baselines(
+            sibling_chance, degree_prior=_a6_prior(ctrl_prior_nr))
+    return out
+
+
+_A6_LIVE = dict(amendment_1=True, amendment_2=True, amendment_4=True)
+
+
+class TestP2Amendment6:
+    """p2_amendment_6_20260926 -- the USER's 2026-09-25 ruling: compare each arm against ITS OWN
+    tree's degree prior, and make the normalized_rank equivalence band relative."""
+
+    def test_the_unamended_reading_cannot_return_generalises_on_a_genuinely_better_arm(self):
+        """C-A itself. The real arm improves 4x on its own tree's prior while the control improves
+        only 1.33x -- unambiguously the better model -- yet the raw cross-tree reading refuses
+        GENERALISES, because the control's task is ~3.8x easier for a ranker that learned nothing.
+        This is the test that must FAIL if anyone reverts amendment_6 believing it cosmetic."""
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        v = p2_verdict(res, **_A6_LIVE)
+        assert v["by_arm_verdict"]["vis00"]["verdict"] != "GENERALISES"
+        assert v["by_arm_verdict"]["vis00"]["below_control_all_seeds"] is False
+
+    def test_amendment_6_makes_generalises_reachable_for_that_same_arm(self):
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        v = p2_verdict(res, **_A6_LIVE, amendment_6=True)
+        assert v["verdict"] == "GENERALISES"
+        assert v["amendment_6_applied"] is True
+        arm = v["by_arm_verdict"]["vis00"]
+        assert arm["below_control_all_seeds"] is True
+        assert arm["amendment_6_applied"] is True
+        assert arm["cross_tree_metric"] == "normalized_rank_over_own_degree_prior"
+
+    def test_an_arm_that_improves_no_more_than_its_control_still_reads_memorises(self):
+        """The load-bearing half: amendment_6 must not simply hand out GENERALISES. Both sides
+        improve on their own priors by the SAME factor -- no relative gain -- so the arm is
+        equivalent to its control and the verdict must say so."""
+        res = _p2_amendment6_result(real_factor=0.242, ctrl_factor=0.242)
+        v = p2_verdict(res, **_A6_LIVE, amendment_6=True)
+        assert v["by_arm_verdict"]["vis00"]["equivalent_to_control"] is True
+        assert v["verdict"] == "MEMORISES"
+
+    def test_an_arm_beaten_by_its_control_does_not_read_generalises(self):
+        res = _p2_amendment6_result(real_factor=0.60, ctrl_factor=0.20)
+        v = p2_verdict(res, **_A6_LIVE, amendment_6=True)
+        assert v["by_arm_verdict"]["vis00"]["below_control_all_seeds"] is False
+        assert v["verdict"] != "GENERALISES"
+
+    def test_generalises_is_refused_while_the_arm_is_equivalent_to_its_control(self):
+        """amendment_6's SECOND correction. `below_control_all_seeds` is a strict `max < min`, so
+        a mathematical tie is settled by the last bit of floating point: on equal improvement
+        factors it can read True while |mean_diff| is 0.000000 and equivalent_to_control is True.
+        Before the fix GENERALISES fired anyway -- a verdict contradicting its own booleans."""
+        res = _p2_amendment6_result(real_factor=0.242, ctrl_factor=0.242)
+        arm = p2_verdict(res, **_A6_LIVE, amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["equivalent_to_control"] is True
+        assert arm["verdict"] != "GENERALISES"
+
+    def test_the_mixed_meaning_names_the_clause_that_actually_bound(self):
+        """amendment_6's THIRD correction. The MIXED string used to assert a depth-stratum sign
+        flip unconditionally; on an arm uniformly WORSE than its control there is no flip, and
+        the published sentence was simply untrue."""
+        res = _p2_amendment6_result(real_factor=0.60, ctrl_factor=0.20)
+        arm = p2_verdict(res, **_A6_LIVE, amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["verdict"] == "MIXED"
+        assert "does not beat its control" in arm["meaning"]
+
+    def test_the_equivalence_band_is_relative_not_the_absolute_mrr_scale_floor(self):
+        """C-A's second mechanism: P2_EQUIV_FLOOR = 0.01 is ~25% of a production normalized_rank
+        (~0.04) but ~1.2% of an MRR (~0.8). Under amendment_6 the band must scale with the
+        control's own mean instead of sitting at the absolute floor."""
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        unamended = p2_verdict(res, **_A6_LIVE)["by_arm_verdict"]["vis00"]
+        amended = p2_verdict(res, **_A6_LIVE, amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert unamended["equivalence_band_vs_control"] == pytest.approx(0.01)
+        assert amended["equivalence_band_vs_control"] == pytest.approx(0.05 * 0.75, rel=1e-6)
+
+    def test_the_reading_records_both_denominators_and_both_sides_as_compared(self):
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        arm = p2_verdict(res, **_A6_LIVE, amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["arm_degree_prior_normalized_rank"] == pytest.approx(_A6_REAL_PRIOR_NR)
+        assert arm["control_degree_prior_normalized_rank"] == pytest.approx(_A6_CTRL_PRIOR_NR)
+        assert arm["arm_values_as_compared"] == pytest.approx([0.25, 0.25, 0.25], rel=1e-6)
+        assert arm["control_values_as_compared"] == pytest.approx([0.75, 0.75, 0.75], rel=1e-6)
+
+    def test_amendment_6_default_false_reproduces_the_amendment_1_reading_exactly(self):
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        assert p2_verdict(res, **_A6_LIVE) == p2_verdict(res, **_A6_LIVE, amendment_6=False)
+
+    def test_amendment_6_without_amendment_1_raises_instead_of_doing_nothing(self):
+        """A flag that silently does nothing is how a pre-registration stops describing the
+        computation it names."""
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        with pytest.raises(ValueError, match="requires amendment_1"):
+            p2_verdict(res, amendment_2=True, amendment_4=True, amendment_6=True)
+
+    def test_a_zero_own_prior_raises_rather_than_dividing(self):
+        """A 0.0 denominator would yield inf/nan, and a NaN comparison is uniformly False --
+        i.e. a silent MEMORISES rather than a crash."""
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75, ctrl_prior_nr=0.0)
+        with pytest.raises(ValueError, match="own-prior denominator"):
+            p2_verdict(res, **_A6_LIVE, amendment_6=True)
+
+    def test_the_depth_stratum_sign_test_is_scaled_by_the_same_own_priors(self):
+        """If the strata kept the raw cross-tree difference while the aggregate moved to the
+        ratio scale, sign_consistent would still carry the difficulty confound and GENERALISES
+        would stay unreachable through that clause alone."""
+        res = _p2_amendment6_result(real_factor=0.25, ctrl_factor=0.75)
+        arm = p2_verdict(res, **_A6_LIVE, amendment_6=True)["by_arm_verdict"]["vis00"]
+        assert arm["sign_consistent"] is True
+        assert arm["depth_strata"]["n_strata"] >= 1
+        for diff in arm["depth_strata"]["diffs"].values():
+            assert diff == pytest.approx(0.25 - 0.75, rel=1e-6)
+
+
+class TestP2Amendment6Artifact:
+    """The amendment block must exist, must say it predates any run, and must record the
+    MEASURED numbers it rests on -- mirrors TestP2Amendment{3,4,5}Artifact."""
+
+    @pytest.fixture(scope="class")
+    def prereg(self):
+        path = _REPO / "results" / "p2_heldout_preregistration.json"
+        return json.loads(path.read_text())
+
+    def test_block_present_and_predates_any_p2_run(self, prereg):
+        assert "p2_amendment_6_20260926" in prereg
+        status = prereg["p2_amendment_6_20260926"]["status"].lower()
+        assert "before any p2 array was submitted" in status
+        assert "no gpu had been spent" in status
+
+    def test_records_the_user_decision_it_implements(self, prereg):
+        text = prereg["p2_amendment_6_20260926"]["the_user_decision"].lower()
+        assert "own tree" in text
+        assert "relative" in text
+
+    def test_records_the_measured_degree_prior_gap_on_the_production_splits(self, prereg):
+        m = prereg["p2_amendment_6_20260926"]["the_defect"]["measured_on_the_production_splits"]
+        assert m["degree_prior_normalized_rank_real"] == [0.15381, 0.15317, 0.15320]
+        assert m["degree_prior_normalized_rank_degmatch"] == [0.04041, 0.03824, 0.03851]
+        assert "metazoa_33208_clean" in m["clade"]
+        assert "28,418 held-out nodes per seed" in m["clade"]
+        # the real arm's prior must be the WORSE (higher) one on every seed -- the whole premise
+        assert all(r > d for r, d in zip(m["degree_prior_normalized_rank_real"],
+                                         m["degree_prior_normalized_rank_degmatch"]))
+
+    def test_records_that_the_numbers_were_re_derived_not_taken_on_trust(self, prereg):
+        text = prereg["p2_amendment_6_20260926"]["the_defect"][
+            "measured_on_the_production_splits"]["independently_re_derived"].lower()
+        assert "2026-09-26" in text
+        assert "not taken on the reviewer's word" in text
+
+    def test_corrects_amendment_4s_by_construction_claim(self, prereg):
+        text = prereg["p2_amendment_6_20260926"]["corrects_amendment_4"]
+        assert "2.8x LARGER" in text
+        assert "FLIPPING ITS SIGN" in text
+
+    def test_states_the_per_stratum_prior_limitation_rather_than_claiming_it(self, prereg):
+        text = prereg["p2_amendment_6_20260926"]["stated_limitations"][
+            "strata_use_the_aggregate_prior"]
+        assert "is NOT claimed" in text
+
+    def test_records_both_halves_of_the_reachability_evidence(self, prereg):
+        text = prereg["p2_amendment_6_20260926"]["verification"]["reachability_probe"]
+        assert "reachable" in text
+        assert "REFUSED" in text        # it could have disagreed -- the load-bearing half
+
+    def test_frozen_block_and_every_prior_amendment_are_untouched(self, prereg):
+        assert len(prereg["declared_confounds"]) == 4
+        assert "randomdag_vis00" in json.dumps(prereg["p2_amendment_2_20260924"])
+        assert "1.84" in json.dumps(prereg["p2_amendment_4_20260924"])
+        assert "0.25" in json.dumps(prereg["p2_amendment_5_20260924"])
+
+
+class TestControlBaselinesExistence:
+    """C-B (2026-09-26): EXISTENCE of a control's own baselines family, which
+    `assert_baselines_agree_across_seeds` structurally cannot check -- an absent family has
+    nothing to disagree with."""
+
+    def _twelve_arm_files(self, emit_control_baselines: bool):
+        files = []
+        for s in (0, 1, 2):
+            arms = {}
+            for arm in ("vis00", "vis50"):
+                for seed, ckpts in _p2_group(0.55, base_seed=100).items():
+                    if seed == s:
+                        arms[f"{arm}_s{s}_ms"] = {"checkpoints": ckpts}
+                        arms[f"{arm}_s{s}_roll"] = {"checkpoints": ckpts[-P2_ROLL_WINDOW:]}
+            files.append({"arms": arms, f"baselines_s{s}": _p2_baselines(0.05)})
+            for control in ("degmatch_vis00", "degmatch_vis50"):
+                arms_c = {}
+                for seed, ckpts in _p2_group(0.10, base_seed=300).items():
+                    if seed == s:
+                        arms_c[f"{control}_s{s}_ms"] = {"checkpoints": ckpts}
+                        arms_c[f"{control}_s{s}_roll"] = {"checkpoints": ckpts[-P2_ROLL_WINDOW:]}
+                f = {"arms": arms_c}
+                if emit_control_baselines:
+                    f[f"baselines_{control}_s{s}"] = _p2_baselines(0.05)
+                files.append(f)
+        return files
+
+    def test_the_merge_refuses_a_control_arm_with_no_baselines_family(self):
+        """Review scenario S5, as a test. Before this the merge returned happily and the control
+        published the REAL tree's floor as its own."""
+        with pytest.raises(ValueError, match="NO baselines family of their own"):
+            merge_p2_scorer_outputs(self._twelve_arm_files(emit_control_baselines=False))
+
+    def test_the_merge_accepts_and_records_controls_that_have_their_own(self):
+        merged = merge_p2_scorer_outputs(self._twelve_arm_files(emit_control_baselines=True))
+        assert set(merged["_control_baselines_present"]) == {"degmatch_vis00", "degmatch_vis50"}
+
+    def test_the_error_names_every_missing_control_not_just_the_first(self):
+        with pytest.raises(ValueError) as exc:
+            merge_p2_scorer_outputs(self._twelve_arm_files(emit_control_baselines=False))
+        assert "degmatch_vis00" in str(exc.value)
+        assert "degmatch_vis50" in str(exc.value)
+
+    def test_real_data_arms_are_not_mistaken_for_controls(self):
+        """vis00/vis50 resolve through the plain `baselines` family and must NOT be demanded to
+        have a `baselines_vis00` of their own -- otherwise the check fires on every valid input."""
+        merged = merge_p2_scorer_outputs(self._twelve_arm_files(emit_control_baselines=True))
+        assert "vis00" not in merged["_control_baselines_present"]
+        assert "vis50" not in merged["_control_baselines_present"]
+
+    def test_a_control_falling_back_to_the_real_trees_block_now_raises(self):
+        """The engine-side half: even if a merge were assembled by hand, `_p2_matched_controls`
+        must not complete a control's fallback chain with the real tree's `baselines`."""
+        res = _p2_twelve_arm_result_named(
+            vis00_final=0.55, vis50_final=0.50,
+            control_vis00_final=0.10, control_vis50_final=0.10,
+            control_vis00_name="degmatch_vis00", control_vis50_name="degmatch_vis50",
+            sibling_chance=0.05)
+        del res["baselines_degmatch_vis00"]
+        del res["baselines_degmatch_vis50"]
+        with pytest.raises(KeyError, match="has no baselines block of its own"):
+            p2_verdict(res, amendment_4=True)
+
+
+class TestP2RollWindowIsApplied:
+    """C-C (2026-09-26): `P2_ROLL_WINDOW` was declared, documented and applied ONLY by the test
+    fixture. Production averaged every checkpoint the glob returned. The fixture guaranteed
+    exactly 5, so no test could ever see the defect -- these build the sets it could not."""
+
+    def _result_with_roll_epochs(self, roll_epochs, level=0.82, orphan_level=0.55):
+        """One arm+seed whose `_roll` group carries exactly `roll_epochs`. Epochs below 190 are
+        an ORPHANED earlier attempt (a run that died mid-flight left them behind) and score
+        `orphan_level`; the real trailing window scores `level`."""
+        ms = _p2_series(_p2_healthy(level))
+        roll = []
+        for e in roll_epochs:
+            val = level if e >= 190 else orphan_level
+            roll.append(_p2_ckpt(e, val))
+        return {
+            "baselines": _p2_baselines(0.05),
+            "arms": {"vis00_s0_ms": {"checkpoints": ms},
+                     "vis00_s0_roll": {"checkpoints": roll}},
+        }
+
+    def test_a_clean_five_checkpoint_window_is_read_and_records_its_epochs(self):
+        res = self._result_with_roll_epochs([196, 197, 198, 199, 200])
+        rv = p2_run_value(res, "vis00", 0)
+        assert rv["n_roll"] == P2_ROLL_WINDOW
+        assert rv["roll_epochs"] == [196, 197, 198, 199, 200]
+        assert rv["per_run_value"] == pytest.approx(0.82)
+
+    def test_a_rerun_leaving_ten_checkpoints_raises_instead_of_averaging_them(self):
+        """THE C-C case, measured by the review: a first attempt that died at epoch 120 leaves
+        _epoch116..120.pth beside the second attempt's _epoch196..200.pth, and the glob returns
+        all ten. Averaging them published 0.68503 instead of 0.82002 (-16%) with jitter_sd
+        0.142284 instead of 0.000171 -- which FAILS gate (a) and makes the WHOLE ARRAY
+        UNINFORMATIVE, since one invalid arm-seed invalidates everything."""
+        res = self._result_with_roll_epochs(
+            [116, 117, 118, 119, 120, 196, 197, 198, 199, 200])
+        with pytest.raises(ValueError, match="10 rolling checkpoints"):
+            p2_run_value(res, "vis00", 0)
+
+    def test_the_error_names_the_epochs_so_the_orphans_can_be_identified(self):
+        res = self._result_with_roll_epochs(
+            [116, 117, 118, 119, 120, 196, 197, 198, 199, 200])
+        with pytest.raises(ValueError) as exc:
+            p2_run_value(res, "vis00", 0)
+        assert "116" in str(exc.value)
+        assert "tag directory" in str(exc.value)
+
+    def test_a_short_window_also_raises_rather_than_quietly_averaging_fewer(self):
+        """The other direction. A screen for the dangerous case alone is blind to the safe-
+        looking one: 3 checkpoints is a run that did not complete its rolling window, and its
+        jitter_sd is computed over too few points to be the noise floor gate (a) assumes."""
+        res = self._result_with_roll_epochs([198, 199, 200])
+        with pytest.raises(ValueError, match="3 rolling checkpoints"):
+            p2_run_value(res, "vis00", 0)
+
+    def test_averaging_the_orphans_would_have_moved_the_number_materially(self):
+        """Proves the guard is load-bearing rather than pedantic: with the window NOT applied,
+        the published value and jitter are the review's measured figures, and gate (a) flips."""
+        roll = [116, 117, 118, 119, 120, 196, 197, 198, 199, 200]
+        res = self._result_with_roll_epochs(roll)
+        ckpts = sorted(res["arms"]["vis00_s0_roll"]["checkpoints"],
+                       key=lambda c: int(c["epoch"]))
+        all_mrrs = np.array([c["metrics_cosine"]["mrr"] for c in ckpts])
+        windowed = all_mrrs[-P2_ROLL_WINDOW:]
+        assert all_mrrs.mean() < windowed.mean() - 0.10      # materially lower
+        assert all_mrrs.std(ddof=1) > windowed.std(ddof=1) * 100   # jitter blown up
