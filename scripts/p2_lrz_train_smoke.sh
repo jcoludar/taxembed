@@ -91,7 +91,19 @@ for flag in --manifest --heldout --checkpoints --out --metric --max-checkpoints 
 done
 echo "all p2_lrz_score.sh flags real"
 
-EPOCHS="${P2_SMOKE_EPOCHS:-2}"
+# B4 (2026-09-26): --save-every AND enough epochs to actually WRITE a milestone.
+# The smoke used to train 2 epochs with no --save-every, so the MILESTONE-WRITING PATH was
+# unexercised -- while scripts/p2_lrz_score.sh's pre-flight REQUIRES ${tag}_milestone_epoch200.pth
+# and refuses without it. A canary that does not touch the path the consumer requires is covered
+# by precedent, not by the canary. 10 epochs with --save-every 10 writes exactly one milestone,
+# which is all that is needed to prove the path exists and is named as the score job expects.
+EPOCHS="${P2_SMOKE_EPOCHS:-10}"
+SAVE_EVERY="${P2_SMOKE_SAVE_EVERY:-10}"
+# NOT exercised here, deliberately and with the reason recorded rather than left implicit:
+# --amp. The real job runs `--gpu 0 --amp`; this canary runs on the CPU queue (minutes, versus
+# hours for a GPU slot), and mixed precision on CPU would exercise a different code path than
+# the one the array uses, so "it passed here" would not transfer. --amp's reality as a FLAG is
+# checked above against the CLI's own --help, which is what this canary can honestly establish.
 python -m taxembed.cli.main train \
     --file "${TRAIN}" --mapping "${MAP}" \
     --dim 100 --gpu -1 \
@@ -99,6 +111,7 @@ python -m taxembed.cli.main train \
     --radial-nudge 0.05 --radial-schedule log \
     --depth-scale-margin --margin-min 0.05 --margin-max 1.0 \
     --epoch-fraction 0.3 --euclidean-param --loss softmax \
+    --save-every "${SAVE_EVERY}" \
     --epochs "${EPOCHS}" --seed 0 \
     --batch-size 256 --n-negatives 300 --lr 0.001 --grad-accum-steps 8 \
     --lr-schedule cosine_warmrestart --warm-restart-on-phase --lr-min-multiplier 0.01 \
@@ -112,6 +125,51 @@ if ! grep -q '"seed": 0' /app/artifacts/tags/smoke_p2_train/run.json; then
     echo "SMOKE FAILED: run.json lacks the seed it was given" >&2
     exit 1
 fi
+
+SMOKE_TAGDIR=/app/artifacts/tags/smoke_p2_train
+n_milestone="$(find "${SMOKE_TAGDIR}" -maxdepth 1 -name "smoke_p2_train_milestone_epoch*.pth" | wc -l | tr -d ' ')"
+if [ "${n_milestone}" -lt 1 ]; then
+    echo "SMOKE FAILED: --save-every ${SAVE_EVERY} wrote NO milestone checkpoint, but" >&2
+    echo "              p2_lrz_score.sh's pre-flight requires \${tag}_milestone_epoch200.pth" >&2
+    ls -la "${SMOKE_TAGDIR}" >&2
+    exit 1
+fi
+echo "milestone-writing path exercised: ${n_milestone} milestone checkpoint(s)"
+
+n_roll="$(find "${SMOKE_TAGDIR}" -maxdepth 1 -name "smoke_p2_train_epoch*.pth" | wc -l | tr -d ' ')"
+echo "rolling checkpoints written: ${n_roll} (the trainer's queue keeps the last 5)"
+
+# B4/V6: run the SCORER end to end. Until 2026-09-26 score_p2_linkpred.py had never been executed
+# on data anywhere in this project -- only --help. It is ~1 second on the mollusca split and it
+# is the single cheapest thing that de-risks the whole post-GPU read, so it belongs in the canary
+# rather than in a reviewer's scratch directory.
+SMOKE_SCORES=/tmp/p2_smoke_scores.json
+python /app/scripts/score_p2_linkpred.py \
+    --manifest "${SPLITDIR}/p2_mollusca_6447_clean_vis00_seed0_manifest.json" \
+    --heldout "${SPLITDIR}/p2_mollusca_6447_clean_seed0_heldout.npz" \
+    --closure "${MOLL_DIR}/taxonomy_edges_mollusca_6447_clean_transitive.npz" \
+    --checkpoints "vis00_s0_ms=${SMOKE_TAGDIR}/smoke_p2_train_milestone_epoch*.pth" \
+    --checkpoints "vis00_s0_roll=${SMOKE_TAGDIR}/smoke_p2_train_epoch*.pth" \
+    --baselines-key baselines_s0 \
+    --out "${SMOKE_SCORES}" 2>&1 | tail -5
+
+python - "${SMOKE_SCORES}" <<'PYCHECK'
+import json, sys
+res = json.load(open(sys.argv[1]))
+b = res["baselines_s0"]
+missing = [k for k in ("sibling_chance_mean", "chance_mrr_mean", "degree_prior") if k not in b]
+if missing:
+    sys.exit(f"SMOKE FAILED: scorer output lacks {missing}")
+# C2 (2026-09-26): the per-stratum degree prior the engine's amendment_6 sign test divides by.
+if "by_depth" not in b["degree_prior"]:
+    sys.exit("SMOKE FAILED: degree_prior.by_depth absent -- amendment_6's per-stratum divisor "
+             "would silently fall back to the aggregate, which over-allows the sign test")
+arms = sorted(res["arms"])
+if not any(a.endswith("_roll") for a in arms) or not any(a.endswith("_ms") for a in arms):
+    sys.exit(f"SMOKE FAILED: scorer registered {arms}, expected both a _ms and a _roll group")
+print(f"scorer output OK: arms {arms}, degree_prior.by_depth strata "
+      f"{sorted(b['degree_prior']['by_depth'])}")
+PYCHECK
 
 echo "=== SMOKE PASSED -- safe to submit p2_lrz_train.sh (after confirming Task 2's vis00/vis50 splits, scripts/build_p2_degmatch_split.py's MATCHED degmatch_vis00 AND degmatch_vis50 splits (p2_amendment_4_20260924) -- run the builder once per --visibility, same --seed -- and the metazoa mapping TSV are all present under /data/p2_splits) ==="
 ls -la /app/artifacts/tags/smoke_p2_train/
