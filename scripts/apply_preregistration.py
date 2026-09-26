@@ -149,7 +149,12 @@ def _render_p2(v: dict) -> None:
                 print(f"  above every RandomDAG seed: {r['above_control_all_seeds']}   "
                       f"equivalent to RandomDAG: {r['equivalent_to_control']}")
             d = r["depth_strata"]
-            print(f"  depth strata ({name} - randomdag, on {r['cross_tree_metric']}): "
+            # R6 (2026-09-26): this line hard-coded "randomdag" and printed it even under
+            # --amendment-4, where RandomDAG is explicitly RETIRED as P2's control. Cosmetic, but
+            # it is exactly the kind of sentence that gets quoted into a manuscript, so it now
+            # names whichever control was actually read.
+            control_name = r.get("control_group", "control")
+            print(f"  depth strata ({name} - {control_name}, on {r['cross_tree_metric']}): "
                   f"{d['n_strata']} strata, sign consistent {r['sign_consistent']}")
             if d["dropped_below_min_n"]:
                 print(f"    dropped below n>=500: {d['dropped_below_min_n']}")

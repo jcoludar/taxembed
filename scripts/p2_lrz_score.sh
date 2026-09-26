@@ -62,10 +62,21 @@ export MKL_THREADING_LAYER=GNU
 # taxembed.eval.preregistration._p2_baselines_for_seed and
 # assert_baselines_agree_across_seeds. This job writes 9 SEPARATE JSON files (never one combined
 # file) -- score with scripts/apply_preregistration.py --task p2 --json <all 9 OUT_FILES>
-# --amendment-1 --amendment-2 --amendment-4, which merges them
+# --amendment-1 --amendment-2 --amendment-4 --amendment-6, which merges them
 # (taxembed.eval.preregistration.merge_p2_scorer_outputs) before scoring. Go through
-# p2_verdict(result, seeds, amendment_1=True, amendment_2=True, amendment_4=True); never read a
-# verdict off these JSON files by hand.
+# p2_verdict(result, seeds, amendment_1=True, amendment_2=True, amendment_4=True,
+# amendment_6=True); never read a verdict off these JSON files by hand.
+#
+# 🛑 --amendment-6 IS NOT OPTIONAL (2026-09-26, p2_amendment_6_20260926, USER design decision of
+# 2026-09-25). WITHOUT IT THIS ARRAY CANNOT PRODUCE A POSITIVE RESULT. The degree-matched
+# control's task is ~3.8x EASIER for a training-free ranker (degree-prior normalized_rank 0.1538
+# real vs 0.0404 degmatch, measured on these very splits), so under --amendment-1/2/4 alone a
+# real arm must beat a number its control gets for free: GENERALISES is structurally unreachable.
+# Measured, not argued -- a checkpoint that SAW EVERY HELD-OUT EDGE (the leaky ceiling, the best
+# any model could possibly be) reads MEMORISES under the three-flag reading
+# (helpers/p2_amendment6_reachability.py, scenario R5). amendment_6 reads every cross-tree
+# quantity as a ratio to each arm's OWN tree's training-free degree prior. Both readings exit 0
+# and both look legitimate, which is exactly why the flag has to be written down here.
 # =============================================================================
 
 SPLITDIR=/data/p2_splits
@@ -76,7 +87,15 @@ SEEDS=(0 1 2)
 # C5 (2026-09-24, p2_amendment_3_20260924): build_p2_split.py's manifest records
 # manifest["source_npz"] as the absolute macOS build-time path -- it does not exist inside this
 # container. --closure overrides it explicitly with the container-mounted path instead.
-REAL_CLOSURE=/data/taxopy/metazoa_33208_clean/taxonomy_edges_metazoa_33208_clean_transitive.npz
+# B2 (2026-09-26): this path is where the closure lives in the LOCAL repo layout
+# (data/taxopy/metazoa_33208_clean/...), which is NOT how it is laid out on the cluster -- the
+# /data mount has it at the top level. Verified server-side: /data/taxopy/ contains only
+# mollusca_6447_clean, there is no metazoa_33208_clean/ directory, and the correct bytes sit at
+# /data/taxonomy_edges_metazoa_33208_clean_transitive.npz with md5 992c8fffd1ac93bee9c0a3b5e4660492
+# -- exactly the `source_md5` every metazoa split manifest records. --closure is LOAD-BEARING, not
+# a convenience: the manifest carries no parent/depth and its `source_npz` is a macOS build-time
+# path, so this is what load_parent_depth actually reads (score_p2_linkpred.py:168).
+REAL_CLOSURE=/data/taxonomy_edges_metazoa_33208_clean_transitive.npz
 
 echo "=== TaxEmbed P2 Task 8 scoring -- 12-run array ==="
 echo "Job: ${SLURM_JOB_ID:-?}, Host: $(hostname)"

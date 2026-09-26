@@ -747,6 +747,10 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
 
         return {
             "arm": name, "verdict": verdict, "meaning": meaning,
+            # R6 (2026-09-26): the control this arm was ACTUALLY read against. The renderer used
+            # to hard-code "randomdag" in its depth-strata line and printed it even under
+            # amendment_4, where RandomDAG is retired -- a sentence that gets quoted.
+            "control_group": control_group,
             "amendment_1_applied": False, "cross_tree_metric": "mrr",
             "margin_above_chance": float(margin), "margin_threshold": float(threshold),
             "above_chance_margin": above_chance_margin,
@@ -898,6 +902,7 @@ def _p2_arm_reading(result: dict, name: str, seeds, group: dict, control: dict,
 
     return {
         "arm": name, "verdict": verdict, "meaning": meaning,
+        "control_group": control_group,            # R6, see the frozen branch above
         "amendment_1_applied": True,
         "amendment_6_applied": bool(amendment_6),
         "cross_tree_metric": ("normalized_rank_over_own_degree_prior" if amendment_6

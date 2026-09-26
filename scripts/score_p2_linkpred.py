@@ -260,6 +260,21 @@ def main() -> None:
     manifest = json.loads(args.manifest.read_text())
     if args.closure is not None and not args.closure.exists():
         raise SystemExit(f"--closure {args.closure} does not exist")
+    # R5 (2026-09-26): --closure was checked for EXISTENCE only. Because the container's layout
+    # differs from the repo's, --closure is always an overriding path typed by hand in a job
+    # script, and the only downstream guard is a node-count check -- which all three degmatch
+    # closures pass identically (498,246 nodes each). A crossed SEED would therefore score an
+    # arm against the wrong tree silently, and every seed's manifest already records the md5 it
+    # was built from. Checking it costs one hash of a ~4 MB file.
+    if args.closure is not None and "source_md5" in manifest:
+        got = hashlib.md5(args.closure.read_bytes()).hexdigest()
+        if got != manifest["source_md5"]:
+            raise SystemExit(
+                f"--closure {args.closure} has md5 {got}, but {args.manifest} was built from "
+                f"source_md5 {manifest['source_md5']} ({manifest.get('source_npz', '?')}). This "
+                f"is a CROSSED CLOSURE: the arm would be scored against a different tree than "
+                f"its split was cut from, and the node-count check cannot see it because the "
+                f"trees are the same size. Point --closure at the matching file.")
     parent, depth, n_nodes = load_parent_depth(manifest, args.closure)
     if args.closure is not None:
         closure_path_used: str | None = str(args.closure.resolve())

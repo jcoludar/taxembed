@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=1-00:00:00
-#SBATCH --array=0-11
+#SBATCH --array=0-11%4
 #SBATCH --output=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/logs/p2_train_%A_%a.out
 #SBATCH --error=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/logs/p2_train_%A_%a.err
 #SBATCH --container-image=/dss/dssfs04/lwp-dss-0002/pr63ci/pr63ci-dss-0004/ge94xik2/taxembed_lrz/pytorch-2.4.0-cuda12.1.sqsh
@@ -18,6 +18,15 @@ export MKL_THREADING_LAYER=GNU
 
 # =============================================================================
 # Plan v1 Task 8 -- train the P2 held-out-link-prediction array: 12 tasks = 4 arms x seeds 0/1/2.
+#
+# R3 (2026-09-26): the array is throttled to 4 CONCURRENT elements (`--array=0-11%4`). Every
+# element runs `pip install --no-cache-dir -e .` into the SAME rw-mounted /app, so 12 writers
+# would race on taxembed.egg-info/ and an element can die in its first minutes. The nearest
+# precedent (task8_lrz_fixed_sampler.sh) ran 3 concurrent on the same pattern. Throttling costs
+# nothing here: measured per-element runtime is ~1 h (vis00/degmatch_vis00, 1.07M edges) and
+# ~6 h (vis50/degmatch_vis50, 6.44M edges) against a 24 h wall, for ~41 GPU-h total -- NOT the
+# "130-230 GPU-h" the earlier ledger estimated from the full 11.84M-pair closure. Fairshare is
+# 0.0071, so fewer simultaneous requests is also the friendlier queue shape.
 # One run per array task, so each gets its own walltime and they queue independently instead of
 # chaining into one multi-day job that dies at the walltime boundary (same shape as Task 9's
 # task9_lrz_recipe_contrast.sh).
@@ -75,12 +84,35 @@ export MKL_THREADING_LAYER=GNU
 # vs its own baselines.sibling_chance_mean) use MRR. Do not read scripts/score_p2_linkpred.py
 # output by hand off this array's checkpoints -- go through
 # src/taxembed/eval/preregistration.py::p2_verdict(..., amendment_1=True, amendment_2=True,
-# amendment_4=True).
+# amendment_4=True, amendment_6=True).
+#
+# 🛑 amendment_6=True IS NOT OPTIONAL (2026-09-26, p2_amendment_6_20260926, USER design decision
+# of 2026-09-25). normalized_rank removes the POOL-SIZE confound but NOT the TASK-DIFFICULTY one:
+# the degree-matched control's training-free degree prior is ~3.8x better than the real tree's
+# (normalized_rank 0.0404 vs 0.1538, measured on these splits), so without amendment_6 a real arm
+# must beat a number its control gets for free and GENERALISES is structurally unreachable --
+# these GPU-hours would buy a MEMORISES caused by the control's construction. amendment_6 reads
+# every cross-tree quantity as a ratio to each arm's OWN tree's prior.
 # =============================================================================
 
 MAP=/data/taxonomy_edges_metazoa_33208_clean.mapping.tsv
 SPLITDIR=/data/p2_splits
 EPOCHS="${P2_EPOCHS:-200}"
+
+# R2 (2026-09-26): sbatch defaults to --export=ALL, so a P2_EPOCHS left set in the SUBMITTING
+# shell silently reaches all 12 elements. P2_FINAL_EPOCH = 200 is hard-coded in the engine
+# (preregistration.py), so any other value means ${TAG}_milestone_epoch200.pth never appears,
+# gate (c) fails for every run, and the score job refuses -- AFTER the GPU is spent. The override
+# stays (the smoke needs it) but it must now be DELIBERATE rather than inherited: a short run has
+# to say so out loud.
+if [ "${EPOCHS}" != "200" ] && [ "${P2_ALLOW_SHORT:-0}" != "1" ]; then
+    echo "ERROR: EPOCHS=${EPOCHS}, but the engine's P2_FINAL_EPOCH is 200 and gate (c) requires" >&2
+    echo "       a milestone checkpoint at epoch 200. If this is deliberate (a smoke or pilot)," >&2
+    echo "       set P2_ALLOW_SHORT=1 as well. If it is not, P2_EPOCHS leaked in from the" >&2
+    echo "       submitting shell via --export=ALL -- unset it and resubmit." >&2
+    exit 1
+fi
+echo "EPOCHS=${EPOCHS}  (P2_ALLOW_SHORT=${P2_ALLOW_SHORT:-0})"
 
 # Array index -> (arm, seed), per p2_amendment_2_20260924's 12-element shape (amendment_4 only
 # renames slots 6-11's arm, never the shape itself).
