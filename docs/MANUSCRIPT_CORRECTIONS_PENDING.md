@@ -333,6 +333,63 @@ revisited.
 
 ---
 
+## C11 — the headline S_angle is a METAZOA number; the released artifact is the CELLULAR model
+
+**Status:** UNCONDITIONAL that it must be checked against the manuscript before submission.
+**Evidence:** `helpers/_sangle_provenance_audit.py` · `results/sangle_provenance_audit_20260929.json`
+· `results/c9_masked_sangle_20260929.json` · `results/fig4_runs_20260922_104857.json`
+
+Found while chasing what looked like a 0.0073 discrepancy. It was not a discrepancy.
+
+**The headline's source.** `results/fig4_runs_20260922_104857.json`, which carries the 0.9726-class
+numbers, records:
+
+```
+closure  /data/taxonomy_edges_metazoa_33208_clean_transitive.npz
+n_nodes  498,246        max_depth 37
+runs     prior, canonical, prior_roll, canonical_roll
+```
+
+**Metazoa**, 498k nodes, scored on Task-9 **recipe-contrast checkpoints**. The shipped artifact is
+`release/taxembed-cellular-v1/cellular_embedding.safetensors` — the **cellular** model, 1,102,163
+nodes. A different model on a different tree.
+
+**The audit over every `results/*.json`:**
+
+| closure | files |
+|---|---:|
+| METAZOA (498,246) | 5 |
+| mollusca (32,017) | 4 |
+| **CELLULAR, carrying an S_angle** | **0, before 2026-09-29** |
+
+`negative_sampler_audit.json` and `radial_init_floor.json` are on the cellular tree but contain no
+S_angle. ⇒ **No S_angle had ever been computed for the released model.**
+
+**It has now.** `results/c9_masked_sangle_20260929.json`, cellular closure, shipped artifact,
+production settings (n=10,000 queries, k=10, seed=0): **S_angle = 0.9653, cluster se 0.0069**, with
+the init null at **−0.0035** on the same tree and queries. Index alignment is verified, not assumed:
+`md5(release/taxembed-cellular-v1/taxid_to_index.tsv)` **equals**
+`md5(…cellular_organisms_131567_clean.mapping.tsv)` = `a8ef06b048e03613230a0a14908f515e`, so release
+row *i* is closure node *i*.
+
+⛔ **What must happen before submission — a manuscript check I cannot do from the repo.** Read what
+the paper actually claims 0.9726 is:
+- **If the paper scopes it to Metazoa**, it is correct as written; the fix is only that C3/C8's
+  phrase *"the headline S_angle"* invites conflation, and the released model's own number (0.9653)
+  should be reported alongside it, since that is the artifact readers download.
+- **If the paper presents 0.9726 as the released model's score**, it is a **misattribution** and must
+  be corrected to 0.9653 (cellular), with the Metazoa number labelled as such.
+
+⚠ **Related, and the reason this went unnoticed:** most `results/*.json` record `closure`, but the
+ones that do not (`transplant_2x2_*`, `task9_scorer_dose_response_*`) cannot be provenance-checked at
+all, and my own masking artifact initially lacked the field too — fixed by recording `closure`,
+`embedding`, `clade`, the mapping md5 and `is_shipped_release_artifact`. **A score without its
+closure and its checkpoint is not a comparable number**
+([[feedback_two_numbers_are_comparable_only_if_their_definitions_are]]). Every S_angle written from
+here on should carry those keys.
+
+---
+
 ## Still to be added
 
 - Task 9 verdict — Figure 4 re-plot or caption rewrite (the single most likely change to what the
@@ -429,10 +486,14 @@ revisited.
     [[feedback_two_numbers_are_comparable_only_if_their_definitions_are]].
   - Reason 3 above predicted masking would *raise* S_angle. It does not. Withdrawn above.
 
-  ⚠ **Open discrepancy, flag before either number is quoted:** this run's all-query S_angle is
-  **0.9653**, against the manuscript headline **0.9726**. A 0.0073 gap, ~1 cluster SE, but it is
-  not yet explained — query seed, k, or the `radii` argument are the candidates. **Reconcile before
-  quoting either.**
+  ~~⚠ Open discrepancy: this run's all-query S_angle is 0.9653 against the manuscript headline
+  0.9726, a 0.0073 gap, not yet explained — query seed, k, or the `radii` argument.~~
+  🛑 **RESOLVED SAME DAY, and it was not a discrepancy — it was a CATEGORY ERROR of mine. See C11.**
+  The headline's source is on the **METAZOA** closure (498,246 nodes); this run is on **CELLULAR**
+  (1,102,163). Different trees, different models. There was never a gap to reconcile, and I
+  proposed three mechanisms for it before checking whether the two numbers measured the same thing
+  — [[feedback_two_numbers_are_comparable_only_if_their_definitions_are]], which is indexed and
+  which I had quoted twice earlier in this same session.
 
   **What Methods must say instead (no retrain):** the noise filter does not exclude the
   `"<clade> bacterium|archaeon <id>"` form; such taxa are 43.9 % of Bacteria and 48.1 % of Archaea in

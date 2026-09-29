@@ -137,7 +137,16 @@ def main() -> None:
     print(f"  placeholder nodes in the closure: {int(is_ph.sum()):,} "
           f"({100*is_ph.mean():.2f} %)   setup {time.time()-t0:.0f}s")
 
+    # 🧨 PROVENANCE, recorded because its absence is exactly the defect
+    # helpers/_sangle_provenance_audit.py found everywhere else: every OTHER recorded S_angle in
+    # results/ is on the METAZOA (498,246-node) or mollusca closure, and the manuscript's headline
+    # 0.9726 is a Metazoa recipe-contrast number -- while the SHIPPED artifact is the CELLULAR
+    # model. A score without its closure and its checkpoint is not a comparable number.
     out: dict = {"purpose": "C9 masked S_angle; answers the retrain question without retraining",
+                 "closure": str(CLOSURE), "embedding": str(EMB),
+                 "mapping_md5_release_equals_closure": "a8ef06b048e03613230a0a14908f515e",
+                 "clade": "cellular_organisms_131567_clean",
+                 "is_shipped_release_artifact": True,
                  "n_nodes": n, "n_placeholder": int(is_ph.sum()),
                  "n_queries": N_QUERIES, "k": K, "seed": SEED}
 

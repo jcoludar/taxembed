@@ -1,0 +1,158 @@
+{
+  "purpose": "which closure/model each recorded S_angle belongs to",
+  "rows": [
+    {
+      "file": "c9_masked_sangle_20260929.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean_transitive.npz",
+      "n_nodes": 1102163,
+      "n_scores": 14,
+      "max_S": 0.978247534551569,
+      "runs": null
+    },
+    {
+      "file": "fig4_runs_20260922_104857.json",
+      "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+      "n_nodes": 498246,
+      "n_scores": 579,
+      "max_S": 0.9917198423037556,
+      "runs": [
+        "prior",
+        "canonical",
+        "prior_roll",
+        "canonical_roll"
+      ]
+    },
+    {
+      "file": "negative_sampler_audit.json",
+      "closure": null,
+      "n_nodes": 1102163,
+      "n_scores": 0,
+      "max_S": null,
+      "runs": null
+    },
+    {
+      "file": "radial_init_floor.json",
+      "closure": null,
+      "n_nodes": 1102163,
+      "n_scores": 0,
+      "max_S": null,
+      "runs": null
+    },
+    {
+      "file": "seeds_20260924_084146.json",
+      "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+      "n_nodes": 498246,
+      "n_scores": 1737,
+      "max_S": 0.991763106607146,
+      "runs": [
+        "canonical_s0_ms",
+        "canonical_s0_roll",
+        "canonical_s1_ms",
+        "canonical_s1_roll",
+        "canonical_s2_ms",
+        "canonical_s2_roll",
+        "prior_s0_ms",
+        "prior_s0_roll",
+        "prior_s1_ms",
+        "prior_s1_roll",
+        "prior_s2_ms",
+        "prior_s2_roll"
+      ]
+    },
+    {
+      "file": "task8_seeds_20260924_132043.json",
+      "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+      "n_nodes": 498246,
+      "n_scores": 1534,
+      "max_S": 0.991763106607146,
+      "runs": [
+        "fixed_s0_ms",
+        "fixed_s0_roll",
+        "fixed_s1_ms",
+        "fixed_s1_roll",
+        "fixed_s2_ms",
+        "fixed_s2_roll",
+        "unfixed_s0_ms",
+        "unfixed_s0_roll",
+        "unfixed_s1_ms",
+        "unfixed_s1_roll",
+        "unfixed_s2_ms",
+        "unfixed_s2_roll"
+      ]
+    },
+    {
+      "file": "task9_scorer_dose_response_mollusca.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+      "n_nodes": null,
+      "n_scores": 6,
+      "max_S": 0.8659067305658453,
+      "runs": null
+    },
+    {
+      "file": "task9_scorer_mollusca_levelauc.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+      "n_nodes": 32017,
+      "n_scores": 26,
+      "max_S": 0.9466031519011536,
+      "runs": [
+        "canonical",
+        "prior"
+      ]
+    },
+    {
+      "file": "task9_scorer_mollusca_seedspread.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+      "n_nodes": 32017,
+      "n_scores": 78,
+      "max_S": 0.9476206803604994,
+      "runs": [
+        "canonical",
+        "prior"
+      ]
+    },
+    {
+      "file": "task9_scorer_mollusca_sensitivity.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+      "n_nodes": 32017,
+      "n_scores": 6,
+      "max_S": 0.9131130591550208,
+      "runs": [
+        "canonical",
+        "prior"
+      ]
+    },
+    {
+      "file": "task9_seeds_smoke_20260923_183040.json",
+      "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+      "n_nodes": 498246,
+      "n_scores": 30,
+      "max_S": 0.9915352047091996,
+      "runs": [
+        "canonical_s0_ms",
+        "canonical_s0_roll",
+        "canonical_s1_ms",
+        "canonical_s1_roll"
+      ]
+    },
+    {
+      "file": "transplant_2x2_20260922_132857.json",
+      "closure": "/data/taxonomy_edges_metazoa_33208_clean_transitive.npz",
+      "n_nodes": null,
+      "n_scores": 6,
+      "max_S": 0.9728988269445251,
+      "runs": null
+    },
+    {
+      "file": "transplant_2x2_mollusca_smoke.json",
+      "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/mollusca_6447_clean/taxonomy_edges_mollusca_6447_clean_transitive.npz",
+      "n_nodes": null,
+      "n_scores": 6,
+      "max_S": 0.8659067305658453,
+      "runs": null
+    }
+  ],
+  "n_cellular": 1,
+  "n_metazoa": 5,
+  "n_other": 7,
+  "mapping_md5_release_equals_closure": "a8ef06b048e03613230a0a14908f515e"
+}

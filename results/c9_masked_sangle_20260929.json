@@ -1,5 +1,10 @@
 {
   "purpose": "C9 masked S_angle; answers the retrain question without retraining",
+  "closure": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean_transitive.npz",
+  "embedding": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/release/taxembed-cellular-v1/cellular_embedding.safetensors",
+  "mapping_md5_release_equals_closure": "a8ef06b048e03613230a0a14908f515e",
+  "clade": "cellular_organisms_131567_clean",
+  "is_shipped_release_artifact": true,
   "n_nodes": 1102163,
   "n_placeholder": 91317,
   "n_queries": 10000,
