@@ -390,6 +390,69 @@ here on should carry those keys.
 
 ---
 
+## C12 — §4.5 TimeTree RUN: the relatedness claim does not survive. Delete it or restrict it.
+
+**Status:** UNCONDITIONAL. The spec's standing instruction was *"Schedule it, or delete the
+relatedness claim from the paper."* It is now scheduled, run, and read.
+**Evidence:** `results/timetree_preregistration.json` (frozen SHA256 `a3e733c7…`, amendments 1–3) ·
+`results/timetree_pairs_20260929.json` · `results/timetree_result_20260929.json` ·
+`helpers/_timetree_{fetch_probe,feasibility,freeze_preregistration,fetch_pairs,score,amendment_1,amendment_2,amendment_3}.py`
+
+6,000 pre-registered pairs (3,000 per stratum, uniform within-stratum, seed 0, drawn before any
+distance); 5,984 carry a TimeTree age. **Primary = Spearman(ANGULAR distance, divergence time)**,
+with **Spearman(NCBI path length, divergence time)** as the co-reported primary comparator.
+
+| stratum | **primary, angular** | **comparator, NCBI path** | verdict |
+|---|---|---|---|
+| Vertebrata (n=2,993) | **+0.8946** [0.8798, 0.9085] | +0.7911 [0.7695, 0.8123] | TRACKS_RELATEDNESS |
+| Insecta (n=2,991) | **+0.2963** [0.2473, 0.3457] | **+0.4434** [0.3992, 0.4853] | **TRACKS_CONVENTION** |
+
+**Gates b and d pass in both strata** — angular init null +0.0307 / +0.0126 (≤0.05 required);
+shuffle control −0.0092 / +0.0041.
+
+🎯 **The design choice that mattered, vindicated by measurement.** Making the primary *angular*
+rather than Poincaré was not fastidiousness: the **Poincaré init null is −0.2296 (Vertebrata) and
+−0.3712 (Insecta)** — strongly nonzero, because the planted radius alone correlates with divergence
+time. Had Poincaré been the primary, a large part of the "signal" would have been the radial prior
+we put there ourselves. The angular init null is ≈0, as required.
+
+🛑 **THE VERDICT BY THE PRE-REGISTERED RULES IS `TRACKS_CONVENTION`.** The rule is asymmetric and
+deliberately so: `TRACKS_RELATEDNESS` requires the primary to beat the comparator in **both** strata;
+`TRACKS_CONVENTION` fires on **either**. Insecta fires it. Per the spec, this is *"the honest finding
+and it is publishable."*
+
+**Three things make the Vertebrata result weaker than its headline, all pre-declared or recorded:**
+1. **Insecta collapses on better-supported pairs.** At `all_total ≥ 10` (n=2,639) the angular
+   correlation falls to **+0.0425** while the comparator holds at +0.2161. On the insect pairs with
+   the most study support, the embedding carries **almost no** divergence-time signal.
+2. **Most of the Vertebrata advantage is between-bin, not within** (amendment 2's tercile secondary).
+   Within LCA-depth terciles the angular advantage shrinks from **+0.1035 pooled to +0.0221**
+   (depth 17–33), and at depth 10–15 **both** correlations are *negative* (angular −0.3852, path
+   −0.3151). The pooled advantage largely reflects the embedding encoding **LCA depth** — a property
+   of the tree, not of relatedness. Simpson's-paradox-shaped, and it points the unwelcome way.
+3. **The effective sample size is ~115 MRCA nodes, not ~3,000 pairs** (amendment 3). TimeTree ages
+   are node-level: 2,993 Vertebrata pairs carry **118 distinct ages**, and one age-class is **28.7 %**
+   of them. ⛔ **Never quote the pair count as the sample size.** The taxon-level bootstrap partly
+   absorbs this; the stricter clustering unit is the MRCA node, so **treat the reported CIs as lower
+   bounds on the true width.**
+
+**What the manuscript should say (final form only):** external divergence-time validation was run
+against TimeTree. In vertebrates the embedding's angular geometry correlates with divergence time
+somewhat better than NCBI path length does; **in insects NCBI path length wins**, and on the
+best-supported insect pairs the embedding's correlation is indistinguishable from zero. Stratifying
+by LCA depth removes most of the vertebrate advantage. ⇒ **The general claim that embedded distance
+tracks evolutionary relatedness rather than NCBI convention is NOT supported and must be deleted**,
+or restricted to vertebrates with items 1–3 stated. Steelman (ii) stands.
+
+⚠ **This is now the answer to Burkhard's *"TaxEmbed: overfitting?"*, and it is a negative one.**
+P2 was vacuous (Finding 3), P3 measured subtree size (Finding 4), and §4.5 — the last instrument,
+and the only one drawing on data outside NCBI — returns TRACKS_CONVENTION. **The honest position is
+that TaxEmbed's geometry is an efficient encoding of the NCBI topology it was trained on, with no
+demonstrated generalisation beyond it.** That is publishable as stated; it is not a relatedness
+claim.
+
+---
+
 ## Still to be added
 
 - Task 9 verdict — Figure 4 re-plot or caption rewrite (the single most likely change to what the

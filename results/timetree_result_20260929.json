@@ -1,0 +1,144 @@
+{
+  "preregistration": "results/timetree_preregistration.json",
+  "preregistration_sha256": "a3e733c781914a80046a7e116f491951269422d46ff31bf88bd2929521eb7fba",
+  "amendment": "timetree_amendment_1_20260929",
+  "embedding": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/release/taxembed-cellular-v1/cellular_embedding.safetensors",
+  "clade": "cellular_organisms_131567_clean",
+  "n_boot": 1000,
+  "seed": 0,
+  "strata": {
+    "Vertebrata": {
+      "n_pairs": 2993,
+      "n_taxa": 5132,
+      "primary_angular": {
+        "rho": 0.8945942295566647,
+        "ci95": [
+          0.8798191681838566,
+          0.9084953294517297
+        ]
+      },
+      "comparator_ncbi_path": {
+        "rho": 0.79112819439874,
+        "ci95": [
+          0.7695342905058855,
+          0.8123019286590282
+        ]
+      },
+      "secondary_poincare_descriptive": 0.7577825813212353,
+      "gate_b_init_null_angular": {
+        "rho": 0.030685408140243852,
+        "pass": true
+      },
+      "init_null_poincare_expected_nonzero": -0.22961741939967154,
+      "gate_d_shuffle": {
+        "rho": -0.009194169104971098,
+        "pass": true
+      },
+      "gate_a_power": true,
+      "all_total_surface": {
+        "1": {
+          "n": 2993,
+          "rho_angular": 0.8945942295566647,
+          "rho_path": 0.79112819439874
+        },
+        "10": {
+          "n": 2849,
+          "rho_angular": 0.8864667037281192,
+          "rho_path": 0.7583498954605501
+        },
+        "25": {
+          "n": 2642,
+          "rho_angular": 0.9242752530745815,
+          "rho_path": 0.7366380483865362
+        }
+      },
+      "lca_depth_secondary": {
+        "10-15": {
+          "n": 907,
+          "rho_angular": -0.38523422963768095,
+          "rho_path": -0.3150945571014805,
+          "age_median": 435.12562641043
+        },
+        "16-16": {
+          "n": 524,
+          "rho_angular": NaN,
+          "rho_path": NaN,
+          "age_median": 352.08191893591
+        },
+        "17-33": {
+          "n": 1562,
+          "rho_angular": 0.8345891125197071,
+          "rho_path": 0.8124587127620267,
+          "age_median": 280.68497209618
+        }
+      },
+      "verdict": "TRACKS_RELATEDNESS"
+    },
+    "Insecta": {
+      "n_pairs": 2991,
+      "n_taxa": 3811,
+      "primary_angular": {
+        "rho": 0.2962967603042307,
+        "ci95": [
+          0.24729393393971766,
+          0.3456797320884773
+        ]
+      },
+      "comparator_ncbi_path": {
+        "rho": 0.44341165180691317,
+        "ci95": [
+          0.39917262232421374,
+          0.48528871168797505
+        ]
+      },
+      "secondary_poincare_descriptive": -0.08015699861104969,
+      "gate_b_init_null_angular": {
+        "rho": 0.012591974965879146,
+        "pass": true
+      },
+      "init_null_poincare_expected_nonzero": -0.37121155871397277,
+      "gate_d_shuffle": {
+        "rho": 0.0041003557626380915,
+        "pass": true
+      },
+      "gate_a_power": true,
+      "all_total_surface": {
+        "1": {
+          "n": 2991,
+          "rho_angular": 0.2962967603042307,
+          "rho_path": 0.44341165180691317
+        },
+        "10": {
+          "n": 2639,
+          "rho_angular": 0.04251892015309285,
+          "rho_path": 0.2161317553314277
+        },
+        "25": {
+          "n": 0,
+          "underpowered": true
+        }
+      },
+      "lca_depth_secondary": {
+        "16-20": {
+          "n": 826,
+          "rho_angular": -0.08989078230614725,
+          "rho_path": -0.005360122996187933,
+          "age_median": 366.64766465386
+        },
+        "21-21": {
+          "n": 888,
+          "rho_angular": 0.15317537620833677,
+          "rho_path": 0.14833513103818022,
+          "age_median": 331.27872447774
+        },
+        "22-37": {
+          "n": 1277,
+          "rho_angular": 0.6024469577538063,
+          "rho_path": 0.7546417743253189,
+          "age_median": 286.1212715434
+        }
+      },
+      "verdict": "TRACKS_CONVENTION"
+    }
+  }
+}

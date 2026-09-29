@@ -51,5 +51,94 @@
     "fetch_probe": "results/timetree_fetch_probe_20260929.json",
     "provenance_of_the_headline_S_angle": "MANUSCRIPT_CORRECTIONS_PENDING.md C11",
     "session_log": "SpeciesEmbedding/docs/sessions/2026-09-29-taxembed-p3-tree-distance-control.md"
+  },
+  "timetree_amendment_1_20260929": {
+    "status": "Recorded 2026-09-29 AFTER the pair sample was fetched but BEFORE any distance, rank or correlation was computed against any embedding. Only the LABEL distribution (divergence times and study counts) has been observed. Both changes below make the test HARDER or more informative; neither touches the primary endpoint or the verdict rules.",
+    "defect_1_gate_c_could_not_have_failed": {
+      "what_i_wrote": "Gate (c), the interpolation guard: 'the primary is read on pairs with all_total >= 1; pairs with all_total == 0 are reported as a SEPARATE stratum and never pooled.'",
+      "what_happened": "ALL 5,984 pairs carrying an age have all_total >= 1. The gate passed at 100.0 %. A threshold that every observation clears is not a guard -- it is the exact defect this project keeps re-learning, and I wrote it into a pre-registration hours after documenting it as Finding 4's method lesson. See feedback_a_check_that_could_not_have_failed_is_not_evidence.",
+      "the_actual_distribution": {
+        "min": 1,
+        "q25": 14,
+        "median": 19,
+        "q75": 37,
+        "max": 75,
+        "ge_2": 5933,
+        "ge_5": 5784,
+        "ge_10": 5488,
+        "ge_25": 2642,
+        "ge_50": 47,
+        "n": 5984
+      },
+      "why_the_substantive_worry_is_nonetheless_answered": "The concern was that TimeTree might interpolate an obscure pair's age from its own topology rather than from dated studies. With a MEDIAN of 19 supporting studies and 91.7 % of pairs at >= 10, this sample is not interpolation-dominated. The worry was real; the threshold chosen to test it was simply too low to discriminate.",
+      "the_fix": "Gate (c) is REPLACED by a reported ROBUSTNESS SURFACE over all_total rather than a single threshold: the primary and the NCBI-path-length comparator are both reported at all_total >= 1 (n=5,984), >= 10 (n=5,488) and >= 25 (n=2,642). A verdict that holds at one cut and reverses at another is reported as unstable, not as a result. The >= 50 cut (n=47) is excluded as underpowered. No threshold is chosen after seeing a correlation."
+    },
+    "defect_2_uniform_pairs_are_almost_all_ancient": {
+      "what_i_declared": "Cross-stratum pairs are excluded because 'their divergence times are ancient and near-constant, which would inflate every correlation identically.'",
+      "what_happened": "WITHIN-stratum uniform pairs are ALSO overwhelmingly ancient. Median divergence is 318.8 Mya (Vertebrata) and 331.3 Mya (Insecta); the full ranges are 0.6-562.8 and 5.1-431.3 Mya. A uniformly drawn pair from 18,404 vertebrates or 6,122 insects is usually cross-ORDER.",
+      "why_it_matters": "The reasoning I applied to cross-stratum pairs applies one level down and I did not carry it there -- feedback_a_guard_carried_across_a_boundary_is_a_new_guard. If almost every pair is a deep cross-order split, both the embedding and NCBI path length are being scored mainly on 'which order is this taxon in', where they agree by construction. That biases the comparison toward NO_EVIDENCE: it hides a real difference rather than manufacturing one.",
+      "the_fix": "The PRIMARY is unchanged -- the pre-registered uniform within-stratum sample stands, and its result is the headline. ADDED as a pre-declared SECONDARY robustness surface: the primary and the comparator are also reported within bins of NCBI LCA depth (the depth of LCA(a,b) in the training tree), so the comparison has resolution in the range where relatedness actually varies. Bins with fewer than 300 pairs are reported as underpowered and carry no verdict weight. This is a SECONDARY: it cannot overturn the primary, and if primary and secondary disagree that disagreement is the finding."
+    },
+    "what_is_NOT_changed": "The primary metric (Spearman of ANGULAR distance vs divergence time), the co-reported NCBI-path-length comparator, the verdict rules, the taxon-level cluster bootstrap, the init null gate, the shuffle control, the strata and the pair sample itself are all unchanged. No endpoint is swapped and no new primary is introduced.",
+    "data_quality_note": "16 of 6,000 pairs returned no age (13 HTTP 500, 3 no data row), 0.27 %. Recorded; too few to bias anything."
+  },
+  "timetree_amendment_2_20260929": {
+    "status": "Recorded AFTER the primary was read, and it touches ONLY the secondary surface. The primary verdicts (Vertebrata TRACKS_RELATEDNESS on its own terms, Insecta TRACKS_CONVENTION) are quoted inside this amendment so it is visible that the change could not have been selected to move them.",
+    "what_failed": "Amendment 1's LCA-depth SECONDARY used hard-coded bins (0-6, 7-9, 10-12, 13-40). The run placed 2,945 of 2,993 Vertebrata pairs and 2,991 of 2,991 Insecta pairs in the LAST bin; the first two were EMPTY in both strata. The secondary resolved nothing.",
+    "the_pattern_this_is_the_third_instance_of": "A cut chosen without looking at the distribution it is meant to cut. (1) The prescribed tree-distance control for P3 could not move a candidate because tree distance was constant across the pool (Finding 4 §4.2). (2) Gate (c)'s all_total >= 1 was cleared by 100 % of pairs (amendment 1, defect 1). (3) These bins. All three were written by me, all three were caught by running them, and none would have been caught by reading them. See feedback_a_check_that_could_not_have_failed_is_not_evidence.",
+    "the_fix": "The secondary's bins are TERCILES of the observed per-stratum LCA-depth distribution, and that distribution is reported alongside. A quantile bin cannot be empty by construction -- which is exactly the property the fixed bins lacked. If the LCA depth distribution is too concentrated for terciles to separate (all boundaries equal), that is REPORTED as 'secondary has no resolution on this tree' rather than papered over with another guess.",
+    "what_is_NOT_changed": "Primary metric, co-reported NCBI-path-length comparator, gates a/b/d, the all_total surface, the strata, the pair sample, the taxon-level cluster bootstrap and every verdict rule. The secondary cannot overturn the primary; if they disagree, the disagreement is the finding.",
+    "primary_as_read_before_this_amendment": {
+      "Vertebrata": {
+        "angular": [
+          0.8946,
+          0.8798,
+          0.9085
+        ],
+        "ncbi_path": [
+          0.7911,
+          0.7695,
+          0.8123
+        ],
+        "verdict": "TRACKS_RELATEDNESS"
+      },
+      "Insecta": {
+        "angular": [
+          0.2963,
+          0.2473,
+          0.3457
+        ],
+        "ncbi_path": [
+          0.4434,
+          0.3992,
+          0.4853
+        ],
+        "verdict": "TRACKS_CONVENTION"
+      }
+    }
+  },
+  "timetree_amendment_3_20260929": {
+    "status": "A LIMITATION recorded after the primary was read. Changes no endpoint, gate, stratum or verdict rule. Exists so the result cannot be read as stronger than its label supports.",
+    "discovered_via": "amendment 2's tercile secondary printed nan for Vertebrata LCA depth 16 (n=524). Not a code defect: `age` has ONE distinct value there, so the Spearman denominator is 0 and the statistic is undefined. Verified 0 nan in distances, 0 nan in the embedding, 524 distinct angular values.",
+    "the_finding": "TimeTree ages are NODE-LEVEL — every pair sharing an MRCA gets the same precomputed_age.",
+    "effective_sample_size": {
+      "Vertebrata": {
+        "pairs": 2993,
+        "distinct_ages": 118,
+        "largest_age_class": 859,
+        "largest_age_class_pct": 28.7,
+        "singleton_classes": 54
+      },
+      "Insecta": {
+        "pairs": 2991,
+        "distinct_ages": 113,
+        "largest_age_class": 881,
+        "largest_age_class_pct": 29.5,
+        "singleton_classes": 55
+      }
+    },
+    "consequence": "The primary is closer to 'can the embedding ORDER ~115 clade-split ages' than to 'does it predict divergence time over 3,000 independent comparisons'. 🛑 THE PAIR COUNT MUST NEVER BE QUOTED AS THE SAMPLE SIZE.",
+    "effect_on_the_reported_CIs": "The pre-registered bootstrap clusters over TAXA, so resampling destroys and recreates whole age-classes — the right call, for a reason adjacent to this one. But the stricter clustering unit is the MRCA NODE, since pairs within a class share the label EXACTLY, and the reported CIs are not clustered at that level. TREAT THE REPORTED CIs AS LOWER BOUNDS ON THE TRUE WIDTH.",
+    "does_it_change_the_verdicts": "Not by itself. Insecta's TRACKS_CONVENTION rests on the comparator BEATING the primary on the identical label, so label coarseness applies to both arms equally and cannot explain the gap. Vertebrata's TRACKS_RELATEDNESS is the one to treat cautiously, and amendment 2's secondary already does so: within LCA-depth terciles the angular advantage over path shrinks from +0.1035 pooled to +0.0221 (depth 17-33), and at depth 10-15 BOTH correlations are NEGATIVE (angular -0.3852, path -0.3151). Most of the pooled advantage is BETWEEN-bin, i.e. the embedding encoding LCA depth — a property of the tree, not of relatedness."
   }
 }
