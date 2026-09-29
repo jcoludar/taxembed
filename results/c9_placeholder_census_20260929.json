@@ -1,0 +1,32 @@
+{
+  "purpose": "C9 owed measurement: placeholder-named leaves in TaxEmbed's own embedded set",
+  "taxdump": "2026-07-01",
+  "embedded_total": 1025217,
+  "by_domain": {
+    "Bacteria": {
+      "embedded": 200712,
+      "placeholder_unfiltered": 88108,
+      "already_caught_by_filter": 201,
+      "clean": 112403,
+      "placeholder_pct": 43.9
+    },
+    "Archaea": {
+      "embedded": 6667,
+      "placeholder_unfiltered": 3209,
+      "already_caught_by_filter": 25,
+      "clean": 3433,
+      "placeholder_pct": 48.13
+    },
+    "Eukaryota": {
+      "embedded": 817837,
+      "placeholder_unfiltered": 0,
+      "already_caught_by_filter": 234,
+      "clean": 817603,
+      "placeholder_pct": 0.0
+    }
+  },
+  "prokaryote_total": 207379,
+  "prokaryote_placeholder": 91317,
+  "prokaryote_already_caught": 226,
+  "placeholder_share_of_whole_embedding_pct": 8.907
+}

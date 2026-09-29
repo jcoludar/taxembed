@@ -42,6 +42,10 @@ umap*.png
 data/
 artifacts/
 artifacts_archive/
+# The shipped model artifact: 438 MB, never tracked, no LFS configured. Left unignored it is one
+# stray `git add .` away from a 438 MB commit -- the SLIP-4 shape Rule 14's bulk guard exists for,
+# and this submodule has NO hooks installed, so that guard does not protect it here. (2026-09-29)
+release/
 small_model_28epoch/
 wordnet/*.csv
 

@@ -1,0 +1,46 @@
+[
+  {
+    "label": "TTOL 2015 newick (classic full tree)",
+    "url": "http://www.timetree.org/public/data/TimetreeOfLife2015.nwk",
+    "status": 200,
+    "content_type": "?",
+    "content_length": "1885646",
+    "final_url": "https://www.timetree.org/public/data/TimetreeOfLife2015.nwk",
+    "first_bytes": "((Thermotoga_maritima:4055.5046,(((((Chloroflexus_aurantiacus:3026.355,((Deinococcus_radiodurans:2777.9475,(((",
+    "seconds": 0.787
+  },
+  {
+    "label": "TTOL 2015 newick, https",
+    "url": "https://timetree.org/public/data/TimetreeOfLife2015.nwk",
+    "status": 200,
+    "content_type": "?",
+    "content_length": "1885646",
+    "final_url": "https://timetree.org/public/data/TimetreeOfLife2015.nwk",
+    "first_bytes": "((Thermotoga_maritima:4055.5046,(((((Chloroflexus_aurantiacus:3026.355,((Deinococcus_radiodurans:2777.9475,(((",
+    "seconds": 0.698
+  },
+  {
+    "label": "TimeTree5 'Latest' data page",
+    "url": "https://timetree.org/home",
+    "status": 403,
+    "error": "HTTPError 403 Forbidden",
+    "seconds": 0.626
+  },
+  {
+    "label": "public data directory",
+    "url": "http://www.timetree.org/public/data/",
+    "status": 403,
+    "error": "HTTPError 403 Forbidden",
+    "seconds": 0.793
+  },
+  {
+    "label": "species-pair API shape (expect 4xx if absent)",
+    "url": "http://www.timetree.org/api/pairwise/9606/10090",
+    "status": 200,
+    "content_type": "text/plain; charset=utf-8",
+    "content_length": "?",
+    "final_url": "https://www.timetree.org/api/pairwise/9606/10090",
+    "first_bytes": "taxon_a_id,taxon_b_id,scientific_name_a,scientific_name_b,all_total,precomputed_age,precomputed_ci_low,precomp",
+    "seconds": 0.913
+  }
+]

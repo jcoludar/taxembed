@@ -1,0 +1,42 @@
+{
+  "preregistration": "results/p3_placement_preregistration.json",
+  "preregistration_sha256": "3b07275053d61082a8adc6891e0af17bf412616030b4afb68f41fd264644ce38",
+  "old_date": "2026-07-01",
+  "new_date": "2026-09-01",
+  "training_date": "2026-06-09",
+  "n_moved": 1646,
+  "n_primary_queries": 1407,
+  "primary": {
+    "n_scored": 1241,
+    "mean_normalized_rank": 0.4400282297778546,
+    "ci95": [
+      0.42142890356597273,
+      0.45882674455218864
+    ],
+    "median_pool": 24
+  },
+  "gate_b_control": {
+    "n_scored": 644,
+    "mean": 0.5012663069034692,
+    "ci95": [
+      0.4777521078398004,
+      0.5246228938715685
+    ]
+  },
+  "gate_c_init_null": {
+    "n_scored": 1241,
+    "mean": 0.5144982784098086,
+    "ci95": [
+      0.4973437607909537,
+      0.5317272743368854
+    ]
+  },
+  "secondary_descriptive_nearer_new_rate": 0.11940298507462686,
+  "gates": {
+    "a_power": true,
+    "b_negative_control": true,
+    "c_init_null": true,
+    "d_pool_size": true
+  },
+  "verdict": "ANTICIPATES"
+}

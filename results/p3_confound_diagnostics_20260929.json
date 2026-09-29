@@ -1,0 +1,37 @@
+{
+  "purpose": "read-only diagnosis of P3 qualification 3; no verdict, no amendment applied",
+  "old_date": "2026-07-01",
+  "new_date": "2026-09-01",
+  "n_primary_queries": 1407,
+  "n_scored": 1241,
+  "p1_tree_distance": {
+    "pools_constant": 1241,
+    "pools_varying": 0,
+    "constant_equals_target_distance": 1241,
+    "prediction_confirmed": true
+  },
+  "p2_substitution": {
+    "rank_from_v": {
+      "mean": 0.4400282297778546,
+      "ci95": [
+        0.42142890356597273,
+        0.45882674455218864
+      ]
+    },
+    "rank_from_p_old": {
+      "mean": 0.4444118690744808,
+      "ci95": [
+        0.4256504333568612,
+        0.4628481692336812
+      ]
+    },
+    "paired_delta_v_minus_pold": {
+      "mean": -0.004383639296626335,
+      "ci95": [
+        -0.014544541551218709,
+        0.006182326976861326
+      ]
+    }
+  },
+  "reproduction_of_primary_0p4400": true
+}

@@ -1,0 +1,23 @@
+{
+  "purpose": "spec \u00a74.5 feasibility; COUNTS ONLY, no statistic computed",
+  "newick": {
+    "url": "https://timetree.org/public/data/TimetreeOfLife2015.nwk",
+    "path": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/timetree/TimetreeOfLife2015.nwk",
+    "bytes": 1885646,
+    "download_seconds": 6.63
+  },
+  "ttol_leaf_labels": 50574,
+  "ttol_unique": 50574,
+  "resolved_to_taxid": 45237,
+  "resolved_and_embedded": 43287,
+  "located_in_tree": 43287,
+  "pairs_available": 936860541,
+  "clade_breakdown": {
+    "Vertebrata": 18404,
+    "Insecta": 6122,
+    "Mammalia": 3379,
+    "Aves": 5677,
+    "Actinopterygii": 3052
+  },
+  "names_source": "/Users/jcoludar/CascadeProjects/SpeciesEmbedding/TaxPointCare/poincare-embeddings/data/taxdump_archive_2026-07-01/names.dmp"
+}

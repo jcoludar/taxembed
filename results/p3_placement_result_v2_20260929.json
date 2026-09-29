@@ -1,0 +1,61 @@
+{
+  "supersedes": "results/p3_placement_result_20260929.json",
+  "supersedes_verdict": "ANTICIPATES (primary 0.4400, CI95 [0.4214, 0.4588], four gates passing)",
+  "why_superseded": "p3_amendment_3_20260929 \u2014 a control the pre-registration did not contain. The primary is fully accounted for by candidate subtree size, and the moved taxon's own coordinate contributes nothing.",
+  "preregistration": "results/p3_placement_preregistration.json",
+  "amendment": "p3_amendment_3_20260929",
+  "old_date": "2026-07-01",
+  "new_date": "2026-09-01",
+  "training_date": "2026-06-09",
+  "n_scored": 1241,
+  "primary_unchanged": {
+    "mean_normalized_rank": 0.4400282297778546,
+    "ci95": [
+      0.42142890356597273,
+      0.45882674455218864
+    ]
+  },
+  "substitution_control_p_old_for_v": {
+    "mean": 0.4444,
+    "paired_delta_v_minus_pold": -0.0044,
+    "ci95": [
+      -0.0145,
+      0.0062
+    ],
+    "reading": "contains zero; v is inert"
+  },
+  "size_conditioned_residual": {
+    "bins_10": {
+      "mean": -0.0031,
+      "ci95": [
+        -0.0203,
+        0.0137
+      ]
+    },
+    "bins_20": {
+      "mean": 0.0019,
+      "ci95": [
+        -0.0149,
+        0.0185
+      ]
+    },
+    "bins_40": {
+      "mean": 0.0076,
+      "ci95": [
+        -0.0091,
+        0.0241
+      ]
+    },
+    "reading": "all contain zero, sign changes across binnings"
+  },
+  "non_embedding_baseline_subtree_size": {
+    "mean": 0.3146,
+    "ci95": [
+      0.2982,
+      0.3313
+    ],
+    "reading": "BEATS the embedding outright; paired +0.1298 [+0.1107, +0.1488]"
+  },
+  "verdict": "UNINFORMATIVE",
+  "one_line": "P3 placement does not separate the real taxonomy's geometry from candidate subtree size, and never tested the held-out taxon at all. It joins P2."
+}

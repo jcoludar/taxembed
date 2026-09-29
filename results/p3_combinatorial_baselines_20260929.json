@@ -1,0 +1,60 @@
+{
+  "purpose": "non-embedding baselines on the P3 amendment-2 pools; read-only, no verdict",
+  "old_date": "2026-07-01",
+  "new_date": "2026-09-01",
+  "n_scored": 1241,
+  "p_new_is_direct_sibling_of_p_old_frac": 0.8017727639000806,
+  "scores": {
+    "emb_v": {
+      "mean": 0.4400282297778546,
+      "ci95": [
+        0.42142890356597273,
+        0.45882674455218864
+      ]
+    },
+    "emb_pold": {
+      "mean": 0.4444118690744808,
+      "ci95": [
+        0.4256504333568612,
+        0.4628481692336812
+      ]
+    },
+    "b0_random": {
+      "mean": 0.493656058229917,
+      "ci95": [
+        0.4761020342651766,
+        0.5109859191459917
+      ]
+    },
+    "b1_subtree": {
+      "mean": 0.3146066463563847,
+      "ci95": [
+        0.29823189149841084,
+        0.3313194199012915
+      ]
+    },
+    "b2_taxid": {
+      "mean": 0.5570571836689435,
+      "ci95": [
+        0.5391877263871737,
+        0.5746656873708044
+      ]
+    },
+    "b3_children": {
+      "mean": 0.3187953527008662,
+      "ci95": [
+        0.3019887783259533,
+        0.3359313529569592
+      ]
+    }
+  },
+  "strongest_baseline": "b1_subtree",
+  "paired_embedding_minus_best_baseline": {
+    "mean": 0.1298052227180962,
+    "ci95": [
+      0.11067509951601706,
+      0.1487838331138256
+    ]
+  },
+  "multiple_comparisons_note": "3 baselines tried, strongest selected; biased AGAINST the embedding claim"
+}

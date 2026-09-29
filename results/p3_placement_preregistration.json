@@ -1,0 +1,108 @@
+{
+  "status": "PRE-REGISTERED 2026-09-29, BEFORE any distance, rank or placement statistic was computed. Only COUNTS have been observed (helpers/_p3_placement_feasibility.py: 1,646 moved / 1,441 usable over 2026-07-01 -> 2026-09-01). Frozen at commit time; revise only by adding a dated amendment block, never by editing this one.",
+  "task": "P3 placement arm (spec v3 \u00a7P3) -- does the SHIPPED embedding, trained on the 2026-06-09 taxonomy, already place a taxon nearer the parent NCBI LATER assigns it than the equally-local alternatives NCBI could have chosen?",
+  "why": "P2 (held-out link prediction) is vacuous for this model class -- docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md Finding 3, \u00a73.7: on a strict tree every single-edge holdout is trivial or vacuous. Burkhard's 'TaxEmbed: overfitting?' therefore has no NCBI-internal answer from a node holdout. A LATER NCBI release is information from outside the training tree, so it escapes \u00a73.7: the moved taxon keeps its coordinate (it trained with its OLD parent edge) and the new parent assignment was never seen.",
+  "population": {
+    "source_model": "release/taxembed-cellular-v1/cellular_embedding.safetensors (1,102,163 taxa, dim 100), mapping taxid_to_index.tsv. Trained on the closure built 2026-06-09.",
+    "old_release": "data/taxdump_archive_2026-07-01 (taxdmp_2026-07-01.zip)",
+    "new_release": "data/taxdump_archive_2026-09-01 (taxdmp_2026-09-01.zip)",
+    "no_leakage_ordering": "training_date 2026-06-09 <= old_date 2026-07-01 < new_date 2026-09-01. Every move scored happened strictly AFTER training.",
+    "eligible": "Taxa embedded in the shipped artifact whose DIRECT PARENT changed old->new under release_diff.reclassified_taxa (canonicalized through merged.dmp/delnodes.dmp), AND whose old and new parents are both embedded. Measured count 1,441; the analysis re-derives it rather than trusting this number."
+  },
+  "the_confound_this_design_exists_to_control": "Reclassifications are overwhelmingly LOCAL -- a taxon moves between neighbouring genera, not across the tree. The model was trained to sit near p_old. If p_new is taxonomically adjacent to p_old, then the model sits near p_new TOO, for a reason that has nothing to do with anticipating the move. Any statistic comparing d(v,p_new) against unrestricted alternatives would therefore manufacture a positive result. The primary metric below restricts every candidate to the SAME LCA subtree AND the same depth as p_new, so the locality that would confound the test is held constant across all candidates.",
+  "metrics": {
+    "primary": {
+      "name": "normalized_rank of p_new within the locality-matched candidate pool",
+      "pool": "L = LCA(p_old, p_new) in the OLD tree. Candidates = all nodes at depth(p_new) that are descendants of L and are embedded, EXCLUDING p_old itself and excluding v. p_new is in this pool by construction.",
+      "rank": "Candidates sorted by Poincare distance from v, nearest first, seeded tie jitter (src/taxembed/eval/linkpred.py::rank_of_true_parent, metric='poincare', exact radii where available).",
+      "statistic": "normalized_rank = (rank - 1) / (pool_size - 1), averaged over scored taxa. LOWER IS BETTER.",
+      "chance": 0.5,
+      "chance_justification": "E[rank] = (k+1)/2 under uniform ranking for every pool size k >= 2, so E[normalized_rank] = 0.5 independent of pool size. This floor was CONFIRMED EMPIRICALLY on this codebase 2026-09-29: the P2 arms sat at 0.4997/0.5004/0.5016 at initialization (helpers/_p2_cosine_vs_poincare.py).",
+      "exclusion": "Pool size k < 2 is TRIVIAL (rank is always 1) and is EXCLUDED, with n_trivial and n_scored both reported -- never a silent shrink. Same rule as p2_amendment_3_20260924."
+    },
+    "secondary_descriptive_only": {
+      "name": "raw rate of d(v, p_new) < d(v, p_old)",
+      "verdict_weight": "NONE. Reported for description only.",
+      "why_not_primary": "The model was TRAINED on the (p_old, v) edge, so it is pulled toward p_old by construction. The chance floor of this quantity is NOT 0.5 and is not known in closed form. A rate below 50% is therefore consistent with a perfectly good embedding and must never be read as a negative result."
+    },
+    "transductive_limit": "Report taxa present in the new release with no coordinate (measured 1,961,538 of 2,986,118 = 65.7% of current NCBI uncovered). Reported as a LIMITATION, not an outcome."
+  },
+  "validity_gates": {
+    "gate_a_power": "n_scored >= 1000. Below that the result is UNDERPOWERED, not negative.",
+    "gate_b_negative_control_MUST_land_at_chance": "Take taxa that did NOT move between the two releases, matched to the moved set on depth. For each, draw a RANDOM pseudo-new-parent from the same locality-matched pool construction (same L-subtree, same depth), and run the IDENTICAL statistic. This MUST come out at 0.5 within its bootstrap CI. If it does not, the pool construction or the distance path is biased and the whole reading is UNINFORMATIVE.",
+    "gate_c_init_null_MUST_land_at_chance": "Run the identical statistic on a randomly-initialized embedding of the same shape and depth-radius schedule. MUST be 0.5 within CI. Catches any way the POOL ITSELF encodes the answer independent of training.",
+    "gate_d_pool_sanity": "Report the pool-size distribution. If the median pool size is < 3 the test has little room to discriminate and the result is UNDERPOWERED regardless of the point estimate.",
+    "why_these_gates": "P2's gates were passable by a defect: its gate (b) required a falling loss, which a CONVERGED arm cannot do (2026-09-24), and its metric never had a control that could have caught a systematically inverted reading. Gates b and c here are BOTH designed to FAIL LOUDLY on a broken harness, and both are computed from the same code path as the primary. A gate that could not have failed is not evidence."
+  },
+  "verdict_rules": {
+    "ANTICIPATES": "primary normalized_rank bootstrap CI (over taxa, 10,000 resamples) lies ENTIRELY BELOW 0.5, AND gates a-d all pass.",
+    "NO_EVIDENCE": "CI includes 0.5, gates pass. The model does not anticipate reclassification. This is a REPORTABLE result, not a failure.",
+    "CONTRADICTS": "CI lies ENTIRELY ABOVE 0.5, gates pass. The model places moved taxa FURTHER from their future parent than chance.",
+    "UNINFORMATIVE": "any gate fails. No direction is read."
+  },
+  "multiple_comparisons": {
+    "primary_endpoint": "ONE: normalized_rank on the 2026-07-01 -> 2026-09-01 window.",
+    "secondary": "The two one-month windows (07-01->08-01, 08-01->09-01) are ROBUSTNESS only and carry no verdict. They are not independent of the primary (the 2-month set is their union).",
+    "no_post_hoc": "No other window, pool definition, metric or subgroup may be promoted to primary after the numbers are seen. If the primary is NO_EVIDENCE, that is the result."
+  },
+  "declared_confounds": [
+    "Pool membership requires a coordinate, and the embedding covers 37% of present-day NCBI. Candidates absent from the embedding are silently unavailable, which makes pools smaller and possibly easier. n_trivial and the pool-size distribution are reported for this reason.",
+    "LCA(p_old, p_new) is computed in the OLD tree. For a move whose new parent did not exist in the old release, the LCA is taken to the nearest ancestor of p_new that did exist; such taxa are counted and reported separately.",
+    "Depth-matching for the gate-b control set is on the moved taxon's own depth, not on its parent's fan-out. Fan-out is NOT matched, so the control sets the harness's floor, not a difficulty-matched twin.",
+    "The shipped artifact predates this project's seeding fix, so it is not itself seed-reproducible (plan v2 Task 5). This analysis reads it as a fixed given; it is not a claim about reproducibility of training."
+  ],
+  "p3_amendment_1_20260929": {
+    "status": "Recorded BEFORE any result was computed.",
+    "what": "Gate (c), the init null, is implemented as 'random directions at each node's TRAINED radius' rather than 'a freshly initialized embedding at the depth-radius schedule'.",
+    "why": "This is the project's established null (a random-direction embedding scores S_angle = 0 by construction, src/taxembed/eval/angular.py) and it is STRICTLY STRONGER here: it preserves the planted radial prior EXACTLY, so if the pool or the metric could deliver the answer from radius alone, this null detects it where a fresh init might not."
+  },
+  "p3_amendment_2_20260929": {
+    "status": "Recorded AFTER the first run, BECAUSE GATE (b) FAILED. The primary point estimate from the first run (0.4473) is reported in the amendment's own record and is NOT carried forward as a result; the pool definition it was computed under is withdrawn as mis-specified.",
+    "what_failed": "Gate (b), the negative control on unmoved taxa, returned mean 0.6016, CI95 [0.5828, 0.6204] \u2014 it MUST contain 0.5. Gate (c) passed (0.5156, CI [0.4985, 0.5329]); gates (a) and (d) passed.",
+    "the_defect_it_caught": "It is in THIS pre-registration, not in the model. L = LCA(p_old, p_new), so by the definition of an LCA, p_new always lies in a DIFFERENT child branch of L than p_old. But the pool as defined was 'all nodes at depth(p_new) under L', which INCLUDES p_old's branch. v was trained adjacent to p_old, so p_old's branch is the nearest region of the pool, and the true target is drawn only from the complement. The chance floor of the statistic as originally defined is therefore NOT 0.5 \u2014 it is the ~0.60 gate (b) measured.",
+    "the_fix": "The candidate pool EXCLUDES the child branch of L that contains p_old (previously only p_old itself was excluded). Under the null, p_new is then uniform within the candidate set and the analytic 0.5 floor is true again. Gate (b), rebuilt under the identical construction, must now land on 0.5 \u2014 if it does not, the reading stays UNINFORMATIVE.",
+    "direction_of_the_change": "This makes the test STRICTER, not easier. Against the biased ~0.60 floor the first run's 0.4473 would have read as a large effect; against a correct 0.5 the same quantity must earn the verdict on its own. The amendment is made because a validity gate failed, NOT because a point estimate was unwelcome.",
+    "what_is_NOT_changed": "The primary metric (normalized_rank), the verdict rules, the gates, the windows, the eligible population, and the secondary's descriptive-only status are all unchanged. No new endpoint is introduced and no window is promoted."
+  },
+  "pointers": {
+    "finding_that_motivates_this": "docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md \u00a73.7",
+    "spec": "docs/specs/2026-08-11-taxembed-overfitting-and-plm-showcase-design-v3.md \u00a7P3",
+    "diff_machinery": "src/taxembed/eval/release_diff.py (parse_parents, parse_merged, parse_delnodes, canonicalize_taxid, reclassified_taxa)",
+    "feasibility_run": "helpers/_p3_placement_feasibility.py, 2026-09-29",
+    "session_log": "SpeciesEmbedding/docs/sessions/2026-09-29-taxembed-p2-below-chance-diagnosis.md"
+  },
+  "p3_amendment_3_20260929": {
+    "status": "Recorded AFTER the amendment-2 run, BECAUSE A CONTROL THE PRE-REGISTRATION NEVER CONTAINED was built and the primary did not survive it. The ANTICIPATES verdict of results/p3_placement_result_20260929.json is WITHDRAWN. Superseded by results/p3_placement_result_v2_20260929.json. The withdrawn numbers are kept, not deleted.",
+    "what_prompted_it": "The closing qualification 3 of the 2026-09-29 session: the pool excludes p_old's branch but not branches adjacent to it, so if p_new is systematically tree-nearer to p_old than a pool draw, the embedding ranks it well for encoding the OLD tree, not for anticipating. The prescribed fix was to match pseudo-parents on TREE DISTANCE from p_old.",
+    "finding_0_the_prescribed_fix_is_vacuous": {
+      "measurement": "helpers/_p3_confound_diagnostics.py; results/p3_confound_diagnostics_20260929.json",
+      "result": "path(p_old, q) is CONSTANT across the pool in 1,241 / 1,241 pools (100.00%), and equals path(p_old, p_new) in 1,241 / 1,241.",
+      "why": "The pool is depth-homogeneous (all q at depth(p_new)) and, after amendment 2, branch-homogeneous (LCA(p_old, q) == L for every q). So path(p_old,q) = (depth(p_old)-depth(L)) + (depth(p_new)-depth(L)), which has no term varying with q. Matching on tree distance could not have moved one candidate in one pool; it would have been a control incapable of failing."
+    },
+    "finding_1_the_moved_taxon_is_inert": {
+      "measurement": "helpers/_p3_confound_diagnostics.py, substitution control",
+      "result": "Ranking the IDENTICAL pool from p_old instead of v gives 0.4444 [0.4257, 0.4628] against the primary's 0.4400 [0.4214, 0.4588]; paired delta (v - p_old) = -0.0044, CI95 [-0.0145, +0.0062], CONTAINS ZERO.",
+      "consequence": "p_old alone delivers 0.0556 of the 0.0600 total effect over chance (92.7%). P3 IS NOT A HELD-OUT-TAXON TEST: the moved taxon's own coordinate contributes nothing measurable. Any sentence attributing the signal to the reclassified taxon is false."
+    },
+    "finding_2_a_one_line_baseline_beats_the_embedding": {
+      "measurement": "helpers/_p3_combinatorial_baselines.py; results/p3_combinatorial_baselines_20260929.json",
+      "result": "On the identical pools: random 0.4937 [0.4761, 0.5110] (harness PASS); subtree size, larger first 0.3146 [0.2982, 0.3313]; n_children 0.3188; |taxid - taxid(p_old)| 0.5571 (mirror 0.4429); embedding from p_old 0.4444. Paired (embedding - size) = +0.1298, CI95 [+0.1107, +0.1488].",
+      "consequence": "'Pick the largest candidate branch' predicts the destination far better than the embedding does. NCBI moves taxa into big, actively curated groups; p_new's mean within-pool size rank is 0.3218 against a background of 0.5013."
+    },
+    "finding_3_the_signal_is_a_size_proxy_and_nothing_more": {
+      "measurement": "helpers/_p3_size_residual_control_v3.py; results/p3_size_residual_control_v3_20260929.json",
+      "design": "Condition on subtree size rather than match on it (two matching designs failed their own gates first; see superseded_attempts). For every candidate compute within-pool normalized ranks r_s (size, larger first) and r_e (Poincare distance from p_old); estimate E[r_e | r_s] by binned mean over NON-TARGET candidates only (166,852), weighted 1/n_q so the curve is fit under the same weighting the query-averaged statistic uses; test each target's residual r_e(p_new) - curve(r_s(p_new)).",
+      "gates": "G1 null residual for uniformly drawn pseudo-targets (20 per query) must contain 0: +0.0010 / +0.0011 / +0.0009, CIs contain 0 -- PASS at 10/20/40 bins. G2 curve spread must exceed 0.05: 0.3067 / 0.3626 / 0.4068 -- PASS.",
+      "result": "G3 target residual from p_old: -0.0031 [-0.0203, +0.0137] (10 bins), +0.0019 [-0.0149, +0.0185] (20), +0.0076 [-0.0091, +0.0241] (40). ALL THREE CONTAIN ZERO and the sign CHANGES across binnings. From v: -0.0075 / -0.0025 / +0.0032, same picture.",
+      "decomposition": "Of the 0.0556 raw effect over chance, subtree size alone accounts for 0.0525 / 0.0575 / 0.0631 at 10/20/40 bins -- 94% / 103% / 113%. Nothing is left over.",
+      "consequence": "The P3 placement signal is a LOSSY ENCODING OF SUBTREE SIZE. Conditional on how large a candidate subtree is, the embedding carries no information about where NCBI will move the taxon."
+    },
+    "integrity_note_the_gate_that_reversed_the_verdict": "The FIRST v3 run, with one pseudo-target per query, returned G3 = -0.0325 / -0.0340 / -0.0269 with CIs EXCLUDING zero -- i.e. BEYOND SIZE, a positive result. It would have been reported. G1 passed there only because its CI half-width (0.017) was half the effect it was certifying. Raising R_NULL from 1 to 20 for POWER made G1 FAIL (+0.0122 / +0.0092 / +0.0090, CIs excluding zero), exposing a WEIGHTING MISMATCH IN MY OWN ESTIMATOR: the curve was candidate-weighted while the statistic is query-weighted. Fitting the curve with 1/n_q weights fixed it, G1 now passes at +0.001, AND THE VERDICT FLIPPED FROM POSITIVE TO NULL. The correction moved the headline the UNWELCOME way, which is the evidence it was made for the right reason.",
+    "superseded_attempts": {
+      "helpers/_p3_size_matched_control.py": "Fixed log2 band around the target's size. Its gate (size must neutralize inside the band) FAILED at every band -- 0.4746 [0.455, 0.495] even at +-0.5 log2. Random control was one draw per query and mis-read two of four bands; rank_by then shown unbiased by synthetic test (20,000 reps x 15 pool sizes, all 0.494-0.504). DEPRECATED.",
+      "helpers/_p3_size_matched_control_v2.py": "k-nearest-in-size pools + matched-procedure null. H1 (random, R=25) PASSED 0.4998/0.5012/0.4982. H2 FAILED worse than v1: size read 0.2445/0.2575/0.2907. Cause: subtree size is heavy-tailed and p_new sits in the UPPER TAIL, so the k nearest in log-size are drawn asymmetrically FROM BELOW and the target stays among the largest in its own 'matched' pool. That also invalidates its gate (e), whose pseudo-target is drawn uniformly and is therefore typically small. Its k=4 / k=8 'BEYOND SIZE' readings (-0.0792, -0.0356) are WITHDRAWN. DEPRECATED."
+    },
+    "what_is_NOT_changed": "The primary metric, the amendment-2 pool, the verdict rules, the windows and the eligible population are all unchanged. Amendment 3 adds a control the pre-registration did not contain and reports that the primary does not survive it. No endpoint was swapped and no window was promoted.",
+    "verdict_after_amendment_3": "UNINFORMATIVE \u2014 the primary does not survive conditioning on subtree size, and it was never a held-out-taxon test."
+  }
+}

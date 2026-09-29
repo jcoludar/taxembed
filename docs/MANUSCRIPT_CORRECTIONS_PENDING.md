@@ -227,14 +227,109 @@ either was written into the P2 evaluation, and both degenerate:
    **5.403** on mollusca. Comparing arms on raw MRR would have let the control win regardless of what
    either model learned, producing a false "the model memorises tree shape" verdict.
 
-**What the manuscript should say (final form only — do not narrate the rejected alternative):** the
-held-out evaluation uses a **leaf parent-edge holdout** over the interquartile depth band
-(`depth ∈ [11, 28]`, 501,037 eligible leaves at cellular_organisms scale), and cross-tree comparisons
-against the RandomDAG control use **chance-normalised `normalized_rank`**, not raw MRR. Cite the
-leaf-holdout precedent (TaxoExpan, Arborist, Octet — spec §3.4) as the methodological grounding, not
-Ganea's split. The full reasoning — including why a leaf restriction specifically is required (the
-internal-node leak) and why RandomDAG needs chance normalisation — lives in
-`docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md`, not in the manuscript itself.
+🛑 **SUPERSEDED 2026-09-29 — DO NOT PASTE THE PARAGRAPH BELOW.** It prescribes a sentence asserting a
+working held-out evaluation, and the P2 array has since been run and read: the leaf parent-edge
+holdout adopted as the fix is **itself vacuous** for this model class (Finding 3 of the same note).
+The superseded prescription is kept, not deleted, because the reasoning above it still stands.
+
+> *(superseded)* **What the manuscript should say (final form only — do not narrate the rejected
+> alternative):** the held-out evaluation uses a **leaf parent-edge holdout** over the interquartile
+> depth band (`depth ∈ [11, 28]`, 501,037 eligible leaves at cellular_organisms scale), and
+> cross-tree comparisons against the RandomDAG control use **chance-normalised `normalized_rank`**,
+> not raw MRR. Cite the leaf-holdout precedent (TaxoExpan, Arborist, Octet — spec §3.4) as the
+> methodological grounding, not Ganea's split. The full reasoning — including why a leaf restriction
+> specifically is required (the internal-node leak) and why RandomDAG needs chance normalisation —
+> lives in `docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md`, not in the manuscript
+> itself.
+
+**What the manuscript should say INSTEAD (2026-09-29, one sentence, final form only):** held-out link
+prediction cannot test generalisation for a transductive, feature-free taxonomy embedding, because
+removing a leaf's parent edge removes the only training row that distinguishes its parent from that
+parent's siblings. Cite `docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md` §3 for why.
+
+**Additional evidence (2026-09-29):** `results/p2_verdict_20260929.json` (verdict `UNINFORMATIVE`,
+all 12 runs) · `helpers/_p2_peak_real_vs_control.py` · `helpers/_p2_curriculum_vs_collapse.py` ·
+`helpers/_p2_cosine_vs_poincare.py` · submodule `e04c478`.
+
+**Do not amend or re-run P2.** Read at each arm's own best epoch — a post-hoc reading, admissible
+only in the negative direction — the real tree does not beat its degree-matched control: mean delta
+**−0.0008** against pooled within-arm seed SD **0.00626**/**0.01056**, sign-changing across seeds.
+No schedule fix recovers a verdict, so GPU time spent here buys nothing.
+
+⚠ **Consequence for the paper's claims.** P2 was the designated answer to Burkhard's
+*"TaxEmbed: overfitting?"* (the headline S_angle 0.9726 is measured **in-sample**; a memorising model
+scores the same). That question now splits:
+- *Is the headline planted at initialization?* Answerable now, no GPU — see **C3** (depth-norm init
+  floor 0.957151 vs trained 0.957244) and the Task 9 Figure 4 re-plot onto S_angle, whose null is 0
+  by construction (canonical 0.9726 vs init null −0.0015).
+- *Does it generalise or memorise?* **Not answerable by any node holdout on this model class.** It
+  needs an inductive, feature-bearing probe — spec §P4, the pLM showcase, which is Burkhard's own
+  suggestion 1. Until that runs it is a **stated limitation**, not a result.
+  🛑 **UPDATED 2026-09-29 — see C10.** The P3 placement arm was built as the out-of-sample answer and
+  read `ANTICIPATES`; it has since been **withdrawn** — it measured candidate subtree size and never
+  tested the held-out taxon. So this bullet now holds more strongly than when written: **no NCBI
+  data of any vintage can answer it.** The remaining instruments are §4.5 TimeTree and §P4, and C10
+  records that P4 is currently losing to its own majority-class baseline.
+
+⚠ **Also from this run, for C-anything that quotes a chance floor:** `chance_mrr_mean` (0.2711)
+disagrees with the empirical untrained MRR (0.2457) by ~10 %, while `normalized_rank` sits on its 0.5
+floor exactly. Do not quote `chance_mrr_mean` as a floor until it is re-derived.
+
+---
+
+## C10 — the P3 placement arm measured subtree size; `ANTICIPATES` is withdrawn
+
+**Status:** UNCONDITIONAL — nothing about P3 may be written into the manuscript.
+**Evidence:** `results/p3_placement_preregistration.json` key **`p3_amendment_3_20260929`** (read
+this first; it is self-contained) · verdict `results/p3_placement_result_v2_20260929.json`
+(**UNINFORMATIVE**) · `docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md` **§4** ·
+`helpers/_p3_confound_diagnostics.py` · `_p3_combinatorial_baselines.py` ·
+`_p3_size_residual_control_v3.py`
+
+C8 closed by saying the generalisation question *"needs an inductive, feature-bearing probe"*. In the
+interim the **P3 placement arm** was built and read as `ANTICIPATES` (primary 0.4400, CI95
+[0.4214, 0.4588], n = 1,241, four gates passing) — the first apparent out-of-sample evidence. **It
+does not survive, for three independent reasons, and the verdict is withdrawn.**
+
+1. **It was never a held-out-taxon test.** Ranking the identical pool from `p_old` instead of from
+   the moved taxon `v` gives 0.4444; paired delta **−0.0044, CI95 [−0.0145, +0.0062]**, containing
+   zero. `p_old` alone delivers **92.7 %** of the effect. The moved taxon's own coordinate
+   contributes nothing measurable.
+2. **A one-line tree statistic beats it outright.** "Pick the largest candidate branch" scores
+   **0.3146** [0.2982, 0.3313] against the embedding's 0.4444; paired **+0.1298** [+0.1107, +0.1488].
+   NCBI moves taxa into big, actively curated groups.
+3. **Conditioned on subtree size, nothing remains.** Target residual against a calibration curve
+   `E[r_e | r_s]`: **−0.0031 / +0.0019 / +0.0076** at 10/20/40 bins, all CIs containing zero, sign
+   changing across binnings, both harness gates passing.
+   Subtree size accounts for **94 % / 103 % / 113 %** of the raw effect.
+
+⛔ **Do not quote `results/p3_placement_result_20260929.json`.** It is the superseded `ANTICIPATES`
+record, kept unedited on purpose (Rule 5: verdicts are append-only at the file level).
+
+**What the manuscript should say (final form only, if P3 is mentioned at all):** nothing. P3 produced
+no result. If a reviewer asks whether later NCBI releases were used as external validation, the
+honest answer is that they were, and the test was confounded by candidate subtree size — a statistic
+requiring no embedding.
+
+⚠ **The general lesson, and it constrains what may be attempted next.** Outside-the-tree information
+is **necessary but not sufficient** (Finding 4 §4.7): a label can be unseen and still be predictable
+from a cheap statistic of the training data. **Before any remaining protocol is run, name the
+cheapest statistic that could pass it, compute it on the same data, and report it beside the
+embedding.**
+- **§4.5 TimeTree already satisfies this by construction** — it specifies Spearman(embedded distance,
+  divergence time) *beside* Spearman(NCBI path length, divergence time). It is also the only
+  remaining instrument that can touch steelman (ii), *embedded distance tracks NCBI convention rather
+  than relatedness*, which no NCBI-internal test can refute — **and P3 was the last NCBI-internal
+  candidate.** The spec's standing instruction is *"Schedule it, or delete the relatedness claim."*
+- **§P4 is already failing this test** — C5 records the bridge at 0.6029 against a majority-class
+  baseline of 0.6448, and P4.2's three asymmetries all favour the embedding arm, so fixing them moves
+  it down. That comparison is not a formality; it is the same test P3 failed.
+
+⚠ **Recommendation, recorded so it is a decision and not a drift: do not spend GPU on the P3 strong
+variant** (train-on-T, score-on-T+1 across release pairs). It runs the same statistic on more pairs;
+the size confound applies identically and the size-conditioned residual is already zero on this pair.
+More pairs buys a distribution of nulls for queue wall-clock. Snapshots are on disk if this is
+revisited.
 
 ---
 
@@ -266,11 +361,54 @@ internal-node leak) and why RandomDAG needs chance normalisation — lives in
   named taxa, 76.0 % for `sp.`, **69.3 % for `bacterium/archaeon`** (after stripping "Candidatus ").
   So the unfiltered form is the least reliable one. Evidence:
   `SpeciesEmbedding/projects/unknown_unknowns/helpers/{taxembed_noise_crosscheck,ncbi_vs_gtdb_order_agreement}.py`.
-  ⚠ **NOT yet measured on TaxEmbed's own tree.** Owed first: count such leaves in
-  `cellular_canonical` (Bacteria 217k / Archaea 7k nodes). If material, add
-  `r"\b(?:bacterium|archaeon)\b"` to the noise list, rebuild, and state the pattern in Methods. A
-  retrain touches every cellular number, so decide with the USER before acting. Metazoa panels are
-  unaffected (the form is prokaryotic).
+  ✅ **MEASURED 2026-09-29 on TaxEmbed's own embedded set** — `helpers/_c9_placeholder_census.py`,
+  `results/c9_placeholder_census_20260929.json`, 1,025,217 embedded taxa located in the 2026-07-01
+  tree:
+
+  | domain | embedded | placeholder, UNFILTERED | already caught by the filter |
+  |---|---:|---:|---:|
+  | Bacteria | 200,712 | **88,108 (43.9 %)** | 201 (0.1 %) |
+  | Archaea | 6,667 | **3,209 (48.1 %)** | 25 (0.4 %) |
+  | Eukaryota | 817,837 | **0 (0.0 %)** | 234 (0.0 %) |
+
+  **44.0 % of embedded prokaryotes (91,317 of 207,379) carry the unfiltered form; that is 8.91 % of
+  the whole embedding.** The current filter reaches **226** prokaryote taxa — adding the pattern
+  would multiply its reach by **405×**. Eukaryota is exactly 0, confirming the form is purely
+  prokaryotic and that metazoan panels are unaffected. **C9's premise is confirmed and it is
+  material.**
+
+  🛑 **DECISION 2026-09-29: DO NOT RETRAIN for this paper. Disclose, and measure by MASKING AT
+  EVALUATION TIME instead.** Reasons, in order of weight:
+  1. **A retrain does not touch the paper's actual problem.** Finding 4 / C10 established that
+     TaxEmbed has no out-of-sample generalisation evidence at all. S_angle 0.9726 is in-sample and a
+     memorising model scores the same. A cleaner training set moves that number slightly and leaves
+     Burkhard's question exactly as unanswered.
+  2. **The question a retrain would answer can be answered without one.** Mask the 91,317 placeholder
+     taxa out of *scoring* and re-read S_angle on the shipped artifact — minutes of CPU, no GPU, no
+     re-plotting. If the headline barely moves, the whole issue is one Methods sentence. If it moves,
+     that is itself the finding, and it is reportable without retraining. **⛔ Owed: this run.**
+  3. ⚠ **The direction of a retrain is unfavourable to credibility.** Dropping 44 % of prokaryote
+     leaves removes low-information nodes sitting in big flat fans, which would most likely *raise*
+     S_angle. Reporting a better in-sample number bought by deleting the tautological cases is the
+     same species of error as P3's — improving a metric by changing what is measured. A referee asks
+     that question immediately.
+  4. **Cost and calendar.** `scripts/train_lrz.sh` requests `--time=48:00:00` on a depleted
+     fairshare, and a retrain invalidates every cellular number — all figures, C1–C10, the P2/P3
+     work. ERC StG is 14 Oct 2026.
+
+  **What Methods must say instead (no retrain):** the noise filter does not exclude the
+  `"<clade> bacterium|archaeon <id>"` form; such taxa are 43.9 % of Bacteria and 48.1 % of Archaea in
+  the embedded set (8.91 % overall) and their NCBI placement reflects the clade named by the
+  submitter rather than an independent placement. Report the masked-subset S_angle beside the full
+  one. ⚠ Carry C2's caveat separately: the shipped artifact predates the seeding fix and is **not**
+  seed-reproducible — that is also a disclosure, not a retrain trigger.
+
+  **Named triggers that WOULD justify a retrain** (recorded so a future session does not re-litigate
+  it): a reviewer demanding a seed-reproducible released artifact · the masking run showing the
+  headline is substantially carried by placeholder taxa **and** the paper's central claim resting on
+  that number · §4.5 TimeTree returning "tracks NCBI convention, not relatedness" **and** the
+  placeholder nodes being the suspected cause — in which case the retrain is a hypothesis test, not
+  a cleanup.
 - **P2 verdict READ 2026-09-29: `UNINFORMATIVE`** (`results/p2_verdict_20260929.json`, all four
   amendment flags, 9 score JSONs md5-verified against LRZ job `5815567`). All 12 runs fail gate (b),
   the floor, and all six `*vis00*` runs also fail gate (a), learning (MRR falls over training). No
