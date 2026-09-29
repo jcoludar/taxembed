@@ -256,3 +256,24 @@ internal-node leak) and why RandomDAG needs chance normalisation — lives in
   `heinzinger2024prostt5`.
 - Data-availability: Zenodo DOI (must include the parent/depth **edgelist** — the HF release lacks it
   and the bridge cannot run without it).
+- **C9 candidate (2026-09-29, from the UU cross-check; USER: "mark for it") — the `--clean` filter
+  misses the dominant PROKARYOTE placeholder form.** `taxopy_clade.py:26-33` catches `sp.`, `cf./aff./nr.`,
+  `environmental`, `uncultured`, `unidentified`, `hybrid`. It does **not** catch
+  `"<clade> bacterium|archaeon <id>"` (e.g. *Verrucomicrobiia bacterium DG1235*, *Thermoplasmatales
+  archaeon BRNA1*), whose NCBI placement is just the clade the submitter typed. Measured on the UU
+  all-cellular panel (5,962 proteomes, same new_taxdump release 2026-06-09): **3,144 of 4,820
+  prokaryotes** have this form vs 801 `sp.`-form; NCBI-vs-GTDB order agreement is 81.6 % for properly
+  named taxa, 76.0 % for `sp.`, **69.3 % for `bacterium/archaeon`** (after stripping "Candidatus ").
+  So the unfiltered form is the least reliable one. Evidence:
+  `SpeciesEmbedding/projects/unknown_unknowns/helpers/{taxembed_noise_crosscheck,ncbi_vs_gtdb_order_agreement}.py`.
+  ⚠ **NOT yet measured on TaxEmbed's own tree.** Owed first: count such leaves in
+  `cellular_canonical` (Bacteria 217k / Archaea 7k nodes). If material, add
+  `r"\b(?:bacterium|archaeon)\b"` to the noise list, rebuild, and state the pattern in Methods. A
+  retrain touches every cellular number, so decide with the USER before acting. Metazoa panels are
+  unaffected (the form is prokaryotic).
+- **P2 verdict READ 2026-09-29: `UNINFORMATIVE`** (`results/p2_verdict_20260929.json`, all four
+  amendment flags, 9 score JSONs md5-verified against LRZ job `5815567`). All 12 runs fail gate (b),
+  the floor, and all six `*vis00*` runs also fail gate (a), learning (MRR falls over training). No
+  direction may be read. ⚠ Descriptively, per-run MRR (0.18–0.23) sits **below** the arm's own
+  `chance_mrr_mean` (~0.27 real, ~0.32 degmatch). That needs a diagnosis (metric? candidate pool?
+  held-out node embeddings?) before any P2 sentence is written. Not rescued post hoc.
