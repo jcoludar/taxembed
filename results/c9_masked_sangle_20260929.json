@@ -1,0 +1,96 @@
+{
+  "purpose": "C9 masked S_angle; answers the retrain question without retraining",
+  "n_nodes": 1102163,
+  "n_placeholder": 91317,
+  "n_queries": 10000,
+  "k": 10,
+  "seed": 0,
+  "condition_A_split_by_query": {
+    "all": {
+      "n": 10000,
+      "S": 0.9653271964078118,
+      "se": 0.006858605458939184,
+      "by_band": {
+        "shallow": {
+          "n": 2256,
+          "S": 0.9413126884083226
+        },
+        "mid": {
+          "n": 5144,
+          "S": 0.9620903347887931
+        },
+        "deep": {
+          "n": 2600,
+          "S": 0.978247534551569
+        }
+      }
+    },
+    "placeholder": {
+      "n": 844,
+      "S": 0.9496749184206478,
+      "se": 0.007586694103022492,
+      "by_band": {
+        "shallow": {
+          "n": 844,
+          "S": 0.9496749184206478
+        },
+        "mid": {
+          "n": 0,
+          "S": null
+        },
+        "deep": {
+          "n": 0,
+          "S": null
+        }
+      }
+    },
+    "real": {
+      "n": 9156,
+      "S": 0.9656673558072607,
+      "se": 0.006821055182159511,
+      "by_band": {
+        "shallow": {
+          "n": 1412,
+          "S": 0.9391623439432975
+        },
+        "mid": {
+          "n": 5144,
+          "S": 0.9620903347887931
+        },
+        "deep": {
+          "n": 2600,
+          "S": 0.978247534551569
+        }
+      }
+    },
+    "gap_placeholder_minus_real": -0.015992437386612934
+  },
+  "condition_B_pool_masked": {
+    "n": 9156,
+    "S": 0.9659038566574012,
+    "se": 0.006337412929657536,
+    "by_band": {
+      "shallow": {
+        "n": 1412,
+        "S": 0.9419748090507832
+      },
+      "mid": {
+        "n": 5144,
+        "S": 0.9620884323462677
+      },
+      "deep": {
+        "n": 2600,
+        "S": 0.978247534551569
+      }
+    },
+    "n_nodes_after_prune": 1010858
+  },
+  "G1_init_null": {
+    "full": -0.0034771682054185924,
+    "pruned": -0.0022298761024423003,
+    "pass": true
+  },
+  "delta_masked_minus_real_same_queries": 0.00023650085014048638,
+  "verdict": "NOT CARRIED BY PLACEHOLDERS (|\u0394S| < 0.02)",
+  "limit": "Condition B masks at SCORING time only. The geometry was still FIT with the placeholder nodes present, so this bounds what a retrain could change at evaluation; it does not simulate a retrain."
+}

@@ -1,0 +1,8 @@
+{
+  "purpose": "can the C9 placeholder taxa be pruned as leaves for a masked S_angle re-score?",
+  "embedded_in_tree": 1025217,
+  "placeholder": 91317,
+  "placeholder_leaves": 91305,
+  "placeholder_with_children": 12,
+  "placeholder_leaf_pct": 99.99
+}

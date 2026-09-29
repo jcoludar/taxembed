@@ -387,14 +387,52 @@ revisited.
      taxa out of *scoring* and re-read S_angle on the shipped artifact — minutes of CPU, no GPU, no
      re-plotting. If the headline barely moves, the whole issue is one Methods sentence. If it moves,
      that is itself the finding, and it is reportable without retraining. **⛔ Owed: this run.**
-  3. ⚠ **The direction of a retrain is unfavourable to credibility.** Dropping 44 % of prokaryote
-     leaves removes low-information nodes sitting in big flat fans, which would most likely *raise*
-     S_angle. Reporting a better in-sample number bought by deleting the tautological cases is the
-     same species of error as P3's — improving a metric by changing what is measured. A referee asks
-     that question immediately.
+  3. ~~⚠ The direction of a retrain is unfavourable: dropping 44 % of prokaryote leaves removes
+     low-information nodes in big flat fans and would most likely *raise* S_angle.~~
+     🛑 **WITHDRAWN — this argument was WRONG, and the masking run below refutes it.** Masking moves
+     S_angle by **+0.0002**. The speculation was never needed; reason 2 said to measure it, and
+     measuring it replaced the guess with a number that supports the same decision far better.
+     Recorded rather than deleted, because a withdrawn argument of mine is exactly the kind of thing
+     that otherwise gets re-invented.
   4. **Cost and calendar.** `scripts/train_lrz.sh` requests `--time=48:00:00` on a depleted
      fairshare, and a retrain invalidates every cellular number — all figures, C1–C10, the P2/P3
      work. ERC StG is 14 Oct 2026.
+
+  ### C9 masking run — DONE 2026-09-29. The headline is NOT carried by placeholder taxa.
+
+  `helpers/_c9_masked_sangle.py` → `results/c9_masked_sangle_20260929.json`. Production settings
+  (n=10,000 queries, k=10, seed=0) on the shipped artifact and the closure it trained on. 91,305 of
+  91,317 placeholders are leaves (99.99 %), so pruning cannot orphan a subtree. **29 seconds, one
+  core, no GPU.**
+
+  | | S_angle | cluster se | n |
+  |---|---:|---:|---:|
+  | all queries | +0.9653 | 0.0069 | 10,000 |
+  | real queries, **full** pool | +0.9657 | 0.0068 | 9,156 |
+  | real queries, **masked** pool | **+0.9659** | 0.0063 | 9,156 |
+  | placeholder queries | +0.9497 | 0.0076 | 844 |
+
+  **ΔS (masked − full, same 9,156 queries) = +0.0002.** Per band: shallow +0.9392 → +0.9420
+  (+0.0028), mid and deep **identical** to four decimals. Even in the shallow band — where pruning
+  takes the depth-4 pool from 49,560 members to ~573 — the number does not move.
+
+  **GATE G1 PASSED:** the init null (random directions at planted radii) reads −0.0035 on the full
+  tree and −0.0022 on the pruned tree. Both ≈ 0, so the pruning did not break the tree, the depths
+  or the per-query bounds — which is what makes the masked condition trustworthy.
+
+  ⚠ **Two corrections to my own reading, both recorded rather than quietly fixed:**
+  - The headline "placeholder − real = −0.0160" is a **band-composition artifact**. *Every*
+    placeholder query is shallow (they live at depths 4–9), and shallow scores lower for everyone.
+    Band-matched, placeholder queries score **+0.0105 HIGHER** than real shallow queries
+    (0.9497 vs 0.9392) — the opposite sign, though within ~1.4 cluster SEs and not significant.
+    Comparing a shallow-only subset against an all-band average is exactly
+    [[feedback_two_numbers_are_comparable_only_if_their_definitions_are]].
+  - Reason 3 above predicted masking would *raise* S_angle. It does not. Withdrawn above.
+
+  ⚠ **Open discrepancy, flag before either number is quoted:** this run's all-query S_angle is
+  **0.9653**, against the manuscript headline **0.9726**. A 0.0073 gap, ~1 cluster SE, but it is
+  not yet explained — query seed, k, or the `radii` argument are the candidates. **Reconcile before
+  quoting either.**
 
   **What Methods must say instead (no retrain):** the noise filter does not exclude the
   `"<clade> bacterium|archaeon <id>"` form; such taxa are 43.9 % of Bacteria and 48.1 % of Archaea in
