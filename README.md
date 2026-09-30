@@ -1,498 +1,202 @@
-# Hierarchical Taxonomy Embeddings with Poincaré Geometry
+# TaxEmbed — one hyperbolic embedding for all named cellular life
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Status: Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)](https://github.com/jcoludar/taxembed)
+[![Embedding on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-taxembed--cellular-yellow)](https://huggingface.co/jcoludar/taxembed-cellular)
 
-**Learn hierarchical embeddings of NCBI's biological taxonomy in hyperbolic space.**
+TaxEmbed embeds the NCBI Taxonomy of cellular life, all **1,102,163 taxon identifiers** under
+"cellular organisms" (`new_taxdump` downloaded 2026-06-09), into a single **100-dimensional Poincaré
+ball**. The released tensor is a lookup: 100 numbers per taxon, fixed-size and differentiable.
 
-✅ **v10a architecture:** Euclidean Adam + radial nudge + tiered negatives + class-weighted loss
-📊 **Validated:** Echinodermata r=+0.990 (1.68x sep), Arthropoda 275K nodes (cleaned from 980K)
-📁 **Models:** `artifacts/tags/<tag>/` (run `taxembed train <clade> -as <tag>`)
-🧹 **NEW:** `--clean` flag removes NCBI taxonomy noise (sp., cf., environmental — 50-70% of nodes)
+- **Embedding (441 MB, Apache-2.0):** https://huggingface.co/jcoludar/taxembed-cellular, with the
+  taxid-to-row mapping, the parent-child edgelist, the training closure and a model card.
+- **Paper:** Koludarov I, Rost B. *TaxEmbed: one hyperbolic embedding for all named cellular life*
+  (2026, preprint to follow).
+- **This repository:** the trainer that produced the release, the evaluation code, and the audit
+  trail behind every number in the paper.
 
-This project began from the reference implementation of Poincaré embeddings (Nickel & Kiela, 2017; open-sourced by Facebook Research in 2018) and has since been **entirely reimplemented** for deep biological taxonomies (38 ranks, ~2.7M organisms). Where the original embeds lexical word hierarchies (WordNet nouns), we embed the **NCBI taxonomy** — millions of taxon IDs across the tree of life. No source code from the original implementation remains; see [NOTICE](NOTICE).
+In the geometry, **radius is taxonomic depth** (set by a schedule at initialization and held there by
+a radial nudge; the norm-depth correlation is +0.957 before the first gradient step and +0.957 after
+training) and **direction is learned lineage** (same-depth taxa are ordered by lineage at 0.965 on a
+radius-free criterion whose random expectation is 0). Half of a taxon's ten nearest embedded
+neighbours are among its ten nearest by tree path (precision@10 0.546, chance 0.005). Against
+TimeTree divergence times the angular distance correlates at +0.89 in vertebrates (NCBI path length
++0.79) and +0.30 in insects (path length +0.44): embedded distance is a taxonomic distance and should
+not be read as a molecular clock.
+
+The implementation began as a fork of the Poincaré-embeddings reference code (Nickel & Kiela, 2017;
+open-sourced by Facebook Research in 2018) and has been entirely rewritten; no source code from the
+original remains (see [NOTICE](NOTICE)).
 
 ---
 
-## ✨ Features
-
-- **Hyperbolic Geometry**: Embeddings in Poincaré ball model (ideal for hierarchies)
-- **Transitive Closure Training**: Ancestor-descendant pairs (not just parent-child)
-- **Depth-Aware Features**: Initialization, regularization, and weighting by taxonomic depth
-- **Hard Negative Sampling**: Cousin sampling at same depth level (vectorized for scale)
-- **Vectorized Negative Sampling**: Depth-grouped batch operations instead of per-sample loops
-- **Ball Constraint Enforcement**: Per-batch projection ensures 100% valid embeddings
-- **Radial Nudge**: Post-step norm correction preserves angular clustering while enforcing depth-radius mapping
-- **Dual UMAP Metrics**: Euclidean and Poincaré distance UMAP visualizations
-- **Curriculum Learning**: Optional shallow-pairs-first training for large trees
-- **Performance Optimized**: 1000x faster regularizer, selective projection
-- **Comprehensive Validation**: `analyze_hierarchy_hyperbolic.py` for depth-norm correlation and taxonomic separation
-
----
-
-## 🚀 Quick Start
-
-### **Trained Models** ⭐
-
-Models are stored in `artifacts/tags/<tag>/` with full metadata in `run.json`:
-
-| Tag | Clade | Nodes | Dim | Depth-Norm r | Class Sep | Status |
-|-----|-------|-------|-----|-------------|-----------|--------|
-| `echino_v9d` | Echinodermata | 7,833 | 10 | +0.990 | 1.68x | Production |
-| `echino_v4` | Echinodermata | 7,833 | 10 | +0.950 | 1.21x | Production |
-| `cnidaria_v10a` | Cnidaria | 5,145 | 20 | — | — | Complete |
-| `mammalia_v10a` | Mammalia | ~5,800 | 30 | — | — | Complete |
-| `mollusca_v11` | Mollusca | 53,720 | 100 | TBD | TBD | In progress |
-| `arthropoda_clean_v2` | Arthropoda | 275,651 | 200 | TBD | TBD | First clean run |
-
-Legacy model in `small_model_28epoch/` (92K organisms, pre-v4 architecture).
-
-### **Installation**
-
-```bash
-# Clone the repository
-git clone https://github.com/jcoludar/taxembed.git
-cd poincare-embeddings
-
-# Install with uv (recommended)
-make install
-# or: uv sync
-```
-
-After installation, the unified CLI is available:
-- `taxembed download` - Download NCBI taxdump into data/ (also auto-invoked by build/train when missing)
-- `taxembed build <clade>` (alias: `taxembed prepare`) - Build a clade's transitive-closure dataset
-- `taxembed train <clade> -as <tag>` - Train embeddings; auto-builds dataset if needed
-- `taxembed visualize <tag>` - Visualize results with automatic best checkpoint
-- `taxembed visualize <tag> --metric poincare` - Poincaré distance UMAP
-- `taxembed dim <clade>` - Recommend embedding dimensionality for a clade
-- `taxembed check` - Runtime smoke test (imports, columnar I/O, model forward+backward)
-
-### **Using Pre-trained Model**
+## Use the released embedding
 
 ```python
-import torch
-import pandas as pd
+import numpy as np, pandas as pd
+from safetensors.numpy import load_file
 
-# Load embeddings
-ckpt = torch.load('small_model_28epoch/taxonomy_model_small_best.pth')
-embeddings = ckpt['embeddings']  # Shape: (92290, 10)
+emb = load_file("cellular_embedding.safetensors")["embedding"]           # (1102163, 100) float32
+idx = pd.read_csv("taxid_to_index.tsv", sep="\t").set_index("taxid")["idx"]
 
-# Load TaxID mapping
-mapping = pd.read_csv('data/taxonomy_edges_small.mapping.tsv', 
-                      sep='\t', header=None, names=['idx', 'taxid'])
+def poincare_distance(u, v):
+    sq = np.sum((u - v) ** 2)
+    return np.arccosh(1 + 2 * sq / ((1 - u @ u) * (1 - v @ v)))
+
+def angular_distance(u, v):
+    """Lineage similarity lives in the direction; the radius is planted depth."""
+    return np.arccos(np.clip(u @ v / (np.linalg.norm(u) * np.linalg.norm(v)), -1.0, 1.0))
+
+h, m = emb[idx[9606]], emb[idx[10090]]                                     # Homo sapiens, Mus musculus
+print(poincare_distance(h, m), angular_distance(h, m), np.linalg.norm(h))
 ```
 
-### **Train New Model**
+The lineage structure that training determines is in the **direction** of each vector; the norm is
+set by depth through a fixed schedule. Compare taxa by the angle between their directions, or by
+Poincaré distance among taxa at the same depth. `edges_parent_child.tsv` (row indices) gives depths
+and tree-path distances without the taxdump; `training_closure.npz` holds all 21,399,053
+ancestor-descendant pairs the model was trained on. Names come from `names.dmp` of the same
+`new_taxdump` release; 7.0 % of rows are superseded taxids kept beside their replacement, and 8.3 %
+carry depositor placeholder binomials (details on the model card).
 
-**Using unified CLI** (recommended - easiest):
-```bash
-# Train any clade by name or TaxID (auto-builds dataset, downloads taxonomy if needed)
-# v10a defaults: Euclidean Adam + radial nudge (0.05) + lambda_reg 0.1 + euclidean param
-taxembed train Echinodermata -as echino_v4 --epochs 100 --euclidean-param
-taxembed train Cnidaria -as cnidaria_v10a --dim 20 --curriculum --euclidean-param --epochs 100
-
-# For large clades (>30K nodes), scale dim and use --clean to filter taxonomy noise:
-taxembed train Mollusca -as mollusca_v11 --clean --dim 100 --curriculum --tiered-negatives --euclidean-param --epochs 100
-
-# For very large clades (>100K nodes):
-taxembed train Arthropoda -as arthropoda_clean_v2 --clean --dim 200 --batch-size 128 --n-negatives 100 \
-    --curriculum --tiered-negatives --euclidean-param --epochs 100
-
-# Visualize results (automatically uses best checkpoint)
-taxembed visualize echino_v4 --children 2
-taxembed visualize echino_v4 --children 2 --metric poincare  # Poincaré distance UMAP
-
-# Analyze hierarchy quality
-python scripts/analyze_hierarchy_hyperbolic.py --tag echino_v4
-
-# All artifacts saved to artifacts/tags/<tag>/
-```
-
-
-### **Analyze Results**
+## Install
 
 ```bash
-# Check hierarchy quality
-python scripts/analyze_hierarchy_hyperbolic.py
-
-# Visualize embeddings (use the unified CLI)
-taxembed visualize <tag> --metric poincare
+git clone https://github.com/jcoludar/taxembed.git
+cd taxembed
+uv sync                      # Python 3.11+, PyTorch; or: make install
+uv run taxembed check        # imports, columnar I/O, model forward+backward
 ```
+
+The `taxembed` CLI: `download` (NCBI taxdump into `data/`), `build <clade> [--clean]` (a clade's
+transitive-closure dataset), `train <clade> -as <tag>`, `visualize <tag>`, `dim <clade>`, `check`.
+Reference: [docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md), [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
 ---
 
-## 📊 What's Different from the Original Poincaré-Embedding Method?
+## Reproduce the training run
 
-The original method (Nickel & Kiela, 2017) embeds lexical hierarchies (WordNet); this project is a from-scratch
-reimplementation targeting the NCBI taxonomy. Key differences:
-
-| Feature | Original (Nickel & Kiela 2017) | This Project (v10a) |
-|---------|----------|-------------------|
-| **Training Data** | Parent-child only | All ancestor-descendant pairs (transitive closure) |
-| **Optimizer** | SGD | Euclidean Adam (preserves angular gradients) |
-| **Initialization** | Random | Depth-aware (root near center, leaves near boundary) |
-| **Regularization** | None | Radial penalty + post-step radial nudge (norm-only correction) |
-| **Negative Sampling** | Random | Hard negatives (cousins at same taxonomic level) |
-| **Loss Weighting** | Uniform | Depth-weighted (deeper pairs more important) |
-| **Ball Constraints** | Soft projection | Per-batch unconditional projection (100% compliance) |
-| **Visualization** | None | UMAP with Euclidean or Poincaré distance metric |
-| **Performance** | Baseline | 1000x faster regularizer, selective projection |
-
----
-
-## 📁 Project Structure
-
-```
-poincare-embeddings/
-├── README.md                       # This file
-├── pyproject.toml                  # Package config + ruff + pytest
-├── Makefile                        # Common tasks (install, test, lint)
-├── Dockerfile                      # Container deployment
-│
-├── train_hierarchical.py           # Core: model, dataloader, loss, vectorized sampling
-├── train_small.py                  # Training orchestrator (called by CLI)
-├── visualize_multi_groups.py       # UMAP visualization (called by CLI)
-├── build_transitive_closure.py     # Transitive closure builder (CLI dep)
-├── prepare_taxonomy_data.py        # NCBI taxonomy downloader (CLI dep)
-├── final_sanity_check.py           # Validation checks (CLI dep)
-│
-├── src/taxembed/                   # Installable package
-│   ├── cli/                        # Unified `taxembed` CLI
-│   ├── analysis/                   # Dimension analysis
-│   ├── builders/                   # TaxoPy clade dataset builder
-│   ├── optim/                      # Riemannian optimizer
-│   └── utils/                      # Data validation
-│
-├── scripts/                        # Standalone tools
-│   ├── analyze_hierarchy_hyperbolic.py  # Post-training quality analysis
-│   ├── build_clade_dataset.py      # Standalone clade dataset builder
-│   ├── validate_data.py            # Data validation utility
-│   └── train_lrz.sh               # HPC/Slurm training script
-│
-├── tests/                          # Test suite
-├── data/                           # Data files (gitignored)
-├── artifacts/                      # Trained models (gitignored)
-│
-└── docs/                           # Documentation
-    ├── QUICKSTART.md               # 5-minute guide
-    ├── JOURNEY.md                  # Development history
-    ├── CLI_COMMANDS.md             # CLI reference
-    ├── TRAIN_*_GUIDE.md            # Training guides
-    └── archive/                    # Historical dev docs + legacy code
-```
-
----
-
-## 🎯 Current Status (v10a — February 2026)
-
-### **Architecture (v10a)**
-The v10a architecture combines Euclidean Adam (proven angular clustering) with a post-step **radial nudge**, **tiered negative sampling**, and **class-weighted loss**. This achieves both angular class separation AND radial hierarchy simultaneously.
-
-Key components:
-- **Euclidean Adam optimizer** — preserves angular gradients (unlike RiemannianAdam which crushes boundary gradients via conformal factor)
-- **Radial nudge** (`--radial-nudge 0.05`) — after each batch, nudges norms toward depth-based targets: `new_norm = (1 - α) * norm + α * target_norm`
-- **Tiered negative sampling** (`--tiered-negatives`) — 50% hard (cousins), 30% medium (same class), 20% easy
-- **Vectorized sampling** — depth-grouped batch operations, O(unique_depths) instead of O(batch_size)
-- **Per-batch projection** — unconditionally projects embeddings back into the Poincaré ball
-- **λ_reg = 0.1** — full regularization strength (no auto-reduction)
-
-### **Results**
-
-| Clade | Nodes | Dim | Depth-Norm r | Class Sep | Status |
-|-------|-------|-----|-------------|-----------|--------|
-| Echinodermata (v9d) | 7,833 | 10 | +0.990 | 1.68x (STRONG) | ✅ Excellent |
-| Echinodermata (v4) | 7,833 | 10 | +0.950 | 1.21x (MODERATE) | ✅ Good |
-| Cnidaria (v10a) | 5,145 | 20 | — | — | ✅ Complete |
-| Mammalia (v10a) | ~5,800 | 30 | — | — | ✅ Complete |
-| Mollusca (v11) | 53,720 | 100 | TBD | TBD | ⚠️ In progress |
-| Arthropoda (clean_v2) | 275,651 | 200 | TBD | TBD | ⚠️ First run |
-
-### **What Works ✅**
-- ✅ Depth-norm correlation consistently positive (+0.65 to +0.99)
-- ✅ Clear UMAP clustering visible for major taxonomic groups
-- ✅ Both Euclidean and Poincaré distance UMAP supported
-- ✅ Unified CLI (`taxembed train/visualize/build`) with automatic dataset building
-- ✅ Full metadata tracking in `run.json` per tag
-- ✅ Curriculum learning for large trees
-- ✅ `--clean` taxonomy noise filtering (removes 50-70% of junk nodes)
-- ✅ Euclidean parametrization eliminates boundary gradient vanishing
-- ✅ MPS device support (works, though ~1.0x speedup)
-
-### **What Needs Work ⚠️**
-- ⚠️ Arthropoda needs extended training (only 1 epoch so far)
-- ⚠️ Imbalanced trees (e.g., Gastropoda = 70% of Mollusca) reduce class separation
-- ⚠️ Default dim=10 only suitable for <10K nodes; scale dim with clade size
-
----
-
-## 🔧 Key Scripts
-
-### **Training**
-```bash
-# Recommended: use the unified CLI
-taxembed train Echinodermata -as echino_v10 --epochs 100 --tiered-negatives
-
-# Or directly:
-python train_hierarchical.py --help
-```
-
-### **Analysis**
-```bash
-# Validate data quality
-python final_sanity_check.py
-
-# Check hierarchy quality
-python scripts/analyze_hierarchy_hyperbolic.py --tag echino_v10
-```
-
-### **Data Preparation**
-```bash
-# Download NCBI taxonomy
-python prepare_taxonomy_data.py
-
-# Build transitive closure
-python build_transitive_closure.py
-
-# Validate data
-python scripts/validate_data.py small
-```
-
-### **Unified CLI: Train & Visualize Any Clade**
-
-The `taxembed` command provides a streamlined workflow:
+The released tensor was trained with one recipe: a Euclidean tangent parametrization of the ball, a
+softmax objective over 300 sampled negatives, a four-stage depth curriculum, a radial nudge toward a
+log depth schedule, and an effective batch of 2,048 (256 × 8) at 10^5 taxa and above. The Slurm
+script that ran it is [`scripts/train_lrz_cellular_canonical.sh`](scripts/train_lrz_cellular_canonical.sh);
+the same flags through the CLI:
 
 ```bash
-# Train any clade by name or TaxID (auto-builds dataset, downloads taxonomy if needed)
-# v4 defaults: optimizer=adam, radial-nudge=0.05, lambda-reg=0.1, dim=10
-taxembed train Echinodermata -as echino_v4 --epochs 100
-taxembed train Mollusca -as mollusca_v4 --epochs 100
-
-# For large clades (>30K nodes), scale up:
-taxembed train Mollusca -as mollusca_v5 --dim 20 --curriculum --n-negatives 100 --epochs 200
-
-# Visualize results (automatically uses best checkpoint for the tag)
-taxembed visualize echino_v4 --children 2
-taxembed visualize echino_v4 --children 2 --metric poincare  # Poincaré distance UMAP
-
-# Analyze hierarchy quality
-python scripts/analyze_hierarchy_hyperbolic.py --tag echino_v4
-
-# All artifacts saved to artifacts/tags/<tag>/
-# - run.json: metadata (config, paths, dataset info)
-# - <tag>.pth: checkpoints
-# - <tag>_best.pth: best checkpoint
-# - <tag>_umap.png: visualizations
+uv run taxembed build 131567 --clean            # 2.6M raw nodes -> 1,102,163 clean, 21.4M pairs
+uv run taxembed train \
+    --file    data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean_transitive.npz \
+    --mapping data/taxopy/cellular_organisms_131567_clean/taxonomy_edges_cellular_organisms_131567_clean.mapping.tsv \
+    -as cellular_canonical --dim 100 --epochs 200 --seed 0 \
+    --batch-size 256 --grad-accum-steps 8 --n-negatives 300 --lr 0.001 \
+    --lr-schedule cosine_warmrestart --warm-restart-on-phase --lr-min-multiplier 0.01 \
+    --curriculum --curriculum-phases auto --epoch-fraction 0.3 \
+    --radial-nudge 0.05 --radial-schedule log --depth-scale-margin --margin-min 0.05 --margin-max 1.0 \
+    --euclidean-param --loss softmax --early-stopping 999 --amp --gpu 0 --save-every 10
 ```
 
-**Features:**
-- **Automatic dataset building**: Uses [TaxoPy](https://pypi.org/project/taxopy/) to query NCBI taxonomy and build datasets on-the-fly
-- **Smart checkpoint selection**: Visualization automatically uses the best checkpoint for each tag
-- **Hierarchical coloring**: `--children` flag controls depth (0=children, 1=grandchildren, 2=great-grandchildren, etc.)
-- **Dual UMAP metrics**: `--metric euclidean` (default) or `--metric poincare` for hyperbolic distance
-- **Radial nudge**: `--radial-nudge 0.05` (default) gently enforces depth-radius mapping without disturbing angular structure
-- **Curriculum learning**: `--curriculum` teaches shallow pairs first, then progressively deeper
-- **Informative titles**: Plots show clade name, children level, epochs, and loss
-- **Organized artifacts**: All outputs stored in `artifacts/tags/<tag>/` with full metadata
+Wall-clock on one V100 (Slurm accounting): 25.5 h at 1,102,163 taxa, 20.5 h at 877,584 (Eukaryota),
+10.5 to 11 h at 498,246 (Metazoa). Use the final checkpoint: angular structure keeps improving after
+the loss plateaus. A reduced-budget configuration of the same objective (batch 512, 100 negatives,
+lr 5×10^-3, constant schedule) collapsed at 498,246 taxa (lineage ordering 0.619 vs 0.973, three seeds
+each); the job scripts for that contrast are `scripts/task9_lrz_recipe_contrast*.sh`.
 
-**Advanced usage:**
+Two things to know before training. `--seed` was added after the release, so the released tensor is
+not seed-reproducible (a repeated CPU run of the current code reproduces its loss exactly). The
+negative sampler draws from the descendant's depth without excluding the anchor's own descendants:
+47.4 % of draws are false negatives on the cellular closure (`src/taxembed/eval/sampler_audit.py`);
+the guarded sampler (`--exclude-descendant-negatives`, plan v2 Task 6) did not converge in three
+seeded runs, so its effect on a converged model is open.
+
+---
+
+## Repository layout
+
+```
+taxembed/
+├── train_hierarchical.py        # model, Poincaré distance, losses, negative sampling (trainer core)
+├── train_small.py               # training orchestrator called by the CLI
+├── build_transitive_closure.py  # closure builder
+├── src/taxembed/
+│   ├── cli/                     # the `taxembed` command
+│   ├── builders/                # taxopy clade dataset builder (the --clean filter lives here)
+│   ├── eval/                    # angular.py (S_angle), radial.py (init floor), sampler_audit.py,
+│   │                            #   treedist.py, fidelity.py, bootstrap.py, linkpred.py, nulls.py, ...
+│   ├── optim/                   # Riemannian Adam (not used by the release)
+│   └── bridge/                  # ProtT5 -> taxonomy bridge (separate follow-up; not in the paper)
+├── scripts/                     # Slurm job scripts (LRZ), scorers, figure-data extractors
+├── helpers/                     # dated one-off analyses; each names the JSON it wrote
+├── results/                     # every number in the paper has a JSON here
+├── docs/                        # specs, plans, findings, the corrections ledger
+├── tests/                       # pytest suite
+├── data/, artifacts/            # gitignored: taxdumps, closures, checkpoints
+└── release/                     # gitignored bundle mirrored on Hugging Face
+```
+
+---
+
+## Evaluate
+
+| What | Where |
+|---|---|
+| Lineage ordering *S*_angle (radius-free; random directions score 0) and its initialization null | `src/taxembed/eval/angular.py`; driver `scripts/score_recipe_checkpoints.py` |
+| Norm-depth correlation and its initialization floor | `src/taxembed/eval/radial.py`, `scripts/radial_init_floor.py` |
+| Tree-neighbour precision@k with taxon-level block bootstrap | `scripts/cophenetic_fidelity.py`; `src/taxembed/eval/{treedist,fidelity,bootstrap}.py` |
+| Divergence-time comparison against TimeTree (pre-registered, frozen SHA256) | `helpers/_timetree_*.py`, `results/timetree_*.json` |
+| Negative-sampler false-negative audit (closed form over the closure) | `src/taxembed/eval/sampler_audit.py` |
+| Per-rank kNN purity and separation (descriptive; they inherit the radial schedule) | `scripts/analyze_hierarchy_hyperbolic.py`, `scripts/knn_purity_hyperbolic.py` |
+| Superseded-taxid and placeholder census of the closure; per-domain counts; query cost | `helpers/_closure_taxid_drift_20260930.py`, `helpers/_owed_numbers_20260930.py` |
+
+## Audit trail
+
+- [`docs/MANUSCRIPT_CORRECTIONS_PENDING.md`](docs/MANUSCRIPT_CORRECTIONS_PENDING.md): the ledger of
+  every correction the objective-integrity review forced (C1 to C14), each with its evidence file.
+- [`docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md`](docs/FINDING_protocols_that_are_vacuous_on_taxonomy_trees.md):
+  why held-out link prediction and RandomDAG controls cannot test generalisation for this model class.
+- `docs/specs/`, `docs/plans/`: the pre-registrations and their amendments; `results/*_preregistration.json`
+  carry the frozen hashes.
+
+## Tests
+
 ```bash
-# Use pre-built dataset files
-taxembed train --file data/my_transitive.pkl --mapping data/my.mapping.tsv -as custom_tag
-
-# Override visualization settings
-taxembed visualize echino_v4 --sample 15000 --output custom_plot.png --root-taxid 7586
-
-# Use Riemannian Adam (alternative optimizer, good radial hierarchy but weaker angular clustering)
-taxembed train Cnidaria -as cnidaria_radam --optimizer radam --burnin 10
+uv run pytest            # 396 passed (2026-09-30)
 ```
 
-### **Build Custom Clade Datasets (Standalone)**
-```bash
-# Example: build the Metazoa (animals) subset with automatic mapping
-uv run python scripts/build_clade_dataset.py \
-    --root-taxid 33208 \
-    --dataset-name animals
-```
-
-This leverages [TaxoPy](https://pypi.org/project/taxopy/) to:
-- Query NCBI taxonomy for all descendants of the requested root
-- Emit raw and remapped edgelists (`data/taxopy/<name>/taxonomy_edges_<name>.edgelist`)
-- Write mapping + manifest files for reproducible provenance
-- Generate transitive-closure datasets ready for `train_small.py`
-
-Use `--max-depth` to truncate deep subtrees or point `--taxdump-dir` at an alternate taxonomy download.
+The suite under `tests/` covers the trainer, the samplers and the evaluation modules. The bridge
+suite under `src/taxembed/bridge/` is not collected by default.
 
 ---
 
-## 📖 Documentation
+## Contributing
 
-- **[QUICKSTART.md](docs/QUICKSTART.md)** - Get started in 5 minutes
-- **[JOURNEY.md](JOURNEY.md)** - Full development history (from the original reference code to the current reimplementation)
-- **[SESSION_SUMMARY_NOV8.md](SESSION_SUMMARY_NOV8.md)** - Latest session summary with findings
-- **[docs/archive/](docs/archive/)** - Intermediate development documents
+Issues and pull requests: https://github.com/jcoludar/taxembed/issues. Open directions: a
+Euclidean-distance arm in the trainer for a matched-geometry control at full scale (the small-scale
+sweep is in the paper's Supplementary Table S3), low-dimensional releases (d = 8 to 16), and
+inductive placement of taxa the taxonomy has not yet named.
 
----
+## References
 
-## 🧪 Validation
+- Nickel M, Kiela D (2017). Poincaré embeddings for learning hierarchical representations. NeurIPS. https://arxiv.org/abs/1705.08039
+- Nickel M, Kiela D (2018). Learning continuous hierarchies in the Lorentz model of hyperbolic geometry. ICML. https://arxiv.org/abs/1806.03417
+- Reference implementation (Facebook Research, 2018): https://github.com/facebookresearch/poincare-embeddings
+- NCBI Taxonomy: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/ and https://www.ncbi.nlm.nih.gov/taxonomy
+- Kumar S et al. (2022). TimeTree 5. Mol Biol Evol 39:msac174.
 
-Before training, run the comprehensive sanity check:
+## License
 
-```bash
-python final_sanity_check.py
-```
-
-This validates:
-- ✅ Mapping file integrity (no duplicates, continuous indices)
-- ✅ Transitive closure data (valid indices, no self-loops)
-- ✅ Projection logic (keeps embeddings in ball)
-- ✅ Hyperbolic distance (correct formula)
-- ✅ Initialization (proper depth-based radii)
-- ✅ Sibling map (hard negatives at same depth)
-- ✅ Regularizer targets (all < 1.0)
-- ✅ Training configuration (reasonable batch sizes)
-
-**Expected: 10/10 checks passed**
-
----
-
-## 📈 Performance
-
-### **Optimizations Applied**
-- **Regularizer**: Vectorized (1000x faster, 1.7B → 111K ops/epoch)
-- **Projection**: Selective + deferred (every 50 batches instead of every batch)
-- **Tensor Creation**: Pre-allocated arrays (10-100x faster)
-- **Fused Batch Transfer**: Single device transfer per batch (reduces GPU/MPS sync)
-- **Taxonomy Cleanup**: `--clean` removes 50-70% of nodes (unnamed species, stale taxids, etc.)
-- **Device**: CPU, CUDA, or MPS (MPS works but ~1.0x speedup due to batch-granular sync)
-
-### **Training Speed (M3 Mac CPU)**
-- Echinodermata (7.8K nodes, dim=10): ~30 sec/epoch
-- Mollusca (53.7K nodes, dim=100): ~5 min/epoch
-- Arthropoda clean (275K nodes, dim=200): ~5 min/epoch
-- Arthropoda unfiltered (980K nodes): ~15 min/epoch (estimated)
-
----
-
-## 🔬 Experimental History
-
-### **Architecture Evolution**
-| Version | Optimizer | Radial Control | Depth-Norm r | Angular Clustering |
-|---------|-----------|----------------|-------------|-------------------|
-| v1-v2 | Euclidean Adam | Regularizer only | -0.074 | 0.65 (good) |
-| v3 | RiemannianAdam | Conformal factor | +0.936 | 0.065 (destroyed) |
-| v4 | Euclidean Adam + radial nudge | Nudge + regularizer | +0.950 | Visible UMAP clusters |
-| **v9d/v10a** | **Eucl. Adam + nudge + tiered negs** | **Nudge + reg + class weight** | **+0.990** | **1.68x class sep** |
-
-**Key insight:** RiemannianAdam's conformal factor `((1-||p||²)²/4)` gives 110x gradient reduction at norm 0.9, crushing angular gradients for deep nodes. The v4 radial nudge achieves the same radial ordering without touching directions.
-
-### **Scaling Analysis (v4)**
-| Metric | Echinodermata (7.8K) | Mollusca (53.7K) | Ratio |
-|--------|---------------------|------------------|-------|
-| Nodes/dim | 783 | 5,372 | 6.9x |
-| Pairs/node | 8.6 | 9.0 | ~same |
-| Updates/node (total) | ~948 | ~287 | 0.30x |
-| Best loss | 0.169 | 0.295 | 1.75x |
-| Depth-norm r | +0.950 | +0.650 | 0.68x |
-
-**Conclusion:** Larger clades need proportionally more capacity (dim) and training (epochs/lr). The default dim=10 is optimal for ~10K nodes but insufficient for 50K+.
-
----
-
-## 🚧 Known Issues & Next Steps
-
-### **Current Limitations**
-1. **Large-clade scaling** — Default dim=10 insufficient for >30K nodes (Mollusca: 5,372 nodes/dim)
-2. **Class imbalance** — Dominant subclades (e.g., Gastropoda = 70%) consume angular space
-3. **Undertrained large models** — Early stopping triggers before sufficient updates/node for large trees
-
-### **Next Run: Mollusca v5 (Earmarked)**
-```bash
-# Retrain Mollusca with tuned hyperparameters for large clades
-VIRTUAL_ENV= uv run taxembed train Mollusca -as mollusca_v5 \
-    --dim 20 \
-    --curriculum \
-    --n-negatives 100 \
-    --epochs 200 \
-    --early-stopping 25
-
-# Then analyze and visualize
-VIRTUAL_ENV= uv run python scripts/analyze_hierarchy_hyperbolic.py --tag mollusca_v5
-VIRTUAL_ENV= uv run taxembed visualize mollusca_v5 --children 2
-VIRTUAL_ENV= uv run taxembed visualize mollusca_v5 --children 2 --metric poincare
-```
-
-**Rationale:**
-- `--dim 20`: Doubles capacity from 5,372 to 2,686 nodes/dim (closer to Echinodermata's 783)
-- `--curriculum`: Teaches shallow structure first, critical for large trees with deep hierarchies
-- `--n-negatives 100`: Stronger gradient signal per batch (2x default)
-- `--epochs 200 --early-stopping 25`: More room to converge before plateau detection
-
-### **Future Directions**
-1. Adaptive dimensionality heuristic based on node count
-2. Learning rate scheduling (warmup + cosine decay) instead of fixed lr
-3. Class-balanced negative sampling to counteract dominant subtrees
-4. Multi-scale evaluation: per-rank separation metrics at every level
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue or pull request.
-
-### **Priority Areas**
-- Hyperparameter tuning for better hierarchy quality
-- Balanced/curriculum sampling strategies
-- Alternative hyperbolic models (Lorentz, Klein)
-- Evaluation metrics for taxonomic hierarchies
-- Scalability to full 2.7M organism dataset
-
----
-
-## 📚 References
-
-### **Original Method**
-- Nickel & Kiela (2017). "Poincaré Embeddings for Learning Hierarchical Representations." NeurIPS 2017. [[PDF](https://arxiv.org/abs/1705.08039)]
-- Nickel & Kiela (2018). "Learning Continuous Hierarchies in the Lorentz Model of Hyperbolic Geometry." ICML 2018. [[PDF](https://arxiv.org/abs/1806.03417)]
-- Reference implementation (open-sourced by Facebook Research, 2018): [[GitHub](https://github.com/facebookresearch/poincare-embeddings)] — this project was originally forked from it and has since been fully reimplemented (see [NOTICE](NOTICE)).
-
-### **Data**
-- NCBI Taxonomy: https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
-- Taxonomy documentation: https://www.ncbi.nlm.nih.gov/taxonomy
-
-### **Related Work**
-- Hyperbolic Neural Networks
-- Lorentz Embeddings
-- Box Embeddings for Hierarchies
-
----
-
-## 📜 License
-
-**Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE). This project was originally forked from
+Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE). This project was originally forked from
 `facebookresearch/poincare-embeddings` (CC BY-NC 4.0); it has since been fully reimplemented and contains none of
 the original source, so the current code is released under Apache-2.0. The original method is credited to
 Nickel & Kiela (2017).
 
----
+## Citation
 
-## 👥 Authors
+```
+Koludarov I, Rost B. TaxEmbed: one hyperbolic embedding for all named cellular life. 2026. Preprint.
+Code: https://github.com/jcoludar/taxembed
+Embedding: https://huggingface.co/jcoludar/taxembed-cellular
+```
 
-- Method originally introduced by Nickel & Kiela (2017); our codebase began as a fork of their reference implementation and has since been fully reimplemented for taxonomy
-- Extended for hierarchical taxonomy by @jcoludar
-- Development history in [JOURNEY.md](JOURNEY.md)
+Development history: [docs/JOURNEY.md](docs/JOURNEY.md).
 
----
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/jcoludar/taxembed/issues)
-- **Documentation**: See [JOURNEY.md](JOURNEY.md) and [docs/](docs/)
-- **Quick Help**: See [QUICKSTART.md](QUICKSTART.md)
-
----
-
-**⭐ If you find this useful, please star the repository!**
-
-*Last Updated: February 2026*
+*Last updated: 2026-09-30*

@@ -1,0 +1,97 @@
+{
+  "purpose": "owed numbers for the TaxEmbed manuscript, computed on the training closure",
+  "closure": "data/taxopy/cellular_organisms_131567_clean",
+  "mapping_md5": "a8ef06b048e03613230a0a14908f515e",
+  "embedding": "release/taxembed-cellular-v1/cellular_embedding.safetensors",
+  "training_taxdump": "data/new_taxdump.tar.gz",
+  "later_snapshot": "data/taxdump_archive_2026-07-01",
+  "hardware": {
+    "machine": "arm64",
+    "processor": "arm",
+    "python": "3.13.2",
+    "numpy": "1.26.4"
+  },
+  "closure_nodes": 1102163,
+  "closure_edges": 1102162,
+  "max_depth": 40,
+  "mean_depth": 19.415506599296112,
+  "per_domain": {
+    "Bacteria": 216507,
+    "Archaea": 7131,
+    "Eukaryota": 878524,
+    "root": 1,
+    "sum": 1102163,
+    "pct": {
+      "Bacteria": 19.644,
+      "Archaea": 0.647,
+      "Eukaryota": 79.709
+    }
+  },
+  "placeholder_census": {
+    "Bacteria": {
+      "nodes": 216507,
+      "placeholder": 88118,
+      "placeholder_pct": 40.7,
+      "already_caught_by_filter": 199,
+      "unresolved_name": 15783
+    },
+    "Archaea": {
+      "nodes": 7131,
+      "placeholder": 3209,
+      "placeholder_pct": 45.001,
+      "already_caught_by_filter": 25,
+      "unresolved_name": 464
+    },
+    "Eukaryota": {
+      "nodes": 878524,
+      "placeholder": 0,
+      "placeholder_pct": 0.0,
+      "already_caught_by_filter": 234,
+      "unresolved_name": 60519
+    },
+    "total_placeholder": 91327,
+    "share_of_closure_pct": 8.286,
+    "names_resolved": 1025397
+  },
+  "later_snapshot_drift": {
+    "closure_taxids_absent_from_later_nodes_dmp": 76946,
+    "in_merged": 76939,
+    "in_delnodes": 7,
+    "note": "regen_analysis_20260721 reported n_taxonomy_nodes 1,102,149 = 14 fewer than the closure; that analysis rebuilt its taxonomy from the taxdump current on 2026-07-21, not from the closure. This block measures the same drift against the nearest later snapshot on disk (2026-07-01).",
+    "example_missing_taxids": [
+      12,
+      30,
+      36,
+      37,
+      46,
+      67,
+      76,
+      77,
+      79,
+      80,
+      90,
+      91,
+      111,
+      121,
+      129,
+      130,
+      177,
+      219,
+      229,
+      230
+    ]
+  },
+  "query_cost": {
+    "n_pairs_vectorised": 1000000,
+    "n_pairs_single_call": 20000,
+    "embedding_vectorised_us_per_pair": 1.06,
+    "tree_vectorised_us_per_pair": 3.838,
+    "embedding_single_call_us_per_pair": 8.578,
+    "tree_single_call_us_per_pair": 10.789,
+    "mean_path_length_random_pairs": 32.120681,
+    "mean_poincare_distance_random_pairs": 3.5882601737976074,
+    "embedding_dim": 100,
+    "note": "One core, numpy, released F32 tensor in RAM. Vectorised = one call over all pairs; single-call = a Python call per pair. The tree walk is on the closure's own parent array with precomputed depths, i.e. the cheapest traversal, not a taxdump parse. Ratios are hardware-specific; the fixed-size vs depth-dependent shape is not."
+  },
+  "wall_seconds": 22.5
+}

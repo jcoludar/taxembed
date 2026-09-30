@@ -1,0 +1,98 @@
+{
+  "purpose": "closure taxids vs the tarball on disk; merge targets; placeholder census, one denominator",
+  "closure_nodes": 1102163,
+  "tarball": "data/new_taxdump.tar.gz",
+  "tarball_nodes": 2840145,
+  "closure_taxids_absent_from_tarball_nodes": 76766,
+  "of_which_in_tarball_merged": 76766,
+  "merge_targets_in_closure_via_2026_07_01": 76764,
+  "merge_targets_in_closure_via_tarball": 76766,
+  "leaves_among_missing": 76766,
+  "alias_geometry": {
+    "alias_pairs_both_in_closure": 76766,
+    "same_parent_in_closure": 76766,
+    "cos_alias_to_target_median": 0.9984487295150757,
+    "cos_alias_to_target_mean": 0.9877690672874451,
+    "cos_alias_to_random_sibling_of_target_median": 0.9984138607978821,
+    "cos_alias_to_random_sibling_of_target_mean": 0.9887531995773315,
+    "n_with_sibling_control": 72395,
+    "cos_alias_to_random_node_median": -0.005557226948440075,
+    "note": "An alias (old, merged taxid) and its target were both nodes of the training tree with the same parent, so they are trained as siblings. If the alias is no nearer its target than another sibling, it is a second, independent point for the same organism, not a copy."
+  },
+  "census_one_denominator": {
+    "Bacteria": {
+      "nodes": 216507,
+      "placeholder": 88659,
+      "placeholder_pct": 40.95,
+      "already_caught_by_filter": 199,
+      "unresolved_name": 0
+    },
+    "Archaea": {
+      "nodes": 7131,
+      "placeholder": 3283,
+      "placeholder_pct": 46.04,
+      "already_caught_by_filter": 25,
+      "unresolved_name": 0
+    },
+    "Eukaryota": {
+      "nodes": 878524,
+      "placeholder": 0,
+      "placeholder_pct": 0.0,
+      "already_caught_by_filter": 249,
+      "unresolved_name": 0
+    },
+    "total_placeholder": 91942,
+    "share_of_closure_pct": 8.342,
+    "names_unresolved_after_fill": 0
+  },
+  "examples": [
+    {
+      "taxid": 12,
+      "name": "Photobacterium profundum",
+      "merged_into_2026_07_01": 74109,
+      "in_tarball_merged": 74109
+    },
+    {
+      "taxid": 30,
+      "name": "Myxococcales",
+      "merged_into_2026_07_01": 29,
+      "in_tarball_merged": 29
+    },
+    {
+      "taxid": 36,
+      "name": "Corallococcus coralloides",
+      "merged_into_2026_07_01": 184914,
+      "in_tarball_merged": 184914
+    },
+    {
+      "taxid": 37,
+      "name": "Cystobacter",
+      "merged_into_2026_07_01": 42,
+      "in_tarball_merged": 42
+    },
+    {
+      "taxid": 46,
+      "name": "Archangiaceae",
+      "merged_into_2026_07_01": 39,
+      "in_tarball_merged": 39
+    },
+    {
+      "taxid": 67,
+      "name": "Lysobacteraceae",
+      "merged_into_2026_07_01": 32033,
+      "in_tarball_merged": 32033
+    },
+    {
+      "taxid": 76,
+      "name": "Caulobacter vibrioides",
+      "merged_into_2026_07_01": 155892,
+      "in_tarball_merged": 155892
+    },
+    {
+      "taxid": 77,
+      "name": "Brevundimonas bacteroides",
+      "merged_into_2026_07_01": 74311,
+      "in_tarball_merged": 74311
+    }
+  ]
+}

@@ -1,11 +1,48 @@
 # Manuscript corrections pending — TaxEmbed objective-integrity review
 
 **Purpose.** One accumulator for every manuscript change the objective-integrity work implies, so the
-draft is edited **once**, in a single pass, rather than piecemeal across sessions. Nothing here has
-been applied to `manuscript.v3_draft.md` yet.
+draft is edited **once**, in a single pass, rather than piecemeal across sessions.
 
-**Target file:** `manuscript/manuscript.v3_draft.md` (SpeciesEmbedding repo, `main`).
-**Rebuild after applying:** `SRC=<abs>/manuscript.v3_draft.md bash scripts/build.sh docx`
+## STATUS 2026-09-30 — C1–C12 APPLIED in `manuscript/manuscript.v5_draft.md`; C13 and C14 added below
+
+The live draft is `manuscript/manuscript.v5_draft.md` in the SpeciesEmbedding repo (v3 and v4 kept,
+untouched). Every entry below is applied there in its "final form only" wording, or resolved as noted:
+
+| entry | state in v5 |
+|---|---|
+| C1 sampler | Methods "Objective and parametrization": depth-matched draw, missing guard, 47.4 %, 14.1 % empty pools, guarded retrain did not converge |
+| C2 seeding | Methods "The recipe": CPU-exact, GPU near-reproducible, released artifact predates seeding |
+| C3 init floor | Results §2 + Table 1: depth-norm printed beside its initialization value (+0.957 / +0.957) |
+| C4 radial-only null | not quoted anywhere; the null is the initialization state (−0.004 cellular) |
+| C5 bridge below majority | bridge section deleted; logged as the CLEAN follow-up quest |
+| C6 v-PuNNs prior art | cited in the Introduction |
+| C7 kNN purity confounded | per-rank purity/separation demoted to Supplementary Table S1 as descriptive, with the caveat |
+| C8 / P2 vacuous | held-out link prediction not reported; no generalisation claim in the paper |
+| C9 placeholders | Methods "Data": 91,942 rows (8.3 %), one denominator; masking moves S_angle by +0.0002 |
+| C10 P3 withdrawn | nothing about P3 in the paper |
+| C11 Metazoa vs cellular | 0.973 is labelled Metazoa (Table 1, Results §1); the released model's 0.965 is the headline |
+| C12 TimeTree | Results §4 with all three qualifications; no relatedness claim |
+
+**C13 (2026-09-30) — 76,766 rows (7.0 %) are SUPERSEDED taxids carried as leaves beside their
+replacement.** The v4 sentence "prunes stale or merged taxids" was false; v5 Methods "Data" discloses
+the composition (1,025,397 current taxids; aliases share their replacement's parent; alias→replacement
+cosine 0.998 = alias→random sibling). Evidence: `results/closure_taxid_drift_20260930.json`
+(`helpers/_closure_taxid_drift_20260930.py`). Also on the HF model card.
+
+**C14 (2026-09-30) — the Euclidean-vs-hyperbolic dimension sweep EXISTS** (the 2026-09-30 assessment
+said it did not; it had searched only this submodule):
+`SpeciesEmbedding/projects/tax_disentangle/results/app_hyperbolic_necessity_20260725.json`
+(Echinodermata, bare objective, d = 2–100). In v5 as Supplementary Table S3 + one Discussion sentence.
+The open experiment is the same curve under the full recipe at ≥10^5 taxa.
+
+**Owed numbers now recorded** on the training closure, one denominator:
+`results/owed_numbers_20260930.json` (per-domain rows, edges, depths, query cost).
+
+*(The section below is the historical accumulator; "Target file" and "Rebuild" lines refer to v3 and
+are superseded by `manuscript/manuscript.v5_NOTES.md`.)*
+
+**Target file (historical):** `manuscript/manuscript.v3_draft.md` (SpeciesEmbedding repo, `main`).
+**Rebuild after applying (historical):** `SRC=<abs>/manuscript.v3_draft.md bash scripts/build.sh docx`
 (⚠ `build.sh` defaults to the older `manuscript.md` — the SRC override is required).
 
 **House style that applies to every edit below** — zero em dashes · strengths lead, one clean
